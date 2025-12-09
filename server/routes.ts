@@ -5,6 +5,9 @@ import { setupAuth, isAuthenticated } from "./replitAuth";
 import OpenAI from "openai";
 import { z } from "zod";
 import { getExternalJobs } from "./externalJobs";
+import { getUncachableStripeClient, getStripePublishableKey } from "./stripeClient";
+import { sql } from "drizzle-orm";
+import { db } from "./db";
 import { 
   generateResumeRequestSchema, 
   generateInterviewQuestionsRequestSchema,

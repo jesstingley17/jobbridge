@@ -1,7 +1,7 @@
 import { getUncachableStripeClient } from '../server/stripeClient';
 
 async function createSubscriptionProducts() {
-  const stripe = await getUncachableStripeClient();
+  const stripe = getUncachableStripeClient();
 
   console.log('Creating subscription products in Stripe...');
 
