@@ -93,10 +93,10 @@ export default function Pricing() {
     },
   });
 
-  const sortedProducts = products?.sort((a, b) => {
+  const sortedProducts = Array.isArray(products) ? [...products].sort((a, b) => {
     const tierOrder: Record<string, number> = { free: 0, pro: 1, enterprise: 2 };
     return (tierOrder[getTierFromName(a.name)] || 0) - (tierOrder[getTierFromName(b.name)] || 0);
-  });
+  }) : [];
 
   const handleSubscribe = (product: StripeProduct) => {
     if (!isAuthenticated) {
