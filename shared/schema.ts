@@ -252,3 +252,51 @@ export const generateCoverLetterRequestSchema = z.object({
   resumeContent: z.string().optional(),
 });
 export type GenerateCoverLetterRequest = z.infer<typeof generateCoverLetterRequestSchema>;
+
+// AI Feature Request Schemas
+export const jobRecommendationsRequestSchema = z.object({
+  skills: z.array(z.string()).optional(),
+  preferredJobTypes: z.array(z.string()).optional(),
+  preferredLocations: z.array(z.string()).optional(),
+});
+export type JobRecommendationsRequest = z.infer<typeof jobRecommendationsRequestSchema>;
+
+export const simplifyJobRequestSchema = z.object({
+  jobTitle: z.string(),
+  description: z.string(),
+  requirements: z.string(),
+});
+export type SimplifyJobRequest = z.infer<typeof simplifyJobRequestSchema>;
+
+export const skillsGapRequestSchema = z.object({
+  currentSkills: z.array(z.string()),
+  targetRole: z.string(),
+  jobDescription: z.string().optional(),
+});
+export type SkillsGapRequest = z.infer<typeof skillsGapRequestSchema>;
+
+export const chatAssistantRequestSchema = z.object({
+  message: z.string(),
+  conversationHistory: z.array(z.object({
+    role: z.enum(["user", "assistant"]),
+    content: z.string(),
+  })).optional(),
+});
+export type ChatAssistantRequest = z.infer<typeof chatAssistantRequestSchema>;
+
+export const applicationTipsRequestSchema = z.object({
+  jobTitle: z.string(),
+  company: z.string(),
+  jobDescription: z.string(),
+  userSkills: z.array(z.string()).optional(),
+});
+export type ApplicationTipsRequest = z.infer<typeof applicationTipsRequestSchema>;
+
+export const jobMatchScoreRequestSchema = z.object({
+  jobTitle: z.string(),
+  jobDescription: z.string(),
+  jobRequirements: z.string(),
+  userSkills: z.array(z.string()),
+  userExperience: z.string().optional(),
+});
+export type JobMatchScoreRequest = z.infer<typeof jobMatchScoreRequestSchema>;

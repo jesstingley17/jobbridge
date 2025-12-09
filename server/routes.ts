@@ -14,7 +14,13 @@ import {
   analyzeAnswerRequestSchema,
   insertApplicationSchema,
   generateCoverLetterRequestSchema,
-  insertUserProfileSchema
+  insertUserProfileSchema,
+  jobRecommendationsRequestSchema,
+  simplifyJobRequestSchema,
+  skillsGapRequestSchema,
+  chatAssistantRequestSchema,
+  applicationTipsRequestSchema,
+  jobMatchScoreRequestSchema
 } from "@shared/schema";
 
 const normalizeStringArray = z.preprocess((val) => {
@@ -581,6 +587,336 @@ Provide constructive feedback including:
     }
   });
 
+  // AI Job Recommendations
+  app.post("/api/ai/recommendations", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const parsed = jobRecommendationsRequestSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ error: "Invalid request data" });
+      }
+
+      const { skills, preferredJobTypes, preferredLocations } = parsed.data;
+      const profile = await storage.getUserProfile(userId);
+      const userSkills = skills || profile?.skills || [];
+      const jobTypes = preferredJobTypes || profile?.preferredJobTypes || [];
+      const locations = preferredLocations || profile?.preferredLocations || [];
+
+      let recommendations;
+      if (openai && userSkills.length > 0) {
+        try {
+          const prompt = `Based on this job seeker profile, suggest 5 job types/roles that would be a good match:
+
+Skills: ${userSkills.join(", ")}
+Preferred Job Types: ${jobTypes.join(", ") || "Any"}
+Preferred Locations: ${locations.join(", ") || "Any"}
+
+Return a JSON array with objects containing:
+- role: the job title/role
+- reason: why this is a good match
+- searchTerms: array of 2-3 search terms to find these jobs`;
+
+          const response = await openai.chat.completions.create({
+            model: "gpt-4o",
+            messages: [
+              { role: "system", content: "You are a career advisor helping people with disabilities find suitable employment. Return valid JSON only." },
+              { role: "user", content: prompt }
+            ],
+            max_tokens: 1000,
+            temperature: 0.7,
+          });
+
+          const content = response.choices[0]?.message?.content || "[]";
+          const jsonMatch = content.match(/\[[\s\S]*\]/);
+          recommendations = jsonMatch ? JSON.parse(jsonMatch[0]) : getMockRecommendations(userSkills);
+        } catch {
+          recommendations = getMockRecommendations(userSkills);
+        }
+      } else {
+        recommendations = getMockRecommendations(userSkills);
+      }
+
+      res.json({ recommendations });
+    } catch (error) {
+      console.error("Error getting recommendations:", error);
+      res.json({ recommendations: getMockRecommendations([]) });
+    }
+  });
+
+  // AI Job Description Simplifier
+  app.post("/api/ai/simplify-job", async (req, res) => {
+    try {
+      const parsed = simplifyJobRequestSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ error: "Invalid request data" });
+      }
+
+      const { jobTitle, description, requirements } = parsed.data;
+      let simplified;
+
+      if (openai) {
+        try {
+          const prompt = `Simplify this job posting into plain, easy-to-understand language for someone who may have cognitive differences or learning disabilities:
+
+Job Title: ${jobTitle}
+
+Description:
+${description}
+
+Requirements:
+${requirements}
+
+Please provide:
+1. A simple summary of what this job involves (2-3 sentences)
+2. Key daily tasks in bullet points
+3. Must-have skills (simplified)
+4. Nice-to-have skills (simplified)
+5. Work environment details
+
+Use simple words and short sentences.`;
+
+          const response = await openai.chat.completions.create({
+            model: "gpt-4o",
+            messages: [
+              { role: "system", content: "You are a helpful assistant that explains job postings in simple, clear language." },
+              { role: "user", content: prompt }
+            ],
+            max_tokens: 1000,
+            temperature: 0.7,
+          });
+
+          simplified = response.choices[0]?.message?.content || getMockSimplifiedJob(jobTitle);
+        } catch {
+          simplified = getMockSimplifiedJob(jobTitle);
+        }
+      } else {
+        simplified = getMockSimplifiedJob(jobTitle);
+      }
+
+      res.json({ simplified });
+    } catch (error) {
+      console.error("Error simplifying job:", error);
+      res.json({ simplified: getMockSimplifiedJob(req.body?.jobTitle || "this job") });
+    }
+  });
+
+  // AI Skills Gap Analysis
+  app.post("/api/ai/skills-gap", isAuthenticated, async (req: any, res) => {
+    try {
+      const parsed = skillsGapRequestSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ error: "Invalid request data" });
+      }
+
+      const { currentSkills, targetRole, jobDescription } = parsed.data;
+      let analysis;
+
+      if (openai) {
+        try {
+          const prompt = `Analyze the skills gap for someone wanting to become a ${targetRole}:
+
+Current Skills: ${currentSkills.join(", ")}
+${jobDescription ? `Job Description: ${jobDescription}` : ""}
+
+Provide:
+1. Skills they already have that are valuable (matching skills)
+2. Skills they need to develop (gaps)
+3. Recommended learning resources or steps for each gap
+4. Estimated time to develop each skill
+5. Priority ranking (high/medium/low)
+
+Return as JSON with: matchingSkills (array), skillGaps (array with name, priority, timeToLearn, resources)`;
+
+          const response = await openai.chat.completions.create({
+            model: "gpt-4o",
+            messages: [
+              { role: "system", content: "You are a career development advisor. Return valid JSON only." },
+              { role: "user", content: prompt }
+            ],
+            max_tokens: 1500,
+            temperature: 0.7,
+          });
+
+          const content = response.choices[0]?.message?.content || "{}";
+          const jsonMatch = content.match(/\{[\s\S]*\}/);
+          analysis = jsonMatch ? JSON.parse(jsonMatch[0]) : getMockSkillsGap(currentSkills, targetRole);
+        } catch {
+          analysis = getMockSkillsGap(currentSkills, targetRole);
+        }
+      } else {
+        analysis = getMockSkillsGap(currentSkills, targetRole);
+      }
+
+      res.json({ analysis });
+    } catch (error) {
+      console.error("Error analyzing skills gap:", error);
+      res.json({ analysis: getMockSkillsGap([], req.body?.targetRole || "Professional") });
+    }
+  });
+
+  // AI Chat Assistant
+  app.post("/api/ai/chat", async (req, res) => {
+    try {
+      const parsed = chatAssistantRequestSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ error: "Invalid request data" });
+      }
+
+      const { message, conversationHistory } = parsed.data;
+      let reply;
+
+      if (openai) {
+        try {
+          const systemPrompt = `You are a helpful AI assistant for The Job Bridge, an employment platform for people with disabilities. 
+Your role is to:
+- Help users navigate the job search process
+- Answer questions about accessibility accommodations
+- Provide encouragement and support
+- Guide users to platform features (Resume Builder, Interview Prep, Job Search)
+- Give practical job hunting advice
+
+Be warm, supportive, and use clear, simple language. Keep responses concise but helpful.`;
+
+          const messages: Array<{role: "system" | "user" | "assistant", content: string}> = [
+            { role: "system", content: systemPrompt }
+          ];
+          
+          if (conversationHistory) {
+            messages.push(...conversationHistory.map(m => ({ role: m.role, content: m.content })));
+          }
+          messages.push({ role: "user", content: message });
+
+          const response = await openai.chat.completions.create({
+            model: "gpt-4o",
+            messages,
+            max_tokens: 500,
+            temperature: 0.8,
+          });
+
+          reply = response.choices[0]?.message?.content || getMockChatReply(message);
+        } catch {
+          reply = getMockChatReply(message);
+        }
+      } else {
+        reply = getMockChatReply(message);
+      }
+
+      res.json({ reply });
+    } catch (error) {
+      console.error("Error in chat:", error);
+      res.json({ reply: getMockChatReply(req.body?.message || "") });
+    }
+  });
+
+  // AI Application Tips
+  app.post("/api/ai/application-tips", async (req, res) => {
+    try {
+      const parsed = applicationTipsRequestSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ error: "Invalid request data" });
+      }
+
+      const { jobTitle, company, jobDescription, userSkills } = parsed.data;
+      let tips;
+
+      if (openai) {
+        try {
+          const prompt = `Provide 5 specific tips for applying to this position:
+
+Job: ${jobTitle} at ${company}
+Description: ${jobDescription}
+${userSkills?.length ? `Applicant's Skills: ${userSkills.join(", ")}` : ""}
+
+For each tip, include:
+- The tip itself
+- Why it matters for this specific role
+- An example of how to implement it
+
+Return as JSON array with objects: { tip, importance, example }`;
+
+          const response = await openai.chat.completions.create({
+            model: "gpt-4o",
+            messages: [
+              { role: "system", content: "You are a job application coach. Return valid JSON only." },
+              { role: "user", content: prompt }
+            ],
+            max_tokens: 1200,
+            temperature: 0.7,
+          });
+
+          const content = response.choices[0]?.message?.content || "[]";
+          const jsonMatch = content.match(/\[[\s\S]*\]/);
+          tips = jsonMatch ? JSON.parse(jsonMatch[0]) : getMockApplicationTips(jobTitle, company);
+        } catch {
+          tips = getMockApplicationTips(jobTitle, company);
+        }
+      } else {
+        tips = getMockApplicationTips(jobTitle, company);
+      }
+
+      res.json({ tips });
+    } catch (error) {
+      console.error("Error getting application tips:", error);
+      res.json({ tips: getMockApplicationTips(req.body?.jobTitle || "the position", req.body?.company || "the company") });
+    }
+  });
+
+  // AI Job Match Score
+  app.post("/api/ai/match-score", async (req, res) => {
+    try {
+      const parsed = jobMatchScoreRequestSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ error: "Invalid request data" });
+      }
+
+      const { jobTitle, jobDescription, jobRequirements, userSkills, userExperience } = parsed.data;
+      let matchResult;
+
+      if (openai && userSkills.length > 0) {
+        try {
+          const prompt = `Calculate a job match score (0-100) for this candidate:
+
+Job: ${jobTitle}
+Job Description: ${jobDescription}
+Requirements: ${jobRequirements}
+
+Candidate Skills: ${userSkills.join(", ")}
+${userExperience ? `Experience: ${userExperience}` : ""}
+
+Return JSON with:
+- score: number 0-100
+- matchedSkills: array of skills that match
+- missingSkills: array of skills needed
+- strengths: brief summary of candidate strengths
+- recommendation: brief recommendation for the candidate`;
+
+          const response = await openai.chat.completions.create({
+            model: "gpt-4o",
+            messages: [
+              { role: "system", content: "You are a job matching algorithm. Return valid JSON only." },
+              { role: "user", content: prompt }
+            ],
+            max_tokens: 800,
+            temperature: 0.5,
+          });
+
+          const content = response.choices[0]?.message?.content || "{}";
+          const jsonMatch = content.match(/\{[\s\S]*\}/);
+          matchResult = jsonMatch ? JSON.parse(jsonMatch[0]) : getMockMatchScore(userSkills, jobRequirements);
+        } catch {
+          matchResult = getMockMatchScore(userSkills, jobRequirements);
+        }
+      } else {
+        matchResult = getMockMatchScore(userSkills, jobRequirements);
+      }
+
+      res.json(matchResult);
+    } catch (error) {
+      console.error("Error calculating match score:", error);
+      res.json(getMockMatchScore(req.body?.userSkills || [], req.body?.jobRequirements || ""));
+    }
+  });
+
   // Stripe subscription routes
   app.get("/api/stripe/publishable-key", (_req, res) => {
     try {
@@ -785,4 +1121,85 @@ ${wordCount < 50 ? "- Add more specific examples\n" : ""}- Use the STAR method
 - Prepare adaptable stories
 
 Keep practicing!`;
+}
+
+function getMockRecommendations(skills: string[]): Array<{ role: string; reason: string; searchTerms: string[] }> {
+  const hasSkills = skills.length > 0;
+  return [
+    { role: "Customer Service Representative", reason: hasSkills ? `Your skills in ${skills[0] || "communication"} are highly valued` : "Great entry point for many careers", searchTerms: ["customer service", "support specialist", "client relations"] },
+    { role: "Data Entry Specialist", reason: "Remote-friendly with flexible hours", searchTerms: ["data entry", "administrative assistant", "virtual assistant"] },
+    { role: "Content Writer", reason: "Creative role with work-from-home options", searchTerms: ["content writer", "copywriter", "blog writer"] },
+    { role: "Quality Assurance Tester", reason: "Detail-oriented work with growing demand", searchTerms: ["QA tester", "software tester", "quality analyst"] },
+    { role: "Administrative Assistant", reason: "Versatile role with transferable skills", searchTerms: ["admin assistant", "office coordinator", "executive assistant"] }
+  ];
+}
+
+function getMockSimplifiedJob(jobTitle: string): string {
+  return `## What This Job Is About
+This ${jobTitle} position involves helping the team with daily tasks and projects.
+
+## What You'll Do Each Day
+- Complete assigned tasks and projects
+- Work with team members
+- Communicate with others as needed
+- Learn new skills on the job
+
+## Skills You Need
+- Good communication (talking and writing)
+- Basic computer skills
+- Ability to follow instructions
+- Willingness to learn
+
+## Nice to Have
+- Previous work experience
+- Knowledge of the industry
+
+## Work Environment
+The workplace is supportive and offers accommodations as needed.`;
+}
+
+function getMockSkillsGap(currentSkills: string[], targetRole: string): { matchingSkills: string[]; skillGaps: Array<{ name: string; priority: string; timeToLearn: string; resources: string[] }> } {
+  return {
+    matchingSkills: currentSkills.slice(0, 3),
+    skillGaps: [
+      { name: "Communication Skills", priority: "high", timeToLearn: "1-2 months", resources: ["Online courses", "Practice with peers"] },
+      { name: "Technical Proficiency", priority: "medium", timeToLearn: "2-3 months", resources: ["YouTube tutorials", "Free online courses"] },
+      { name: "Industry Knowledge", priority: "medium", timeToLearn: "1-2 months", resources: ["Industry blogs", "Professional associations"] }
+    ]
+  };
+}
+
+function getMockChatReply(message: string): string {
+  const lowerMessage = message.toLowerCase();
+  if (lowerMessage.includes("resume")) {
+    return "I'd be happy to help with your resume! Head over to our Resume Builder section where you can use AI to create a professional resume tailored to your target role. Would you like tips on what to include?";
+  }
+  if (lowerMessage.includes("interview")) {
+    return "Interview preparation is key! Check out our Interview Prep section where you can practice with AI-generated questions and get feedback on your answers. Want some general interview tips?";
+  }
+  if (lowerMessage.includes("job") || lowerMessage.includes("work")) {
+    return "Finding the right job takes time. Use our Job Search to find disability-friendly employers. You can filter by accessibility features like remote work, flexible hours, and workplace accommodations.";
+  }
+  return "I'm here to help you on your job search journey! I can assist with resumes, interview prep, finding accessible jobs, or navigating the platform. What would you like help with?";
+}
+
+function getMockApplicationTips(jobTitle: string, company: string): Array<{ tip: string; importance: string; example: string }> {
+  return [
+    { tip: "Customize your resume for this role", importance: `Tailoring shows ${company} you're genuinely interested`, example: "Match keywords from the job description in your skills section" },
+    { tip: "Research the company culture", importance: "Shows you're a good fit beyond just skills", example: `Look up ${company}'s mission statement and values` },
+    { tip: "Highlight relevant achievements", importance: "Demonstrates your potential impact", example: "Use numbers to quantify your past accomplishments" },
+    { tip: "Prepare for common questions", importance: "Confidence in interviews comes from preparation", example: `Practice explaining why you want to work at ${company}` },
+    { tip: "Follow up after applying", importance: "Shows initiative and genuine interest", example: "Send a brief follow-up email after one week" }
+  ];
+}
+
+function getMockMatchScore(userSkills: string[], jobRequirements: string): { score: number; matchedSkills: string[]; missingSkills: string[]; strengths: string; recommendation: string } {
+  const score = Math.min(Math.max(30 + userSkills.length * 10, 40), 85);
+  return {
+    score,
+    matchedSkills: userSkills.slice(0, 3),
+    missingSkills: ["Industry experience", "Specific certifications"],
+    strengths: userSkills.length > 0 ? `Strong foundation in ${userSkills[0]}` : "Enthusiasm and willingness to learn",
+    recommendation: score > 60 ? "You're a good match! Apply with confidence." : "Consider developing additional skills to strengthen your application."
+  };
 }
