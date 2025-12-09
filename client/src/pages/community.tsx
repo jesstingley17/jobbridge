@@ -1,0 +1,258 @@
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Textarea } from "@/components/ui/textarea";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { apiRequest } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
+import { Users, UserPlus, MessageCircle, Star, Loader2, Briefcase, Code } from "lucide-react";
+import { useState } from "react";
+import type { User } from "@shared/schema";
+
+type MentorWithUser = {
+  id: string;
+  userId: string;
+  expertise: string[] | null;
+  bio: string | null;
+  availability: string | null;
+  isActive: boolean | null;
+  user: User;
+};
+
+export default function Community() {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [connectMessage, setConnectMessage] = useState("");
+  const [selectedMentor, setSelectedMentor] = useState<MentorWithUser | null>(null);
+
+  const { data: currentUser } = useQuery<User>({
+    queryKey: ["/api/auth/user"],
+  });
+
+  const { data: mentors, isLoading: mentorsLoading } = useQuery<MentorWithUser[]>({
+    queryKey: ["/api/mentors"],
+  });
+
+  const connectMutation = useMutation({
+    mutationFn: async ({ mentorId, message }: { mentorId: string; message: string }) => {
+      const response = await apiRequest("POST", "/api/mentors/connect", { mentorId, message });
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Connection request sent!", description: "The mentor will review your request." });
+      setSelectedMentor(null);
+      setConnectMessage("");
+      queryClient.invalidateQueries({ queryKey: ["/api/mentors"] });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to send connection request", variant: "destructive" });
+    },
+  });
+
+  const getRoleIcon = (role: string | null) => {
+    switch (role) {
+      case "employer": return <Briefcase className="w-4 h-4" />;
+      case "developer": return <Code className="w-4 h-4" />;
+      default: return <Users className="w-4 h-4" />;
+    }
+  };
+
+  const getRoleBadgeVariant = (role: string | null) => {
+    switch (role) {
+      case "employer": return "secondary";
+      case "developer": return "outline";
+      default: return "default";
+    }
+  };
+
+  if (!currentUser) {
+    return (
+      <div className="container mx-auto px-4 py-16 text-center">
+        <h1 className="text-2xl font-bold mb-4">Please log in to access the community</h1>
+        <Button asChild>
+          <a href="/api/login" data-testid="link-login-community">Log In</a>
+        </Button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="container mx-auto px-4 py-8">
+      <div className="mb-8">
+        <h1 className="text-3xl font-bold mb-2">Community</h1>
+        <p className="text-muted-foreground">
+          Connect with mentors, peers, and employers in our inclusive community
+        </p>
+      </div>
+
+      <Tabs defaultValue="mentors" className="space-y-6">
+        <TabsList>
+          <TabsTrigger value="mentors" data-testid="tab-mentors">
+            <Star className="w-4 h-4 mr-2" />
+            Mentors
+          </TabsTrigger>
+          <TabsTrigger value="connect" data-testid="tab-connect">
+            <UserPlus className="w-4 h-4 mr-2" />
+            Find Connections
+          </TabsTrigger>
+          <TabsTrigger value="messages" data-testid="tab-messages">
+            <MessageCircle className="w-4 h-4 mr-2" />
+            Messages
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="mentors" className="space-y-6">
+          <div className="flex items-center justify-between gap-4 flex-wrap">
+            <h2 className="text-xl font-semibold">Available Mentors</h2>
+            <Badge variant="outline">{mentors?.length || 0} mentors available</Badge>
+          </div>
+
+          {mentorsLoading ? (
+            <div className="flex justify-center py-12">
+              <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+            </div>
+          ) : mentors && mentors.length > 0 ? (
+            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+              {mentors.map((mentor) => (
+                <Card key={mentor.id} data-testid={`card-mentor-${mentor.id}`}>
+                  <CardHeader>
+                    <div className="flex items-start gap-4">
+                      <Avatar className="w-12 h-12">
+                        <AvatarImage src={mentor.user.profileImageUrl || undefined} />
+                        <AvatarFallback>
+                          {mentor.user.firstName?.[0]}{mentor.user.lastName?.[0]}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="flex-1 min-w-0">
+                        <CardTitle className="text-lg">
+                          {mentor.user.firstName} {mentor.user.lastName}
+                        </CardTitle>
+                        <CardDescription>{mentor.availability}</CardDescription>
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    {mentor.bio && (
+                      <p className="text-sm text-muted-foreground line-clamp-3">{mentor.bio}</p>
+                    )}
+                    {mentor.expertise && mentor.expertise.length > 0 && (
+                      <div className="flex flex-wrap gap-1">
+                        {mentor.expertise.slice(0, 4).map((skill) => (
+                          <Badge key={skill} variant="secondary" className="text-xs">
+                            {skill}
+                          </Badge>
+                        ))}
+                        {mentor.expertise.length > 4 && (
+                          <Badge variant="outline" className="text-xs">
+                            +{mentor.expertise.length - 4}
+                          </Badge>
+                        )}
+                      </div>
+                    )}
+                    <Dialog>
+                      <DialogTrigger asChild>
+                        <Button 
+                          className="w-full" 
+                          onClick={() => setSelectedMentor(mentor)}
+                          data-testid={`button-connect-mentor-${mentor.id}`}
+                        >
+                          <UserPlus className="w-4 h-4 mr-2" />
+                          Connect
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent>
+                        <DialogHeader>
+                          <DialogTitle>Connect with {mentor.user.firstName}</DialogTitle>
+                          <DialogDescription>
+                            Send a message introducing yourself and why you'd like to connect
+                          </DialogDescription>
+                        </DialogHeader>
+                        <div className="space-y-4 py-4">
+                          <Textarea
+                            placeholder="Hi! I'd love to learn from your experience..."
+                            value={connectMessage}
+                            onChange={(e) => setConnectMessage(e.target.value)}
+                            className="min-h-[120px]"
+                            data-testid="textarea-connect-message"
+                          />
+                          <Button 
+                            className="w-full"
+                            disabled={connectMutation.isPending}
+                            onClick={() => {
+                              if (selectedMentor) {
+                                connectMutation.mutate({ 
+                                  mentorId: selectedMentor.id, 
+                                  message: connectMessage 
+                                });
+                              }
+                            }}
+                            data-testid="button-send-connection"
+                          >
+                            {connectMutation.isPending ? (
+                              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                            ) : (
+                              <MessageCircle className="w-4 h-4 mr-2" />
+                            )}
+                            Send Request
+                          </Button>
+                        </div>
+                      </DialogContent>
+                    </Dialog>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          ) : (
+            <Card>
+              <CardContent className="py-12 text-center">
+                <Users className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
+                <h3 className="font-semibold mb-2">No mentors available yet</h3>
+                <p className="text-muted-foreground">
+                  Check back soon for mentorship opportunities
+                </p>
+              </CardContent>
+            </Card>
+          )}
+        </TabsContent>
+
+        <TabsContent value="connect" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Find Connections</CardTitle>
+              <CardDescription>
+                Connect with other job seekers, employers, and partners in the community
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="text-center py-8">
+              <Users className="w-16 h-16 mx-auto text-muted-foreground mb-4" />
+              <p className="text-muted-foreground mb-4">
+                Peer networking features coming soon
+              </p>
+              <Badge variant="outline">Feature in development</Badge>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="messages" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Messages</CardTitle>
+              <CardDescription>
+                Your conversations with mentors and connections
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="text-center py-8">
+              <MessageCircle className="w-16 h-16 mx-auto text-muted-foreground mb-4" />
+              <p className="text-muted-foreground mb-4">
+                No messages yet. Connect with a mentor to start a conversation.
+              </p>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
+    </div>
+  );
+}

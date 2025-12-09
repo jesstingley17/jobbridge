@@ -21,12 +21,16 @@ export const users = pgTable("users", {
   firstName: varchar("first_name"),
   lastName: varchar("last_name"),
   profileImageUrl: varchar("profile_image_url"),
+  role: varchar("role"), // developer, participant, employer
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
 export type UpsertUser = typeof users.$inferInsert;
 export type User = typeof users.$inferSelect;
+
+export const userRoles = ["developer", "participant", "employer"] as const;
+export type UserRole = typeof userRoles[number];
 
 // User profile with Career DNA assessment
 export const userProfiles = pgTable("user_profiles", {

@@ -10,7 +10,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Menu, X, Briefcase, FileText, MessageSquare, LayoutDashboard, Sparkles, User, LogOut, Dna, ClipboardList } from "lucide-react";
+import { Menu, X, Briefcase, FileText, MessageSquare, LayoutDashboard, Sparkles, User, LogOut, Dna, ClipboardList, Users } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 
 const navItems = [
@@ -19,6 +19,7 @@ const navItems = [
   { href: "/jobs", label: "Find Jobs", icon: Briefcase },
   { href: "/resume", label: "Resume Builder", icon: FileText },
   { href: "/interview", label: "Interview Prep", icon: MessageSquare },
+  { href: "/community", label: "Community", icon: Users },
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
 ];
 

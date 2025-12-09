@@ -20,6 +20,8 @@ export interface IStorage {
   // User operations (required for Replit Auth)
   getUser(id: string): Promise<User | undefined>;
   upsertUser(user: UpsertUser): Promise<User>;
+  updateUserRole(id: string, role: string): Promise<User | undefined>;
+  getCommunityMembers(): Promise<User[]>;
   
   // User profile operations
   getUserProfile(userId: string): Promise<UserProfile | undefined>;
@@ -99,6 +101,19 @@ export class DatabaseStorage implements IStorage {
       })
       .returning();
     return user;
+  }
+
+  async updateUserRole(id: string, role: string): Promise<User | undefined> {
+    const [user] = await db
+      .update(users)
+      .set({ role, updatedAt: new Date() })
+      .where(eq(users.id, id))
+      .returning();
+    return user;
+  }
+
+  async getCommunityMembers(): Promise<User[]> {
+    return db.select().from(users).where(sql`${users.role} IS NOT NULL`);
   }
 
   // User profile operations
@@ -550,6 +565,85 @@ export class DatabaseStorage implements IStorage {
 
     for (const dim of dimensions) {
       await db.insert(careerDimensions).values(dim);
+    }
+
+    // Seed sample mentors
+    const sampleMentorUsers = [
+      {
+        id: "mentor-user-1",
+        email: "sarah.chen@example.com",
+        firstName: "Sarah",
+        lastName: "Chen",
+        role: "developer",
+        profileImageUrl: null,
+      },
+      {
+        id: "mentor-user-2",
+        email: "marcus.johnson@example.com",
+        firstName: "Marcus",
+        lastName: "Johnson",
+        role: "employer",
+        profileImageUrl: null,
+      },
+      {
+        id: "mentor-user-3",
+        email: "elena.rodriguez@example.com",
+        firstName: "Elena",
+        lastName: "Rodriguez",
+        role: "developer",
+        profileImageUrl: null,
+      },
+      {
+        id: "mentor-user-4",
+        email: "james.williams@example.com",
+        firstName: "James",
+        lastName: "Williams",
+        role: "employer",
+        profileImageUrl: null,
+      },
+    ];
+
+    for (const user of sampleMentorUsers) {
+      await db.insert(users).values(user).onConflictDoNothing();
+    }
+
+    const sampleMentors = [
+      {
+        userId: "mentor-user-1",
+        expertise: ["Software Development", "Web Accessibility", "Career Transitions", "Technical Interviews"],
+        bio: "Senior software engineer with 10+ years of experience. I specialize in helping people with disabilities break into tech. Previously worked at Google and Microsoft.",
+        availability: "Weekday evenings, 5-8 PM EST",
+        isActive: true,
+      },
+      {
+        userId: "mentor-user-2",
+        expertise: ["Hiring Practices", "Resume Review", "Workplace Accommodations", "HR Policies"],
+        bio: "HR Director with a passion for inclusive hiring. I help job seekers understand what employers are looking for and how to navigate accommodation requests.",
+        availability: "Tuesdays and Thursdays, 12-2 PM EST",
+        isActive: true,
+      },
+      {
+        userId: "mentor-user-3",
+        expertise: ["UX Design", "Assistive Technology", "Product Management", "Startup Culture"],
+        bio: "Product designer and accessibility advocate. I've built accessible products at multiple startups and love helping others find their path in design.",
+        availability: "Weekends, flexible hours",
+        isActive: true,
+      },
+      {
+        userId: "mentor-user-4",
+        expertise: ["Business Development", "Entrepreneurship", "Networking", "Public Speaking"],
+        bio: "Founder of an accessibility consulting firm. I mentor people interested in entrepreneurship and building inclusive businesses.",
+        availability: "Monday and Wednesday mornings, 9-11 AM EST",
+        isActive: true,
+      },
+    ];
+
+    // Check if mentors already exist
+    const existingMentors = await db.select().from(mentors).limit(1);
+    if (existingMentors.length === 0) {
+      for (const mentor of sampleMentors) {
+        await db.insert(mentors).values(mentor);
+      }
     }
   }
 }

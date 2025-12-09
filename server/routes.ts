@@ -78,6 +78,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Update user role
+  app.post('/api/auth/role', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { role } = req.body;
+      if (!["developer", "participant", "employer"].includes(role)) {
+        return res.status(400).json({ error: "Invalid role" });
+      }
+      const user = await storage.updateUserRole(userId, role);
+      res.json(user);
+    } catch (error) {
+      console.error("Error updating role:", error);
+      res.status(500).json({ error: "Failed to update role" });
+    }
+  });
+
   // User profile routes
   app.get('/api/profile', isAuthenticated, async (req: any, res) => {
     try {
@@ -316,10 +332,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const menteeUserId = req.user.claims.sub;
       const { mentorId, message } = req.body;
+      
+      if (!mentorId) {
+        return res.status(400).json({ error: "Mentor ID is required" });
+      }
+      
+      // Verify the mentor exists
+      const mentor = await storage.getMentor(mentorId);
+      if (!mentor) {
+        return res.status(404).json({ error: "Mentor not found" });
+      }
+      
       const connection = await storage.createMentorConnection(mentorId, menteeUserId, message);
       res.status(201).json(connection);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error creating connection:", error);
+      if (error.code === "23503") {
+        return res.status(400).json({ error: "Invalid mentor or user reference" });
+      }
       res.status(500).json({ error: "Failed to create connection" });
     }
   });
