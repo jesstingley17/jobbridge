@@ -76,7 +76,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   await setupAuth(app);
 
   // Seed initial data on startup
-  await storage.seedInitialData();
+  // Seed data removed - using real job search API
 
   // Auth routes
   app.get('/api/auth/user', isAuthenticated, async (req: any, res) => {
