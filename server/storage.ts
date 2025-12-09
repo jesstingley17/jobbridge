@@ -112,6 +112,15 @@ export class DatabaseStorage implements IStorage {
     return user;
   }
 
+  async updateUserStripeInfo(id: string, stripeInfo: { stripeCustomerId?: string; stripeSubscriptionId?: string; subscriptionTier?: string }): Promise<User | undefined> {
+    const [user] = await db
+      .update(users)
+      .set({ ...stripeInfo, updatedAt: new Date() })
+      .where(eq(users.id, id))
+      .returning();
+    return user;
+  }
+
   async getCommunityMembers(): Promise<User[]> {
     return db.select().from(users).where(sql`${users.role} IS NOT NULL`);
   }
