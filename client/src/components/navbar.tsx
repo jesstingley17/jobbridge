@@ -10,7 +10,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Menu, X, Briefcase, FileText, MessageSquare, LayoutDashboard, Sparkles, User, LogOut } from "lucide-react";
+import { Menu, X, Briefcase, FileText, MessageSquare, LayoutDashboard, Sparkles, User, LogOut, Dna } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 
 const navItems = [
@@ -91,6 +91,12 @@ export function Navbar() {
                         <Link href="/profile" className="flex items-center gap-2" data-testid="link-profile">
                           <User className="h-4 w-4" />
                           Profile
+                        </Link>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem asChild>
+                        <Link href="/career-dna" className="flex items-center gap-2" data-testid="link-career-dna">
+                          <Dna className="h-4 w-4" />
+                          Career DNA
                         </Link>
                       </DropdownMenuItem>
                       <DropdownMenuSeparator />

@@ -12,6 +12,7 @@ import Resume from "@/pages/resume";
 import Interview from "@/pages/interview";
 import Dashboard from "@/pages/dashboard";
 import Profile from "@/pages/profile";
+import CareerDNA from "@/pages/career-dna";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -24,6 +25,7 @@ function Router() {
       <Route path="/interview" component={Interview} />
       <Route path="/dashboard" component={Dashboard} />
       <Route path="/profile" component={Profile} />
+      <Route path="/career-dna" component={CareerDNA} />
       <Route component={NotFound} />
     </Switch>
   );
