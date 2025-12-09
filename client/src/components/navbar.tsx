@@ -2,7 +2,16 @@ import { useState } from "react";
 import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "./theme-toggle";
-import { Menu, X, Briefcase, FileText, MessageSquare, LayoutDashboard, Sparkles } from "lucide-react";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Menu, X, Briefcase, FileText, MessageSquare, LayoutDashboard, Sparkles, User, LogOut } from "lucide-react";
+import { useAuth } from "@/hooks/useAuth";
 
 const navItems = [
   { href: "/", label: "Home", icon: null },
@@ -16,6 +25,17 @@ const navItems = [
 export function Navbar() {
   const [isOpen, setIsOpen] = useState(false);
   const [location] = useLocation();
+  const { user, isLoading, isAuthenticated } = useAuth();
+
+  const handleLogout = () => {
+    window.location.href = "/api/logout";
+  };
+
+  const getInitials = (firstName?: string | null, lastName?: string | null) => {
+    const first = firstName?.charAt(0) || "";
+    const last = lastName?.charAt(0) || "";
+    return (first + last).toUpperCase() || "U";
+  };
 
   return (
     <>
@@ -53,6 +73,40 @@ export function Navbar() {
 
             <div className="flex items-center gap-2">
               <ThemeToggle />
+              
+              {!isLoading && (
+                isAuthenticated && user ? (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" className="gap-2" data-testid="button-user-menu">
+                        <Avatar className="h-7 w-7">
+                          <AvatarImage src={user.profileImageUrl || undefined} alt={`${user.firstName} ${user.lastName}`} />
+                          <AvatarFallback className="text-xs">{getInitials(user.firstName, user.lastName)}</AvatarFallback>
+                        </Avatar>
+                        <span className="hidden sm:inline">{user.firstName}</span>
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem asChild>
+                        <Link href="/profile" className="flex items-center gap-2" data-testid="link-profile">
+                          <User className="h-4 w-4" />
+                          Profile
+                        </Link>
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem onClick={handleLogout} data-testid="button-logout">
+                        <LogOut className="h-4 w-4 mr-2" />
+                        Log out
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                ) : (
+                  <Button asChild data-testid="button-login">
+                    <a href="/api/login">Log in</a>
+                  </Button>
+                )
+              )}
+              
               <Button
                 variant="ghost"
                 size="icon"

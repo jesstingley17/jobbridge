@@ -1,14 +1,48 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
+import { setupAuth, isAuthenticated } from "./replitAuth";
 import OpenAI from "openai";
 import { z } from "zod";
 import { 
   generateResumeRequestSchema, 
   generateInterviewQuestionsRequestSchema,
   analyzeAnswerRequestSchema,
-  insertApplicationSchema
+  insertApplicationSchema,
+  generateCoverLetterRequestSchema,
+  insertUserProfileSchema
 } from "@shared/schema";
+
+const normalizeStringArray = z.preprocess((val) => {
+  if (typeof val === 'string') {
+    return val.split(',').map(x => x.trim()).filter(Boolean);
+  }
+  if (Array.isArray(val)) {
+    return val.map(x => String(x).trim()).filter(Boolean);
+  }
+  return [];
+}, z.array(z.string()));
+
+const updateProfileSchema = z.object({
+  headline: z.string().optional(),
+  bio: z.string().optional(),
+  location: z.string().optional(),
+  phone: z.string().optional(),
+  linkedinUrl: z.string().optional(),
+  portfolioUrl: z.string().optional(),
+  skills: normalizeStringArray.optional(),
+  accessibilityNeeds: normalizeStringArray.optional(),
+  preferredJobTypes: normalizeStringArray.optional(),
+  preferredLocations: normalizeStringArray.optional(),
+  careerDnaCompleted: z.boolean().optional(),
+});
+
+const saveScoresSchema = z.object({
+  scores: z.array(z.object({
+    dimensionId: z.string().min(1),
+    score: z.number().min(0).max(100),
+  })).min(1, "At least one score is required"),
+});
 
 const hasOpenAI = !!(process.env.AI_INTEGRATIONS_OPENAI_BASE_URL && process.env.AI_INTEGRATIONS_OPENAI_API_KEY);
 
@@ -21,14 +55,102 @@ const validStatuses = ["applied", "interviewing", "offered", "rejected", "saved"
 const updateApplicationSchema = z.object({
   status: z.enum(validStatuses).optional(),
   notes: z.string().optional(),
+  coverLetter: z.string().optional(),
 });
 
-export async function registerRoutes(
-  httpServer: Server,
-  app: Express
-): Promise<Server> {
-  
-  // Jobs endpoints
+export async function registerRoutes(app: Express): Promise<Server> {
+  // Setup authentication
+  await setupAuth(app);
+
+  // Seed initial data on startup
+  await storage.seedInitialData();
+
+  // Auth routes
+  app.get('/api/auth/user', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      res.json(user);
+    } catch (error) {
+      console.error("Error fetching user:", error);
+      res.status(500).json({ message: "Failed to fetch user" });
+    }
+  });
+
+  // User profile routes
+  app.get('/api/profile', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const profile = await storage.getUserProfile(userId);
+      res.json(profile || null);
+    } catch (error) {
+      console.error("Error fetching profile:", error);
+      res.status(500).json({ error: "Failed to fetch profile" });
+    }
+  });
+
+  app.post('/api/profile', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const parsed = updateProfileSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ error: "Invalid profile data", details: parsed.error.errors });
+      }
+      
+      const existing = await storage.getUserProfile(userId);
+      if (existing) {
+        const updated = await storage.updateUserProfile(userId, parsed.data);
+        res.json(updated);
+      } else {
+        const profile = await storage.createUserProfile({ ...parsed.data, userId });
+        res.status(201).json(profile);
+      }
+    } catch (error) {
+      console.error("Error saving profile:", error);
+      res.status(500).json({ error: "Failed to save profile" });
+    }
+  });
+
+  // Career DNA routes
+  app.get('/api/career-dna/dimensions', async (_req, res) => {
+    try {
+      const dimensions = await storage.getCareerDimensions();
+      res.json(dimensions);
+    } catch (error) {
+      console.error("Error fetching dimensions:", error);
+      res.status(500).json({ error: "Failed to fetch career dimensions" });
+    }
+  });
+
+  app.get('/api/career-dna/scores', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const scores = await storage.getUserDimensionScores(userId);
+      res.json(scores);
+    } catch (error) {
+      console.error("Error fetching scores:", error);
+      res.status(500).json({ error: "Failed to fetch scores" });
+    }
+  });
+
+  app.post('/api/career-dna/scores', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const parsed = saveScoresSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ error: "Invalid scores data", details: parsed.error.errors });
+      }
+      
+      await storage.saveUserDimensionScores(userId, parsed.data.scores);
+      await storage.updateUserProfile(userId, { careerDnaCompleted: true });
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error saving scores:", error);
+      res.status(500).json({ error: "Failed to save scores" });
+    }
+  });
+
+  // Jobs endpoints (public)
   app.get("/api/jobs", async (req, res) => {
     try {
       const { query, type, location } = req.query;
@@ -57,10 +179,11 @@ export async function registerRoutes(
     }
   });
 
-  // Applications endpoints
-  app.get("/api/applications", async (_req, res) => {
+  // Applications endpoints (protected)
+  app.get("/api/applications", isAuthenticated, async (req: any, res) => {
     try {
-      const applications = await storage.getApplications();
+      const userId = req.user.claims.sub;
+      const applications = await storage.getApplications(userId);
       res.json(applications);
     } catch (error) {
       console.error("Error fetching applications:", error);
@@ -68,9 +191,10 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/applications", async (req, res) => {
+  app.post("/api/applications", isAuthenticated, async (req: any, res) => {
     try {
-      const parsed = insertApplicationSchema.safeParse(req.body);
+      const userId = req.user.claims.sub;
+      const parsed = insertApplicationSchema.safeParse({ ...req.body, userId });
       if (!parsed.success) {
         return res.status(400).json({ error: "Invalid application data", details: parsed.error });
       }
@@ -82,7 +206,7 @@ export async function registerRoutes(
     }
   });
 
-  app.patch("/api/applications/:id", async (req, res) => {
+  app.patch("/api/applications/:id", isAuthenticated, async (req: any, res) => {
     try {
       const { id } = req.params;
       const parsed = updateApplicationSchema.safeParse(req.body);
@@ -100,7 +224,7 @@ export async function registerRoutes(
     }
   });
 
-  app.delete("/api/applications/:id", async (req, res) => {
+  app.delete("/api/applications/:id", isAuthenticated, async (req: any, res) => {
     try {
       const deleted = await storage.deleteApplication(req.params.id);
       if (!deleted) {
@@ -113,16 +237,51 @@ export async function registerRoutes(
     }
   });
 
-  // AI-powered Resume Generation
-  app.post("/api/resume/generate", async (req, res) => {
+  // Analytics endpoints
+  app.get("/api/analytics/stats", isAuthenticated, async (req: any, res) => {
     try {
+      const userId = req.user.claims.sub;
+      const stats = await storage.getApplicationStats(userId);
+      res.json(stats);
+    } catch (error) {
+      console.error("Error fetching stats:", error);
+      res.status(500).json({ error: "Failed to fetch stats" });
+    }
+  });
+
+  // Mentor endpoints
+  app.get("/api/mentors", async (_req, res) => {
+    try {
+      const mentors = await storage.getMentors();
+      res.json(mentors);
+    } catch (error) {
+      console.error("Error fetching mentors:", error);
+      res.status(500).json({ error: "Failed to fetch mentors" });
+    }
+  });
+
+  app.post("/api/mentors/connect", isAuthenticated, async (req: any, res) => {
+    try {
+      const menteeUserId = req.user.claims.sub;
+      const { mentorId, message } = req.body;
+      const connection = await storage.createMentorConnection(mentorId, menteeUserId, message);
+      res.status(201).json(connection);
+    } catch (error) {
+      console.error("Error creating connection:", error);
+      res.status(500).json({ error: "Failed to create connection" });
+    }
+  });
+
+  // AI-powered Resume Generation
+  app.post("/api/resume/generate", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
       const parsed = generateResumeRequestSchema.safeParse(req.body);
       if (!parsed.success) {
         return res.status(400).json({ error: "Invalid request data", details: parsed.error });
       }
 
       const { experience, skills, education, targetRole } = parsed.data;
-
       let resumeContent: string;
 
       if (openai) {
@@ -151,10 +310,7 @@ Format the resume in a clean, professional markdown format.`;
         const response = await openai.chat.completions.create({
           model: "gpt-4o",
           messages: [
-            { 
-              role: "system", 
-              content: "You are an expert resume writer who creates accessible, ATS-friendly resumes. Focus on strengths, skills, and accomplishments." 
-            },
+            { role: "system", content: "You are an expert resume writer who creates accessible, ATS-friendly resumes." },
             { role: "user", content: prompt }
           ],
           max_tokens: 2000,
@@ -167,9 +323,9 @@ Format the resume in a clean, professional markdown format.`;
       }
 
       const resume = await storage.createResume({
+        userId,
         title: `Resume for ${targetRole}`,
         content: resumeContent,
-        createdAt: new Date().toISOString(),
       });
 
       res.json({ resume: resumeContent, id: resume.id });
@@ -181,16 +337,67 @@ Format the resume in a clean, professional markdown format.`;
     }
   });
 
-  // AI-powered Interview Question Generation
-  app.post("/api/interview/questions", async (req, res) => {
+  // AI-powered Cover Letter Generation
+  app.post("/api/cover-letter/generate", isAuthenticated, async (req: any, res) => {
     try {
+      const parsed = generateCoverLetterRequestSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ error: "Invalid request data", details: parsed.error });
+      }
+
+      const { jobTitle, company, jobDescription, resumeContent } = parsed.data;
+      let coverLetter: string;
+
+      if (openai) {
+        const prompt = `Write a professional cover letter for a ${jobTitle} position at ${company}.
+
+Job Description:
+${jobDescription}
+
+${resumeContent ? `Candidate's Resume:\n${resumeContent}` : ''}
+
+Create a compelling cover letter that:
+1. Opens with a strong hook
+2. Highlights relevant experience and skills
+3. Shows enthusiasm for the role and company
+4. Addresses how the candidate can contribute
+5. Closes with a clear call to action
+
+Keep it professional, concise (3-4 paragraphs), and personalized.`;
+
+        const response = await openai.chat.completions.create({
+          model: "gpt-4o",
+          messages: [
+            { role: "system", content: "You are an expert cover letter writer who creates personalized, compelling letters." },
+            { role: "user", content: prompt }
+          ],
+          max_tokens: 1000,
+          temperature: 0.7,
+        });
+
+        coverLetter = response.choices[0]?.message?.content || generateMockCoverLetter(jobTitle, company);
+      } else {
+        coverLetter = generateMockCoverLetter(jobTitle, company);
+      }
+
+      res.json({ coverLetter });
+    } catch (error) {
+      console.error("Error generating cover letter:", error);
+      const { jobTitle, company } = req.body;
+      res.json({ coverLetter: generateMockCoverLetter(jobTitle || "Position", company || "Company") });
+    }
+  });
+
+  // AI-powered Interview Question Generation
+  app.post("/api/interview/questions", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
       const parsed = generateInterviewQuestionsRequestSchema.safeParse(req.body);
       if (!parsed.success) {
         return res.status(400).json({ error: "Invalid request data", details: parsed.error });
       }
 
       const { jobTitle, jobDescription } = parsed.data;
-
       let questions;
 
       if (openai) {
@@ -202,24 +409,12 @@ For each question, provide:
 2. Why this question is commonly asked
 3. Tips for answering effectively
 
-Format as a JSON array with objects containing: question, reason, tips
-
-The questions should cover:
-- Behavioral questions
-- Technical/role-specific questions
-- Problem-solving scenarios
-- Questions about teamwork and collaboration
-- Questions about handling challenges
-
-Be inclusive and consider that candidates may have various backgrounds and experiences.`;
+Format as a JSON array with objects containing: question, reason, tips`;
 
           const response = await openai.chat.completions.create({
             model: "gpt-4o",
             messages: [
-              { 
-                role: "system", 
-                content: "You are an expert career coach helping job seekers prepare for interviews. Provide helpful, encouraging, and practical interview preparation advice. Always return valid JSON." 
-              },
+              { role: "system", content: "You are an expert career coach. Always return valid JSON." },
               { role: "user", content: prompt }
             ],
             max_tokens: 2000,
@@ -227,13 +422,8 @@ Be inclusive and consider that candidates may have various backgrounds and exper
           });
 
           const content = response.choices[0]?.message?.content || "[]";
-          
-          try {
-            const jsonMatch = content.match(/\[[\s\S]*\]/);
-            questions = jsonMatch ? JSON.parse(jsonMatch[0]) : getMockQuestions(jobTitle);
-          } catch {
-            questions = getMockQuestions(jobTitle);
-          }
+          const jsonMatch = content.match(/\[[\s\S]*\]/);
+          questions = jsonMatch ? JSON.parse(jsonMatch[0]) : getMockQuestions(jobTitle);
         } catch {
           questions = getMockQuestions(jobTitle);
         }
@@ -242,24 +432,23 @@ Be inclusive and consider that candidates may have various backgrounds and exper
       }
 
       const session = await storage.createInterviewSession({
+        userId,
         jobTitle,
         questions: questions.map((q: { question: string }) => q.question),
         answers: null,
         feedback: null,
-        createdAt: new Date().toISOString(),
       });
 
       res.json({ questions, sessionId: session.id });
     } catch (error) {
       console.error("Error generating interview questions:", error);
       const jobTitle = req.body?.jobTitle || "Professional";
-      const questions = getMockQuestions(jobTitle);
-      res.json({ questions, sessionId: "fallback" });
+      res.json({ questions: getMockQuestions(jobTitle), sessionId: "fallback" });
     }
   });
 
   // AI-powered Answer Analysis
-  app.post("/api/interview/analyze", async (req, res) => {
+  app.post("/api/interview/analyze", isAuthenticated, async (req: any, res) => {
     try {
       const parsed = analyzeAnswerRequestSchema.safeParse(req.body);
       if (!parsed.success) {
@@ -267,33 +456,25 @@ Be inclusive and consider that candidates may have various backgrounds and exper
       }
 
       const { question, answer, jobTitle } = parsed.data;
-
       let feedback: string;
 
       if (openai) {
         try {
-          const prompt = `As an expert interview coach, analyze this interview answer for a ${jobTitle} position:
+          const prompt = `Analyze this interview answer for a ${jobTitle} position:
 
 Question: ${question}
+Answer: ${answer}
 
-Candidate's Answer: ${answer}
-
-Please provide constructive feedback including:
+Provide constructive feedback including:
 1. Overall Assessment (1-5 stars)
-2. Strengths of the answer
+2. Strengths
 3. Areas for improvement
-4. Suggested improvements or additions
-5. Example of how to enhance the answer
-
-Be encouraging and supportive while providing actionable feedback. Consider that candidates may have different communication styles and experiences.`;
+4. Suggestions`;
 
           const response = await openai.chat.completions.create({
             model: "gpt-4o",
             messages: [
-              { 
-                role: "system", 
-                content: "You are a supportive interview coach who provides constructive, encouraging feedback. Focus on helping candidates improve while acknowledging their strengths." 
-              },
+              { role: "system", content: "You are a supportive interview coach." },
               { role: "user", content: prompt }
             ],
             max_tokens: 1000,
@@ -315,6 +496,7 @@ Be encouraging and supportive while providing actionable feedback. Consider that
     }
   });
 
+  const httpServer = createServer(app);
   return httpServer;
 }
 
@@ -322,71 +504,59 @@ function generateMockResume(targetRole: string, experience: string, skills: stri
   return `# Professional Resume
 
 ## Summary
-Dedicated and motivated professional seeking a ${targetRole} position. Brings a unique combination of skills, experience, and passion for excellence to every role.
+Dedicated professional seeking a ${targetRole} position with strong skills and experience.
 
 ## Experience
-${experience || "Professional experience demonstrating strong work ethic, adaptability, and commitment to achieving goals."}
+${experience || "Professional experience demonstrating strong work ethic and commitment."}
 
 ## Skills
-${skills || "Strong communication, problem-solving, and teamwork abilities. Quick learner with attention to detail."}
+${skills || "Strong communication, problem-solving, and teamwork abilities."}
 
 ## Education
-${education || "Relevant educational background with continuous learning and professional development."}
+${education || "Relevant educational background with continuous learning."}
 
 ---
-*This resume was generated by The Job Bridge AI Resume Builder*`;
+*Generated by The Job Bridge AI Resume Builder*`;
+}
+
+function generateMockCoverLetter(jobTitle: string, company: string): string {
+  return `Dear Hiring Manager,
+
+I am writing to express my strong interest in the ${jobTitle} position at ${company}. With my background and skills, I am confident I would be a valuable addition to your team.
+
+Throughout my career, I have developed expertise that aligns well with this role. I am particularly drawn to ${company}'s commitment to innovation and excellence, and I am excited about the opportunity to contribute to your continued success.
+
+I would welcome the opportunity to discuss how my experience and skills can benefit your organization. Thank you for considering my application.
+
+Sincerely,
+[Your Name]`;
 }
 
 function getMockQuestions(jobTitle: string): Array<{ question: string; reason: string; tips: string }> {
   return [
-    { 
-      question: `Tell me about yourself and why you're interested in this ${jobTitle} role.`, 
-      reason: "To understand your background and motivation", 
-      tips: "Keep it relevant to the role and highlight your key strengths" 
-    },
-    { 
-      question: "Describe a challenging project you've worked on and how you handled it.", 
-      reason: "To assess problem-solving and resilience", 
-      tips: "Use the STAR method: Situation, Task, Action, Result" 
-    },
-    { 
-      question: "How do you prioritize tasks when you have multiple deadlines?", 
-      reason: "To evaluate time management skills", 
-      tips: "Give specific examples of tools or methods you use" 
-    },
-    { 
-      question: "Tell me about a time you worked effectively as part of a team.", 
-      reason: "To assess collaboration and communication skills", 
-      tips: "Highlight your specific contribution and the team's success" 
-    },
-    { 
-      question: "Where do you see yourself growing professionally in the next few years?", 
-      reason: "To understand your career goals and ambition", 
-      tips: "Align your goals with opportunities at the company" 
-    }
+    { question: `Tell me about yourself and why you're interested in this ${jobTitle} role.`, reason: "To understand your background", tips: "Keep it relevant to the role" },
+    { question: "Describe a challenging project you've handled.", reason: "To assess problem-solving", tips: "Use the STAR method" },
+    { question: "How do you prioritize tasks?", reason: "To evaluate time management", tips: "Give specific examples" },
+    { question: "Tell me about a time you worked in a team.", reason: "To assess collaboration", tips: "Highlight your contribution" },
+    { question: "Where do you see yourself in 5 years?", reason: "To understand your goals", tips: "Align with company opportunities" }
   ];
 }
 
 function getMockFeedback(answer: string): string {
   const wordCount = answer.split(/\s+/).length;
   const rating = wordCount > 50 ? 4 : wordCount > 20 ? 3 : 2;
-  
-  return `## Overall Assessment: ${"★".repeat(rating)}${"☆".repeat(5 - rating)}
+  return `## Overall: ${"★".repeat(rating)}${"☆".repeat(5 - rating)}
 
 ### Strengths
-- You provided a response that addresses the question
-- Your answer shows engagement with the topic
-${wordCount > 30 ? "- Good level of detail in your response" : ""}
+- You addressed the question
+- Shows engagement
 
 ### Areas for Improvement
-${wordCount < 50 ? "- Consider providing more specific examples or details" : ""}
-- Try using the STAR method (Situation, Task, Action, Result) for behavioral questions
-- Include quantifiable achievements when possible
+${wordCount < 50 ? "- Add more specific examples\n" : ""}- Use the STAR method
 
 ### Suggestions
-- Practice speaking your answers out loud to improve fluency
-- Prepare 2-3 stories that can be adapted to different questions
-- Remember to highlight how your unique experiences add value
+- Practice speaking answers aloud
+- Prepare adaptable stories
 
-Keep practicing! Every interview is an opportunity to learn and improve.`;
+Keep practicing!`;
 }

@@ -11,6 +11,7 @@ import Jobs from "@/pages/jobs";
 import Resume from "@/pages/resume";
 import Interview from "@/pages/interview";
 import Dashboard from "@/pages/dashboard";
+import Profile from "@/pages/profile";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -22,6 +23,7 @@ function Router() {
       <Route path="/resume" component={Resume} />
       <Route path="/interview" component={Interview} />
       <Route path="/dashboard" component={Dashboard} />
+      <Route path="/profile" component={Profile} />
       <Route component={NotFound} />
     </Switch>
   );
