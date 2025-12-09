@@ -93,10 +93,18 @@ export default function Pricing() {
     },
   });
 
-  const sortedProducts = Array.isArray(products) ? [...products].sort((a, b) => {
+  const sortedProducts = Array.isArray(products) ? (() => {
     const tierOrder: Record<string, number> = { free: 0, pro: 1, enterprise: 2 };
-    return (tierOrder[getTierFromName(a.name)] || 0) - (tierOrder[getTierFromName(b.name)] || 0);
-  }) : [];
+    const seenTiers = new Set<string>();
+    return [...products]
+      .sort((a, b) => (tierOrder[getTierFromName(a.name)] || 0) - (tierOrder[getTierFromName(b.name)] || 0))
+      .filter((product) => {
+        const tier = getTierFromName(product.name);
+        if (seenTiers.has(tier)) return false;
+        seenTiers.add(tier);
+        return true;
+      });
+  })() : [];
 
   const handleSubscribe = (product: StripeProduct) => {
     if (!isAuthenticated) {
