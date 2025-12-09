@@ -743,7 +743,7 @@ Provide constructive feedback including:
     }
   });
 
-  // AI Job Recommendations
+  // AI Job Recommendations (enhanced with resume data)
   app.post("/api/ai/recommendations", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
@@ -754,22 +754,44 @@ Provide constructive feedback including:
 
       const { skills, preferredJobTypes, preferredLocations } = parsed.data;
       const profile = await storage.getUserProfile(userId);
-      const userSkills = skills || profile?.skills || [];
+      
+      // Get skills from user's resumes for enhanced matching
+      const userResumes = await storage.getResumes(userId);
+      const resumeSkills = userResumes
+        .filter(r => r.isParsed && r.skills)
+        .flatMap(r => r.skills || []);
+      
+      // Combine and deduplicate skills from profile and resumes
+      const allSkills = [...new Set([
+        ...(skills || []),
+        ...(profile?.skills || []),
+        ...resumeSkills
+      ])];
+      
+      const userSkills = allSkills.length > 0 ? allSkills : [];
       const jobTypes = preferredJobTypes || profile?.preferredJobTypes || [];
       const locations = preferredLocations || profile?.preferredLocations || [];
+      
+      // Extract experience info from resumes
+      const resumeExperiences = userResumes
+        .filter(r => r.isParsed && r.experience)
+        .flatMap(r => r.experience || [])
+        .map(exp => `${exp.title} at ${exp.company}`)
+        .slice(0, 5);
 
       let recommendations;
-      if (openai && userSkills.length > 0) {
+      if (openai && (userSkills.length > 0 || resumeExperiences.length > 0)) {
         try {
           const prompt = `Based on this job seeker profile, suggest 5 job types/roles that would be a good match:
 
-Skills: ${userSkills.join(", ")}
+Skills: ${userSkills.join(", ") || "Not specified"}
+${resumeExperiences.length > 0 ? `Work Experience: ${resumeExperiences.join("; ")}` : ""}
 Preferred Job Types: ${jobTypes.join(", ") || "Any"}
 Preferred Locations: ${locations.join(", ") || "Any"}
 
 Return a JSON array with objects containing:
 - role: the job title/role
-- reason: why this is a good match
+- reason: why this is a good match (consider their skills AND past experience)
 - searchTerms: array of 2-3 search terms to find these jobs`;
 
           const response = await openai.chat.completions.create({
