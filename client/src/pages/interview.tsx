@@ -20,6 +20,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useSubscriptionContext } from "@/contexts/subscription-context";
 import {
   MessageSquare,
   Sparkles,
@@ -65,6 +66,7 @@ export default function Interview() {
   const [sessionStarted, setSessionStarted] = useState(false);
   const [jobTitle, setJobTitle] = useState("");
   const { toast } = useToast();
+  const { handleApiError } = useSubscriptionContext();
 
   const form = useForm<SetupFormData>({
     resolver: zodResolver(setupFormSchema),
@@ -93,7 +95,8 @@ export default function Interview() {
         description: `${generatedQuestions.length} questions prepared for you.`,
       });
     },
-    onError: () => {
+    onError: (error) => {
+      if (handleApiError(error)) return;
       toast({
         title: "Failed to Generate Questions",
         description: "Please try again later.",
@@ -121,7 +124,8 @@ export default function Interview() {
         description: "Check your feedback below.",
       });
     },
-    onError: () => {
+    onError: (error) => {
+      if (handleApiError(error)) return;
       toast({
         title: "Analysis Failed",
         description: "Please try again.",

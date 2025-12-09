@@ -22,6 +22,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useSubscriptionContext } from "@/contexts/subscription-context";
 import {
   FileText,
   Sparkles,
@@ -101,6 +102,9 @@ export default function Resume() {
   const [selectedResumeId, setSelectedResumeId] = useState<string | null>(null);
   const [skillInput, setSkillInput] = useState("");
   const { toast } = useToast();
+  const { handleApiError, hasFeature } = useSubscriptionContext();
+  const canUseAIResume = hasFeature("aiResumeBuilder");
+  const canParseResume = hasFeature("aiResumeParsing");
 
   const { data: resumes, isLoading: resumesLoading } = useQuery<Resume[]>({
     queryKey: ["/api/resumes"],
@@ -162,7 +166,8 @@ export default function Resume() {
         description: "Your AI-optimized resume is ready!",
       });
     },
-    onError: () => {
+    onError: (error) => {
+      if (handleApiError(error)) return;
       toast({
         title: "Generation Failed",
         description: "Please try again later.",
@@ -186,7 +191,8 @@ export default function Resume() {
         description: "Your resume has been parsed and saved!",
       });
     },
-    onError: () => {
+    onError: (error) => {
+      if (handleApiError(error)) return;
       toast({
         title: "Parsing Failed",
         description: "Could not parse the resume. Please try again.",

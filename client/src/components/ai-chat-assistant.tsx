@@ -4,8 +4,10 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { MessageCircle, X, Send, Loader2, Sparkles, Bot, User } from "lucide-react";
+import { MessageCircle, X, Send, Loader2, Sparkles, Bot, User, Lock } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
+import { useSubscriptionContext } from "@/contexts/subscription-context";
+import { Link } from "wouter";
 
 interface Message {
   role: "user" | "assistant";
@@ -19,6 +21,8 @@ export function AIChatAssistant() {
   ]);
   const [input, setInput] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
+  const { handleApiError, hasFeature } = useSubscriptionContext();
+  const canUseChat = hasFeature("aiChatAssistant");
 
   const chatMutation = useMutation({
     mutationFn: async (message: string) => {
@@ -31,7 +35,11 @@ export function AIChatAssistant() {
     onSuccess: (data) => {
       setMessages(prev => [...prev, { role: "assistant", content: data.reply }]);
     },
-    onError: () => {
+    onError: (error) => {
+      if (handleApiError(error)) {
+        setIsOpen(false);
+        return;
+      }
       setMessages(prev => [...prev, { role: "assistant", content: "Sorry, I had trouble responding. Please try again." }]);
     },
   });

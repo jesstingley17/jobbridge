@@ -6,6 +6,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { Navbar } from "@/components/navbar";
 import { Footer } from "@/components/footer";
 import { AIChatAssistant } from "@/components/ai-chat-assistant";
+import { SubscriptionProvider } from "@/contexts/subscription-context";
 import Home from "@/pages/home";
 import Features from "@/pages/features";
 import Jobs from "@/pages/jobs";
@@ -44,15 +45,17 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
-        <div className="flex min-h-screen flex-col">
-          <Navbar />
-          <main id="main-content" className="flex-1">
-            <Router />
-          </main>
-          <Footer />
-        </div>
-        <Toaster />
-        <AIChatAssistant />
+        <SubscriptionProvider>
+          <div className="flex min-h-screen flex-col">
+            <Navbar />
+            <main id="main-content" className="flex-1">
+              <Router />
+            </main>
+            <Footer />
+          </div>
+          <Toaster />
+          <AIChatAssistant />
+        </SubscriptionProvider>
       </TooltipProvider>
     </QueryClientProvider>
   );
