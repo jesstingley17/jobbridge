@@ -20,7 +20,9 @@ import {
   skillsGapRequestSchema,
   chatAssistantRequestSchema,
   applicationTipsRequestSchema,
-  jobMatchScoreRequestSchema
+  jobMatchScoreRequestSchema,
+  parseResumeRequestSchema,
+  bulkApplyRequestSchema
 } from "@shared/schema";
 
 const normalizeStringArray = z.preprocess((val) => {
@@ -425,6 +427,160 @@ Format the resume in a clean, professional markdown format.`;
       const { targetRole, experience, skills, education } = req.body;
       const fallbackResume = generateMockResume(targetRole || "Professional", experience || "", skills || "", education || "");
       res.json({ resume: fallbackResume, id: "fallback" });
+    }
+  });
+
+  // AI-powered Resume Parsing
+  app.post("/api/resume/parse", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const parsed = parseResumeRequestSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ error: "Invalid request data", details: parsed.error });
+      }
+
+      const { resumeText } = parsed.data;
+      let parsedData: {
+        contactInfo: { name: string; email?: string; phone?: string; linkedin?: string; portfolio?: string };
+        skills: string[];
+        education: { school: string; degree?: string; major?: string; gradYear?: string }[];
+        experience: { company: string; title: string; dates?: string; description?: string }[];
+      };
+
+      if (openai) {
+        const prompt = `Parse the following resume text and extract structured data. Return a JSON object with these fields:
+- contactInfo: { name (required), email, phone, linkedin, portfolio }
+- skills: array of skill strings
+- education: array of { school (required), degree, major, gradYear }
+- experience: array of { company (required), title (required), dates, description }
+
+Resume text:
+${resumeText}
+
+Return ONLY valid JSON, no markdown or explanation.`;
+
+        const response = await openai.chat.completions.create({
+          model: "gpt-4o",
+          messages: [
+            { role: "system", content: "You are a resume parser. Extract structured data from resumes and return valid JSON only." },
+            { role: "user", content: prompt }
+          ],
+          max_tokens: 2000,
+          temperature: 0.3,
+        });
+
+        const content = response.choices[0]?.message?.content || "{}";
+        const jsonMatch = content.match(/\{[\s\S]*\}/);
+        parsedData = jsonMatch ? JSON.parse(jsonMatch[0]) : getMockParsedResume(resumeText);
+      } else {
+        parsedData = getMockParsedResume(resumeText);
+      }
+
+      const resume = await storage.createResume({
+        userId,
+        title: `Parsed Resume - ${parsedData.contactInfo?.name || "Unknown"}`,
+        content: resumeText,
+        contactInfo: parsedData.contactInfo,
+        skills: parsedData.skills || [],
+        education: parsedData.education || [],
+        experience: parsedData.experience || [],
+        isParsed: true,
+      });
+
+      res.json({ resume, parsedData });
+    } catch (error) {
+      console.error("Error parsing resume:", error);
+      res.status(500).json({ error: "Failed to parse resume" });
+    }
+  });
+
+  // Update resume with structured data
+  app.patch("/api/resume/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const resume = await storage.getResume(id);
+      if (!resume) {
+        return res.status(404).json({ error: "Resume not found" });
+      }
+      
+      const updated = await storage.updateResume(id, req.body);
+      res.json(updated);
+    } catch (error) {
+      console.error("Error updating resume:", error);
+      res.status(500).json({ error: "Failed to update resume" });
+    }
+  });
+
+  // Get single resume
+  app.get("/api/resume/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const resume = await storage.getResume(req.params.id);
+      if (!resume) {
+        return res.status(404).json({ error: "Resume not found" });
+      }
+      res.json(resume);
+    } catch (error) {
+      console.error("Error fetching resume:", error);
+      res.status(500).json({ error: "Failed to fetch resume" });
+    }
+  });
+
+  // Get user's resumes
+  app.get("/api/resumes", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const resumes = await storage.getResumes(userId);
+      res.json(resumes);
+    } catch (error) {
+      console.error("Error fetching resumes:", error);
+      res.status(500).json({ error: "Failed to fetch resumes" });
+    }
+  });
+
+  // Bulk apply to multiple jobs
+  app.post("/api/applications/bulk", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const parsed = bulkApplyRequestSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ error: "Invalid request data", details: parsed.error });
+      }
+
+      const { jobIds, resumeId } = parsed.data;
+      const results: { jobId: string; success: boolean; applicationId?: string; error?: string }[] = [];
+      
+      for (const jobId of jobIds) {
+        try {
+          const job = await storage.getJob(jobId);
+          if (!job) {
+            results.push({ jobId, success: false, error: "Job not found" });
+            continue;
+          }
+
+          const application = await storage.createApplication({
+            userId,
+            jobId,
+            jobTitle: job.title,
+            company: job.company,
+            status: "applied",
+            appliedDate: new Date().toISOString().split('T')[0],
+            resumeId: resumeId || null,
+          });
+
+          results.push({ jobId, success: true, applicationId: application.id });
+        } catch (err: any) {
+          results.push({ jobId, success: false, error: err.message });
+        }
+      }
+
+      const successCount = results.filter(r => r.success).length;
+      res.json({ 
+        results, 
+        summary: { total: jobIds.length, success: successCount, failed: jobIds.length - successCount }
+      });
+    } catch (error) {
+      console.error("Error bulk applying:", error);
+      res.status(500).json({ error: "Failed to bulk apply" });
     }
   });
 
@@ -1201,5 +1357,32 @@ function getMockMatchScore(userSkills: string[], jobRequirements: string): { sco
     missingSkills: ["Industry experience", "Specific certifications"],
     strengths: userSkills.length > 0 ? `Strong foundation in ${userSkills[0]}` : "Enthusiasm and willingness to learn",
     recommendation: score > 60 ? "You're a good match! Apply with confidence." : "Consider developing additional skills to strengthen your application."
+  };
+}
+
+function getMockParsedResume(resumeText: string): {
+  contactInfo: { name: string; email?: string; phone?: string; linkedin?: string; portfolio?: string };
+  skills: string[];
+  education: { school: string; degree?: string; major?: string; gradYear?: string }[];
+  experience: { company: string; title: string; dates?: string; description?: string }[];
+} {
+  const emailMatch = resumeText.match(/[\w.-]+@[\w.-]+\.\w+/);
+  const phoneMatch = resumeText.match(/\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}/);
+  const lines = resumeText.split('\n').filter(l => l.trim());
+  const name = lines[0]?.trim() || "Unknown";
+
+  return {
+    contactInfo: {
+      name,
+      email: emailMatch?.[0],
+      phone: phoneMatch?.[0],
+    },
+    skills: ["Communication", "Problem Solving", "Team Collaboration", "Adaptability"],
+    education: [
+      { school: "University", degree: "Bachelor's Degree", gradYear: "2020" }
+    ],
+    experience: [
+      { company: "Previous Company", title: "Professional Role", dates: "2020-Present", description: "Contributed to team projects and initiatives." }
+    ]
   };
 }

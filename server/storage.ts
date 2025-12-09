@@ -48,7 +48,9 @@ export interface IStorage {
   
   // Resume operations
   getResumes(userId?: string): Promise<Resume[]>;
+  getResume(id: string): Promise<Resume | undefined>;
   createResume(resume: InsertResume): Promise<Resume>;
+  updateResume(id: string, updates: Partial<Resume>): Promise<Resume | undefined>;
   
   // Interview session operations
   getInterviewSessions(userId?: string): Promise<InterviewSession[]>;
@@ -314,6 +316,20 @@ export class DatabaseStorage implements IStorage {
   async createResume(resume: InsertResume): Promise<Resume> {
     const [newResume] = await db.insert(resumes).values(resume).returning();
     return newResume;
+  }
+
+  async getResume(id: string): Promise<Resume | undefined> {
+    const [resume] = await db.select().from(resumes).where(eq(resumes.id, id));
+    return resume;
+  }
+
+  async updateResume(id: string, updates: Partial<Resume>): Promise<Resume | undefined> {
+    const [updated] = await db
+      .update(resumes)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(resumes.id, id))
+      .returning();
+    return updated;
   }
 
   // Interview session operations
