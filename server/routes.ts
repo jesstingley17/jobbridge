@@ -8,6 +8,7 @@ import { getExternalJobs } from "./externalJobs";
 import { getUncachableStripeClient, getStripePublishableKey } from "./stripeClient";
 import { sql } from "drizzle-orm";
 import { db } from "./db";
+import { requireFeature, requireApplicationQuota, incrementApplicationCount, getUserSubscriptionStatus } from "./subscriptionMiddleware";
 import { 
   generateResumeRequestSchema, 
   generateInterviewQuestionsRequestSchema,
@@ -86,6 +87,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching user:", error);
       res.status(500).json({ message: "Failed to fetch user" });
+    }
+  });
+
+  // Get subscription status
+  app.get('/api/subscription/status', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const status = await getUserSubscriptionStatus(userId);
+      res.json(status);
+    } catch (error) {
+      console.error("Error fetching subscription status:", error);
+      res.status(500).json({ error: "Failed to fetch subscription status" });
     }
   });
 
@@ -270,7 +283,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/applications", isAuthenticated, async (req: any, res) => {
+  app.post("/api/applications", isAuthenticated, requireApplicationQuota(), async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const parsed = insertApplicationSchema.safeParse({ ...req.body, userId });
@@ -278,6 +291,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Invalid application data", details: parsed.error });
       }
       const application = await storage.createApplication(parsed.data);
+      
+      // Increment application count after successful creation
+      await incrementApplicationCount(userId);
+      
       res.status(201).json(application);
     } catch (error) {
       console.error("Error creating application:", error);
@@ -365,8 +382,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // AI-powered Resume Generation
-  app.post("/api/resume/generate", isAuthenticated, async (req: any, res) => {
+  // AI-powered Resume Generation (Pro+ feature)
+  app.post("/api/resume/generate", isAuthenticated, requireFeature('aiResumeBuilder'), async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const parsed = generateResumeRequestSchema.safeParse(req.body);
@@ -430,8 +447,8 @@ Format the resume in a clean, professional markdown format.`;
     }
   });
 
-  // AI-powered Resume Parsing
-  app.post("/api/resume/parse", isAuthenticated, async (req: any, res) => {
+  // AI-powered Resume Parsing (Pro+ feature)
+  app.post("/api/resume/parse", isAuthenticated, requireFeature('aiResumeParsing'), async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const parsed = parseResumeRequestSchema.safeParse(req.body);
@@ -537,8 +554,8 @@ Return ONLY valid JSON, no markdown or explanation.`;
     }
   });
 
-  // Bulk apply to multiple jobs
-  app.post("/api/applications/bulk", isAuthenticated, async (req: any, res) => {
+  // Bulk apply to multiple jobs (Pro+ feature)
+  app.post("/api/applications/bulk", isAuthenticated, requireFeature('bulkApply'), async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const parsed = bulkApplyRequestSchema.safeParse(req.body);
@@ -584,8 +601,8 @@ Return ONLY valid JSON, no markdown or explanation.`;
     }
   });
 
-  // AI-powered Cover Letter Generation
-  app.post("/api/cover-letter/generate", isAuthenticated, async (req: any, res) => {
+  // AI-powered Cover Letter Generation (Pro+ feature)
+  app.post("/api/cover-letter/generate", isAuthenticated, requireFeature('aiCoverLetter'), async (req: any, res) => {
     try {
       const parsed = generateCoverLetterRequestSchema.safeParse(req.body);
       if (!parsed.success) {
@@ -635,8 +652,8 @@ Keep it professional, concise (3-4 paragraphs), and personalized.`;
     }
   });
 
-  // AI-powered Interview Question Generation
-  app.post("/api/interview/questions", isAuthenticated, async (req: any, res) => {
+  // AI-powered Interview Question Generation (Pro+ feature)
+  app.post("/api/interview/questions", isAuthenticated, requireFeature('aiInterviewPrep'), async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const parsed = generateInterviewQuestionsRequestSchema.safeParse(req.body);
@@ -694,8 +711,8 @@ Format as a JSON array with objects containing: question, reason, tips`;
     }
   });
 
-  // AI-powered Answer Analysis
-  app.post("/api/interview/analyze", isAuthenticated, async (req: any, res) => {
+  // AI-powered Answer Analysis (Pro+ feature)
+  app.post("/api/interview/analyze", isAuthenticated, requireFeature('aiInterviewPrep'), async (req: any, res) => {
     try {
       const parsed = analyzeAnswerRequestSchema.safeParse(req.body);
       if (!parsed.success) {
@@ -743,8 +760,8 @@ Provide constructive feedback including:
     }
   });
 
-  // AI Job Recommendations (enhanced with resume data)
-  app.post("/api/ai/recommendations", isAuthenticated, async (req: any, res) => {
+  // AI Job Recommendations (Pro+ feature)
+  app.post("/api/ai/recommendations", isAuthenticated, requireFeature('aiJobRecommendations'), async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const parsed = jobRecommendationsRequestSchema.safeParse(req.body);
@@ -878,8 +895,8 @@ Use simple words and short sentences.`;
     }
   });
 
-  // AI Skills Gap Analysis
-  app.post("/api/ai/skills-gap", isAuthenticated, async (req: any, res) => {
+  // AI Skills Gap Analysis (Pro+ feature)
+  app.post("/api/ai/skills-gap", isAuthenticated, requireFeature('aiSkillsGap'), async (req: any, res) => {
     try {
       const parsed = skillsGapRequestSchema.safeParse(req.body);
       if (!parsed.success) {
@@ -932,8 +949,8 @@ Return as JSON with: matchingSkills (array), skillGaps (array with name, priorit
     }
   });
 
-  // AI Chat Assistant
-  app.post("/api/ai/chat", async (req, res) => {
+  // AI Chat Assistant (Pro+ feature)
+  app.post("/api/ai/chat", isAuthenticated, requireFeature('aiChatAssistant'), async (req: any, res) => {
     try {
       const parsed = chatAssistantRequestSchema.safeParse(req.body);
       if (!parsed.success) {
@@ -986,8 +1003,8 @@ Be warm, supportive, and use clear, simple language. Keep responses concise but 
     }
   });
 
-  // AI Application Tips
-  app.post("/api/ai/application-tips", async (req, res) => {
+  // AI Application Tips (Pro+ feature)
+  app.post("/api/ai/application-tips", isAuthenticated, requireFeature('aiApplicationTips'), async (req: any, res) => {
     try {
       const parsed = applicationTipsRequestSchema.safeParse(req.body);
       if (!parsed.success) {

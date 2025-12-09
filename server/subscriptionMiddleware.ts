@@ -1,20 +1,12 @@
-import { Request, Response, NextFunction } from 'express';
+import { Response, NextFunction } from 'express';
 import { storage } from './storage';
 import { getTierLimits, hasFeatureAccess, FEATURE_DESCRIPTIONS, TierLimits } from './subscriptionLimits';
 import { db } from './db';
 import { users } from '@shared/schema';
 import { eq } from 'drizzle-orm';
 
-interface AuthenticatedRequest extends Request {
-  user?: {
-    claims: {
-      sub: string;
-    };
-  };
-}
-
 export function requireFeature(feature: keyof TierLimits) {
-  return async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+  return async (req: any, res: Response, next: NextFunction) => {
     try {
       const userId = req.user?.claims?.sub;
       if (!userId) {
@@ -118,7 +110,7 @@ export async function incrementApplicationCount(userId: string): Promise<void> {
 }
 
 export function requireApplicationQuota() {
-  return async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+  return async (req: any, res: Response, next: NextFunction) => {
     try {
       const userId = req.user?.claims?.sub;
       if (!userId) {
