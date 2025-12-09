@@ -10,6 +10,7 @@ const CACHE_TTL_MS = 10 * 60 * 1000;
 const jobsCache: Map<string, ExternalJobsCache> = new Map();
 
 const hasRapidApiKey = !!process.env.RAPIDAPI_KEY;
+const hasSerpApiKey = !!process.env.SERPAPI_KEY;
 
 function getCacheKey(query?: string, location?: string, type?: string, accessibilityFilters?: string[]): string {
   const filterKey = accessibilityFilters?.length ? [...accessibilityFilters].sort().join(",") : "none";
@@ -82,6 +83,126 @@ async function fetchIndeedJobs(query?: string, location?: string): Promise<Job[]
     return (data.data || []).map((job: any) => normalizeExternalJob(job, "indeed") as Job);
   } catch (error) {
     console.error("Error fetching external jobs:", error);
+    return [];
+  }
+}
+
+function normalizeSerpJob(serpJob: any): Job {
+  const jobId = `ext_serp_${serpJob.job_id || Math.random().toString(36).substr(2, 9)}`;
+  
+  const accessibilityFeatures: string[] = [];
+  const description = (serpJob.description || "").toLowerCase();
+  const title = (serpJob.title || "").toLowerCase();
+  
+  if (description.includes("remote") || title.includes("remote")) accessibilityFeatures.push("Remote Work");
+  if (description.includes("flexible") || description.includes("flexible hours")) accessibilityFeatures.push("Flexible Hours");
+  if (description.includes("accommodat") || description.includes("accessible")) accessibilityFeatures.push("Accommodations Available");
+  if (description.includes("disability") || description.includes("inclusive")) accessibilityFeatures.push("Disability Inclusive");
+  if (description.includes("work from home") || description.includes("wfh")) accessibilityFeatures.push("Work From Home");
+
+  const detectJobType = (desc: string, titleStr: string): string => {
+    const combined = `${desc} ${titleStr}`.toLowerCase();
+    if (combined.includes("remote") || combined.includes("work from home")) return "remote";
+    if (combined.includes("part-time") || combined.includes("part time")) return "part-time";
+    if (combined.includes("contract")) return "contract";
+    if (combined.includes("hybrid")) return "hybrid";
+    return "full-time";
+  };
+
+  const postedDate = serpJob.detected_extensions?.posted_at || new Date().toISOString().split("T")[0];
+  const parsedDate = parseRelativeDate(postedDate);
+
+  return {
+    id: jobId,
+    title: serpJob.title || "Position Available",
+    company: serpJob.company_name || "Company",
+    location: serpJob.location || "Location Not Specified",
+    type: detectJobType(description, title),
+    salary: serpJob.detected_extensions?.salary || serpJob.salary || null,
+    description: serpJob.description || "",
+    requirements: serpJob.job_highlights?.Qualifications?.join(", ") || "See job description for requirements",
+    accommodations: accessibilityFeatures.length > 0 ? "This employer may offer workplace accommodations" : null,
+    postedDate: parsedDate,
+    accessibilityFeatures: accessibilityFeatures.length > 0 ? accessibilityFeatures : null,
+    externalId: serpJob.job_id || null,
+    externalSource: "google",
+    applyUrl: serpJob.apply_options?.[0]?.link || serpJob.share_link || serpJob.related_links?.[0]?.link || null,
+    createdAt: new Date(parsedDate),
+  };
+}
+
+function parseRelativeDate(dateStr: string): string {
+  const now = new Date();
+  const lower = dateStr.toLowerCase();
+  
+  if (lower.includes("hour") || lower.includes("minute") || lower.includes("just posted")) {
+    return now.toISOString().split("T")[0];
+  }
+  
+  const dayMatch = lower.match(/(\d+)\s*day/);
+  if (dayMatch) {
+    const daysAgo = parseInt(dayMatch[1], 10);
+    now.setDate(now.getDate() - daysAgo);
+    return now.toISOString().split("T")[0];
+  }
+  
+  const weekMatch = lower.match(/(\d+)\s*week/);
+  if (weekMatch) {
+    const weeksAgo = parseInt(weekMatch[1], 10);
+    now.setDate(now.getDate() - (weeksAgo * 7));
+    return now.toISOString().split("T")[0];
+  }
+  
+  const monthMatch = lower.match(/(\d+)\s*month/);
+  if (monthMatch) {
+    const monthsAgo = parseInt(monthMatch[1], 10);
+    now.setMonth(now.getMonth() - monthsAgo);
+    return now.toISOString().split("T")[0];
+  }
+  
+  return now.toISOString().split("T")[0];
+}
+
+async function fetchSerpJobs(query?: string, location?: string): Promise<Job[]> {
+  if (!hasSerpApiKey) {
+    console.log("SERP API key not configured, skipping Google Jobs search");
+    return [];
+  }
+
+  try {
+    const searchQuery = query || "jobs for people with disabilities";
+    const searchLocation = location || "United States";
+    
+    const params = new URLSearchParams({
+      api_key: process.env.SERPAPI_KEY!,
+      engine: "google_jobs",
+      q: `${searchQuery} ${searchLocation}`,
+      hl: "en",
+      gl: "us",
+    });
+    
+    console.log(`Fetching jobs from Google via SERP API: ${searchQuery} in ${searchLocation}`);
+    
+    const response = await fetch(`https://serpapi.com/search?${params.toString()}`);
+
+    if (!response.ok) {
+      console.error("SERP API error:", response.status, await response.text());
+      return [];
+    }
+
+    const data = await response.json();
+    
+    if (data.error) {
+      console.error("SERP API returned error:", data.error);
+      return [];
+    }
+    
+    const jobs = (data.jobs_results || []).map((job: any) => normalizeSerpJob(job) as Job);
+    console.log(`Found ${jobs.length} jobs from Google via SERP API`);
+    
+    return jobs;
+  } catch (error) {
+    console.error("Error fetching SERP jobs:", error);
     return [];
   }
 }
@@ -303,12 +424,28 @@ export async function getExternalJobs(query?: string, location?: string, type?: 
   if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
     jobs = cached.data;
   } else {
+    const jobSources: Promise<Job[]>[] = [];
+    
+    // Add Google SERP API as primary source
+    if (hasSerpApiKey) {
+      jobSources.push(fetchSerpJobs(query, location));
+    }
+    
+    // Add RapidAPI Indeed as secondary source
     if (hasRapidApiKey) {
-      jobs = await fetchIndeedJobs(query, location);
+      jobSources.push(fetchIndeedJobs(query, location));
+    }
+    
+    if (jobSources.length > 0) {
+      const results = await Promise.all(jobSources);
+      jobs = results.flat();
+      
+      // Fallback to simulated jobs if no results from APIs
       if (jobs.length === 0) {
         jobs = getSimulatedExternalJobs(query, location);
       }
     } else {
+      // No API keys configured, use simulated jobs
       jobs = getSimulatedExternalJobs(query, location);
     }
 
