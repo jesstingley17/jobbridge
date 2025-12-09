@@ -8,7 +8,10 @@ import {
   careerDimensions, type CareerDimension,
   userDimensionScores, type UserDimensionScore, type InsertUserDimensionScore,
   mentors, type Mentor,
-  mentorConnections, type MentorConnection
+  mentorConnections, type MentorConnection,
+  peerConnections, type PeerConnection, type InsertPeerConnection,
+  messages, type Message, type InsertMessage,
+  supportTickets, type SupportTicket, type InsertSupportTicket
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, ilike, or, and, desc, sql } from "drizzle-orm";

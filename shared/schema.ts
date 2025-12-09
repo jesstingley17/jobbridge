@@ -172,6 +172,50 @@ export const mentorConnections = pgTable("mentor_connections", {
 
 export type MentorConnection = typeof mentorConnections.$inferSelect;
 
+// Peer connections for community networking
+export const peerConnections = pgTable("peer_connections", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  requesterId: varchar("requester_id").notNull().references(() => users.id),
+  receiverId: varchar("receiver_id").notNull().references(() => users.id),
+  status: text("status").notNull(), // pending, accepted, declined
+  message: text("message"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertPeerConnectionSchema = createInsertSchema(peerConnections).omit({ id: true, createdAt: true });
+export type InsertPeerConnection = z.infer<typeof insertPeerConnectionSchema>;
+export type PeerConnection = typeof peerConnections.$inferSelect;
+
+// Messages for community communication
+export const messages = pgTable("messages", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  senderId: varchar("sender_id").notNull().references(() => users.id),
+  receiverId: varchar("receiver_id").notNull().references(() => users.id),
+  content: text("content").notNull(),
+  isRead: boolean("is_read").default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertMessageSchema = createInsertSchema(messages).omit({ id: true, createdAt: true, isRead: true });
+export type InsertMessage = z.infer<typeof insertMessageSchema>;
+export type Message = typeof messages.$inferSelect;
+
+// Support tickets for help center
+export const supportTickets = pgTable("support_tickets", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  subject: text("subject").notNull(),
+  description: text("description").notNull(),
+  status: text("status").notNull(), // open, in_progress, resolved, closed
+  priority: text("priority").notNull(), // low, medium, high
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertSupportTicketSchema = createInsertSchema(supportTickets).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertSupportTicket = z.infer<typeof insertSupportTicketSchema>;
+export type SupportTicket = typeof supportTickets.$inferSelect;
+
 // Request/response types for API
 export const generateResumeRequestSchema = z.object({
   experience: z.string(),
