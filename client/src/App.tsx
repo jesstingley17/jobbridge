@@ -5,6 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Navbar } from "@/components/navbar";
 import { Footer } from "@/components/footer";
+import { AIChatAssistant } from "@/components/ai-chat-assistant";
 import Home from "@/pages/home";
 import Features from "@/pages/features";
 import Jobs from "@/pages/jobs";
@@ -51,6 +52,7 @@ function App() {
           <Footer />
         </div>
         <Toaster />
+        <AIChatAssistant />
       </TooltipProvider>
     </QueryClientProvider>
   );
