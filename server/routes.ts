@@ -4,6 +4,7 @@ import { storage } from "./storage";
 import { setupAuth, isAuthenticated } from "./replitAuth";
 import OpenAI from "openai";
 import { z } from "zod";
+import { getExternalJobs } from "./externalJobs";
 import { 
   generateResumeRequestSchema, 
   generateInterviewQuestionsRequestSchema,
@@ -176,6 +177,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching job:", error);
       res.status(500).json({ error: "Failed to fetch job" });
+    }
+  });
+
+  // External jobs endpoint (from Indeed/RapidAPI with caching)
+  app.get("/api/external-jobs", async (req, res) => {
+    try {
+      const { query, location } = req.query;
+      const externalJobs = await getExternalJobs(
+        query as string | undefined,
+        location as string | undefined
+      );
+      res.json(externalJobs);
+    } catch (error) {
+      console.error("Error fetching external jobs:", error);
+      res.status(500).json({ error: "Failed to fetch external jobs" });
+    }
+  });
+
+  // Combined jobs endpoint (internal + external)
+  app.get("/api/all-jobs", async (req, res) => {
+    try {
+      const { query, type, location } = req.query;
+      
+      const [internalJobs, externalJobs] = await Promise.all([
+        storage.searchJobs(
+          query as string | undefined,
+          type as string | undefined,
+          location as string | undefined
+        ),
+        getExternalJobs(
+          query as string | undefined,
+          location as string | undefined,
+          type as string | undefined
+        ),
+      ]);
+      
+      const allJobs = [...internalJobs, ...externalJobs];
+      res.json(allJobs);
+    } catch (error) {
+      console.error("Error fetching all jobs:", error);
+      res.status(500).json({ error: "Failed to fetch jobs" });
     }
   });
 

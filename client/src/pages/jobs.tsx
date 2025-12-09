@@ -25,6 +25,8 @@ import {
   Building2,
   Filter,
   X,
+  ExternalLink,
+  Globe,
 } from "lucide-react";
 import type { Job } from "@shared/schema";
 
@@ -76,7 +78,7 @@ export default function Jobs() {
   const [showFilters, setShowFilters] = useState(false);
 
   const { data: jobs, isLoading } = useQuery<Job[]>({
-    queryKey: ["/api/jobs"],
+    queryKey: ["/api/all-jobs"],
   });
 
   const filteredJobs = jobs?.filter((job) => {
@@ -306,14 +308,26 @@ export default function Jobs() {
                           <div className="flex-1">
                             <div className="flex items-start gap-4">
                               <div className="hidden h-12 w-12 items-center justify-center rounded-md bg-primary/10 sm:flex">
-                                <Building2 className="h-6 w-6 text-primary" aria-hidden="true" />
+                                {job.externalSource ? (
+                                  <Globe className="h-6 w-6 text-primary" aria-hidden="true" />
+                                ) : (
+                                  <Building2 className="h-6 w-6 text-primary" aria-hidden="true" />
+                                )}
                               </div>
                               <div>
-                                <h3 className="text-lg font-semibold">
-                                  <button className="text-left hover:text-primary transition-colors" data-testid={`link-job-title-${job.id}`}>
-                                    {job.title}
-                                  </button>
-                                </h3>
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <h3 className="text-lg font-semibold">
+                                    <button className="text-left hover:text-primary transition-colors" data-testid={`link-job-title-${job.id}`}>
+                                      {job.title}
+                                    </button>
+                                  </h3>
+                                  {job.externalSource && (
+                                    <Badge variant="outline" className="gap-1 text-xs" data-testid={`badge-source-${job.id}`}>
+                                      <ExternalLink className="h-3 w-3" aria-hidden="true" />
+                                      {job.externalSource === "indeed" ? "Indeed" : job.externalSource}
+                                    </Badge>
+                                  )}
+                                </div>
                                 <p className="text-muted-foreground">{job.company}</p>
                                 <div className="mt-2 flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
                                   <span className="flex items-center gap-1">
@@ -352,7 +366,16 @@ export default function Jobs() {
                             )}
                           </div>
                           <div className="flex gap-2 sm:flex-col">
-                            <Button data-testid={`button-apply-${job.id}`}>Apply Now</Button>
+                            {job.applyUrl ? (
+                              <Button asChild data-testid={`button-apply-${job.id}`}>
+                                <a href={job.applyUrl} target="_blank" rel="noopener noreferrer" className="gap-2">
+                                  Apply
+                                  <ExternalLink className="h-4 w-4" aria-hidden="true" />
+                                </a>
+                              </Button>
+                            ) : (
+                              <Button data-testid={`button-apply-${job.id}`}>Apply Now</Button>
+                            )}
                             <Button variant="ghost" size="icon" aria-label="Save job" data-testid={`button-save-${job.id}`}>
                               <Heart className="h-5 w-5" aria-hidden="true" />
                             </Button>
