@@ -13,6 +13,7 @@ import Interview from "@/pages/interview";
 import Dashboard from "@/pages/dashboard";
 import Profile from "@/pages/profile";
 import CareerDNA from "@/pages/career-dna";
+import Applications from "@/pages/applications";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -26,6 +27,7 @@ function Router() {
       <Route path="/dashboard" component={Dashboard} />
       <Route path="/profile" component={Profile} />
       <Route path="/career-dna" component={CareerDNA} />
+      <Route path="/applications" component={Applications} />
       <Route component={NotFound} />
     </Switch>
   );

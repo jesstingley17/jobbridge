@@ -31,7 +31,7 @@ export interface IStorage {
   // Job operations
   getJobs(): Promise<Job[]>;
   getJob(id: string): Promise<Job | undefined>;
-  searchJobs(query?: string, type?: string, location?: string): Promise<Job[]>;
+  searchJobs(query?: string, type?: string, location?: string, accessibilityFilters?: string[]): Promise<Job[]>;
   createJob(job: InsertJob): Promise<Job>;
   
   // Application operations
@@ -149,7 +149,7 @@ export class DatabaseStorage implements IStorage {
     return job;
   }
 
-  async searchJobs(query?: string, type?: string, location?: string): Promise<Job[]> {
+  async searchJobs(query?: string, type?: string, location?: string, accessibilityFilters?: string[]): Promise<Job[]> {
     let conditions: any[] = [];
     
     if (query) {
@@ -174,11 +174,69 @@ export class DatabaseStorage implements IStorage {
       }
     }
     
+    let results: Job[];
     if (conditions.length === 0) {
-      return this.getJobs();
+      results = await this.getJobs();
+    } else {
+      results = await db.select().from(jobs).where(and(...conditions)).orderBy(desc(jobs.createdAt));
     }
     
-    return db.select().from(jobs).where(and(...conditions)).orderBy(desc(jobs.createdAt));
+    if (accessibilityFilters && accessibilityFilters.length > 0) {
+      results = results.filter(job => this.matchesAccessibilityFilters(job, accessibilityFilters));
+    }
+    
+    return results;
+  }
+  
+  private matchesAccessibilityFilters(job: Job, filters: string[]): boolean {
+    if (!filters || filters.length === 0) return true;
+    
+    const features = job.accessibilityFeatures || [];
+    const description = (job.description || "").toLowerCase();
+    const accommodations = (job.accommodations || "").toLowerCase();
+    const jobType = (job.type || "").toLowerCase();
+
+    for (const filter of filters) {
+      let matches = false;
+      switch (filter) {
+        case "remote":
+          matches = jobType === "remote" || 
+            features.some(f => f.toLowerCase().includes("remote")) ||
+            description.includes("remote work") ||
+            description.includes("work from home");
+          break;
+        case "flexible":
+          matches = features.some(f => f.toLowerCase().includes("flexible")) ||
+            description.includes("flexible hours") ||
+            description.includes("flexible schedule") ||
+            accommodations.includes("flexible");
+          break;
+        case "wheelchair":
+          matches = features.some(f => f.toLowerCase().includes("wheelchair") || f.toLowerCase().includes("accessible")) ||
+            description.includes("wheelchair accessible") ||
+            accommodations.includes("wheelchair");
+          break;
+        case "screen-reader":
+          matches = features.some(f => f.toLowerCase().includes("screen reader")) ||
+            description.includes("screen reader") ||
+            description.includes("assistive technology");
+          break;
+        case "mental-health":
+          matches = features.some(f => f.toLowerCase().includes("mental health") || f.toLowerCase().includes("wellness")) ||
+            description.includes("mental health") ||
+            accommodations.includes("mental health");
+          break;
+        case "quiet-space":
+          matches = features.some(f => f.toLowerCase().includes("quiet")) ||
+            description.includes("quiet workspace") ||
+            description.includes("quiet environment");
+          break;
+        default:
+          matches = true;
+      }
+      if (!matches) return false;
+    }
+    return true;
   }
 
   async createJob(job: InsertJob): Promise<Job> {

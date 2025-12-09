@@ -11,8 +11,9 @@ const jobsCache: Map<string, ExternalJobsCache> = new Map();
 
 const hasRapidApiKey = !!process.env.RAPIDAPI_KEY;
 
-function getCacheKey(query?: string, location?: string): string {
-  return `${query || "all"}_${location || "all"}`;
+function getCacheKey(query?: string, location?: string, type?: string, accessibilityFilters?: string[]): string {
+  const filterKey = accessibilityFilters?.length ? [...accessibilityFilters].sort().join(",") : "none";
+  return `${query || "all"}_${location || "all"}_${type || "all"}_${filterKey}`;
 }
 
 function normalizeExternalJob(externalJob: any, source: string): Job {
@@ -242,8 +243,59 @@ function getSimulatedExternalJobs(query?: string, location?: string): Job[] {
   });
 }
 
-export async function getExternalJobs(query?: string, location?: string, type?: string): Promise<Job[]> {
-  const cacheKey = getCacheKey(query, location);
+function matchesAccessibilityFilters(job: Job, filters: string[]): boolean {
+  if (!filters || filters.length === 0) return true;
+  
+  const features = job.accessibilityFeatures || [];
+  const description = (job.description || "").toLowerCase();
+  const accommodations = (job.accommodations || "").toLowerCase();
+  const jobType = (job.type || "").toLowerCase();
+
+  for (const filter of filters) {
+    let matches = false;
+    switch (filter) {
+      case "remote":
+        matches = jobType === "remote" || 
+          features.some(f => f.toLowerCase().includes("remote")) ||
+          description.includes("remote work") ||
+          description.includes("work from home");
+        break;
+      case "flexible":
+        matches = features.some(f => f.toLowerCase().includes("flexible")) ||
+          description.includes("flexible hours") ||
+          description.includes("flexible schedule") ||
+          accommodations.includes("flexible");
+        break;
+      case "wheelchair":
+        matches = features.some(f => f.toLowerCase().includes("wheelchair") || f.toLowerCase().includes("accessible")) ||
+          description.includes("wheelchair accessible") ||
+          accommodations.includes("wheelchair");
+        break;
+      case "screen-reader":
+        matches = features.some(f => f.toLowerCase().includes("screen reader")) ||
+          description.includes("screen reader") ||
+          description.includes("assistive technology");
+        break;
+      case "mental-health":
+        matches = features.some(f => f.toLowerCase().includes("mental health") || f.toLowerCase().includes("wellness")) ||
+          description.includes("mental health") ||
+          accommodations.includes("mental health");
+        break;
+      case "quiet-space":
+        matches = features.some(f => f.toLowerCase().includes("quiet")) ||
+          description.includes("quiet workspace") ||
+          description.includes("quiet environment");
+        break;
+      default:
+        matches = true;
+    }
+    if (!matches) return false;
+  }
+  return true;
+}
+
+export async function getExternalJobs(query?: string, location?: string, type?: string, accessibilityFilters?: string[]): Promise<Job[]> {
+  const cacheKey = getCacheKey(query, location, type, accessibilityFilters);
   const cached = jobsCache.get(cacheKey);
   
   let jobs: Job[];
@@ -269,6 +321,10 @@ export async function getExternalJobs(query?: string, location?: string, type?: 
 
   if (type && type !== "all") {
     jobs = jobs.filter(job => job.type === type);
+  }
+
+  if (accessibilityFilters && accessibilityFilters.length > 0) {
+    jobs = jobs.filter(job => matchesAccessibilityFilters(job, accessibilityFilters));
   }
 
   return jobs;

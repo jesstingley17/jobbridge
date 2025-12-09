@@ -183,10 +183,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // External jobs endpoint (from Indeed/RapidAPI with caching)
   app.get("/api/external-jobs", async (req, res) => {
     try {
-      const { query, location } = req.query;
+      const { query, location, type, accessibilityFilters } = req.query;
+      const filters = accessibilityFilters ? 
+        (typeof accessibilityFilters === 'string' ? accessibilityFilters.split(',') : accessibilityFilters as string[]) 
+        : undefined;
       const externalJobs = await getExternalJobs(
         query as string | undefined,
-        location as string | undefined
+        location as string | undefined,
+        type as string | undefined,
+        filters
       );
       res.json(externalJobs);
     } catch (error) {
@@ -198,18 +203,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Combined jobs endpoint (internal + external)
   app.get("/api/all-jobs", async (req, res) => {
     try {
-      const { query, type, location } = req.query;
+      const { query, type, location, accessibilityFilters } = req.query;
+      const filters = accessibilityFilters ? 
+        (typeof accessibilityFilters === 'string' ? accessibilityFilters.split(',') : accessibilityFilters as string[]) 
+        : undefined;
       
       const [internalJobs, externalJobs] = await Promise.all([
         storage.searchJobs(
           query as string | undefined,
           type as string | undefined,
-          location as string | undefined
+          location as string | undefined,
+          filters
         ),
         getExternalJobs(
           query as string | undefined,
           location as string | undefined,
-          type as string | undefined
+          type as string | undefined,
+          filters
         ),
       ]);
       
