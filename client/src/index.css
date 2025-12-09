@@ -173,6 +173,78 @@
   body {
     @apply font-sans antialiased bg-background text-foreground;
   }
+
+  /* Enhanced focus indicators for accessibility */
+  :focus-visible {
+    outline: 2px solid hsl(var(--ring));
+    outline-offset: 2px;
+  }
+
+  /* High contrast focus for buttons and interactive elements */
+  button:focus-visible,
+  a:focus-visible,
+  input:focus-visible,
+  select:focus-visible,
+  textarea:focus-visible,
+  [role="button"]:focus-visible,
+  [tabindex]:focus-visible {
+    outline: 3px solid hsl(var(--ring));
+    outline-offset: 2px;
+    box-shadow: 0 0 0 4px hsl(var(--background)), 0 0 0 6px hsl(var(--ring) / 0.3);
+  }
+
+  /* Reduced motion support - respects user preferences */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+
+  /* Skip link styling for keyboard users */
+  .skip-link {
+    position: absolute;
+    top: -40px;
+    left: 0;
+    padding: 8px 16px;
+    z-index: 100;
+    background: hsl(var(--primary));
+    color: hsl(var(--primary-foreground));
+  }
+
+  .skip-link:focus {
+    top: 0;
+  }
+}
+
+/* Focus trap utility for modals */
+.focus-trap {
+  position: relative;
+}
+
+.focus-trap:focus-within {
+  outline: none;
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  :root {
+    --foreground: 0 0% 0%;
+    --background: 0 0% 100%;
+    --muted-foreground: 0 0% 20%;
+    --border: 0 0% 0%;
+  }
+
+  .dark {
+    --foreground: 0 0% 100%;
+    --background: 0 0% 0%;
+    --muted-foreground: 0 0% 80%;
+    --border: 0 0% 100%;
+  }
 }
 
 /**
