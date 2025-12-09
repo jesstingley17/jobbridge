@@ -21,6 +21,10 @@ interface StripeProduct {
   prices: StripePrice[];
 }
 
+interface StripeProductsResponse {
+  products: StripeProduct[];
+}
+
 const tierFeatures: Record<string, string[]> = {
   free: [
     "Basic job search",
@@ -65,9 +69,11 @@ export default function Pricing() {
   const [billingInterval, setBillingInterval] = useState<"month" | "year">("month");
   const { user, isAuthenticated } = useAuth();
 
-  const { data: products, isLoading } = useQuery<StripeProduct[]>({
+  const { data: productsData, isLoading } = useQuery<StripeProductsResponse>({
     queryKey: ["/api/stripe/products"],
   });
+  
+  const products = productsData?.products;
 
   const checkoutMutation = useMutation({
     mutationFn: async (priceId: string) => {

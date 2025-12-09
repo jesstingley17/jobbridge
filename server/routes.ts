@@ -626,7 +626,8 @@ Provide constructive feedback including:
             id: row.price_id,
             unit_amount: row.unit_amount,
             currency: row.currency,
-            recurring: row.recurring
+            recurring: row.recurring,
+            recurring_interval: row.recurring?.interval || null
           });
         }
       }
