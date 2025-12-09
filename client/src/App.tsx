@@ -16,6 +16,7 @@ import CareerDNA from "@/pages/career-dna";
 import Applications from "@/pages/applications";
 import SelectRole from "@/pages/select-role";
 import Community from "@/pages/community";
+import Pricing from "@/pages/pricing";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -32,6 +33,7 @@ function Router() {
       <Route path="/applications" component={Applications} />
       <Route path="/select-role" component={SelectRole} />
       <Route path="/community" component={Community} />
+      <Route path="/pricing" component={Pricing} />
       <Route component={NotFound} />
     </Switch>
   );
