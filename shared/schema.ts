@@ -126,18 +126,64 @@ export const insertApplicationSchema = createInsertSchema(applications).omit({ i
 export type InsertApplication = z.infer<typeof insertApplicationSchema>;
 export type Application = typeof applications.$inferSelect;
 
-// Resumes table
+// Structured resume data types
+export const resumeEducationSchema = z.object({
+  school: z.string(),
+  degree: z.string().optional(),
+  major: z.string().optional(),
+  gradYear: z.string().optional(),
+});
+export type ResumeEducation = z.infer<typeof resumeEducationSchema>;
+
+export const resumeExperienceSchema = z.object({
+  company: z.string(),
+  title: z.string(),
+  dates: z.string().optional(),
+  description: z.string().optional(),
+});
+export type ResumeExperience = z.infer<typeof resumeExperienceSchema>;
+
+export const resumeContactSchema = z.object({
+  name: z.string(),
+  email: z.string().optional(),
+  phone: z.string().optional(),
+  linkedin: z.string().optional(),
+  portfolio: z.string().optional(),
+});
+export type ResumeContact = z.infer<typeof resumeContactSchema>;
+
+// Resumes table with structured fields
 export const resumes = pgTable("resumes", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id").notNull().references(() => users.id),
   title: text("title").notNull(),
   content: text("content").notNull(),
+  // Structured parsed data
+  contactInfo: jsonb("contact_info").$type<ResumeContact>(),
+  skills: text("skills").array(),
+  education: jsonb("education").$type<ResumeEducation[]>(),
+  experience: jsonb("experience").$type<ResumeExperience[]>(),
+  isParsed: boolean("is_parsed").default(false),
   createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
 });
 
-export const insertResumeSchema = createInsertSchema(resumes).omit({ id: true, createdAt: true });
+export const insertResumeSchema = createInsertSchema(resumes).omit({ id: true, createdAt: true, updatedAt: true });
 export type InsertResume = z.infer<typeof insertResumeSchema>;
 export type Resume = typeof resumes.$inferSelect;
+
+// Resume parsing request schema
+export const parseResumeRequestSchema = z.object({
+  resumeText: z.string(),
+});
+export type ParseResumeRequest = z.infer<typeof parseResumeRequestSchema>;
+
+// Bulk apply request schema
+export const bulkApplyRequestSchema = z.object({
+  jobIds: z.array(z.string()),
+  resumeId: z.string().optional(),
+});
+export type BulkApplyRequest = z.infer<typeof bulkApplyRequestSchema>;
 
 // Interview sessions table
 export const interviewSessions = pgTable("interview_sessions", {
