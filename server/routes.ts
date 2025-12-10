@@ -9,6 +9,8 @@ import { getUncachableStripeClient, getStripePublishableKey } from "./stripeClie
 import { sql } from "drizzle-orm";
 import { db } from "./db";
 import { requireFeature, requireApplicationQuota, incrementApplicationCount, getUserSubscriptionStatus } from "./subscriptionMiddleware";
+import { sendMagicLinkEmail, sendPasswordResetEmail } from "./email";
+import crypto from "crypto";
 import { 
   generateResumeRequestSchema, 
   generateInterviewQuestionsRequestSchema,
@@ -23,8 +25,12 @@ import {
   applicationTipsRequestSchema,
   jobMatchScoreRequestSchema,
   parseResumeRequestSchema,
-  bulkApplyRequestSchema
+  bulkApplyRequestSchema,
+  registerUserSchema,
+  loginUserSchema
 } from "@shared/schema";
+import { hashPassword, verifyPassword } from "./storage";
+import { sendWelcomeEmail } from "./email";
 
 const normalizeStringArray = z.preprocess((val) => {
   if (typeof val === 'string') {
@@ -78,6 +84,109 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Seed initial data on startup
   // Seed data removed - using real job search API
 
+  // Email/password registration
+  app.post('/api/auth/register', async (req, res) => {
+    try {
+      const validatedData = registerUserSchema.parse(req.body);
+      
+      // Check if user already exists
+      const existingUser = await storage.getUserByEmail(validatedData.email);
+      if (existingUser) {
+        return res.status(400).json({ message: "An account with this email already exists" });
+      }
+      
+      // Hash password and create user
+      const hashedPassword = await hashPassword(validatedData.password);
+      const user = await storage.createUserWithPassword({
+        ...validatedData,
+        hashedPassword
+      });
+      
+      // Send welcome email
+      try {
+        await sendWelcomeEmail({ email: user.email!, firstName: user.firstName || undefined });
+      } catch (emailError) {
+        console.error("Failed to send welcome email:", emailError);
+      }
+      
+      // Create session - store user data in session for traditional auth
+      (req.session as any).userId = user.id;
+      (req.session as any).user = {
+        claims: { sub: user.id }
+      };
+      
+      res.status(201).json({ 
+        message: "Registration successful",
+        user: {
+          id: user.id,
+          email: user.email,
+          firstName: user.firstName,
+          lastName: user.lastName,
+        }
+      });
+    } catch (error: any) {
+      console.error("Registration error:", error);
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ message: error.errors[0].message });
+      }
+      res.status(500).json({ message: "Registration failed" });
+    }
+  });
+
+  // Email/password login
+  app.post('/api/auth/login', async (req, res) => {
+    try {
+      const validatedData = loginUserSchema.parse(req.body);
+      
+      // Find user by email
+      const user = await storage.getUserByEmail(validatedData.email);
+      if (!user || !user.password) {
+        return res.status(401).json({ message: "Invalid email or password" });
+      }
+      
+      // Verify password
+      const isValid = await verifyPassword(validatedData.password, user.password);
+      if (!isValid) {
+        return res.status(401).json({ message: "Invalid email or password" });
+      }
+      
+      // Create session
+      (req.session as any).userId = user.id;
+      (req.session as any).user = {
+        claims: { sub: user.id }
+      };
+      
+      res.json({ 
+        message: "Login successful",
+        user: {
+          id: user.id,
+          email: user.email,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          role: user.role,
+        }
+      });
+    } catch (error: any) {
+      console.error("Login error:", error);
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ message: error.errors[0].message });
+      }
+      res.status(500).json({ message: "Login failed" });
+    }
+  });
+
+  // Logout
+  app.post('/api/auth/logout', (req, res) => {
+    req.session.destroy((err) => {
+      if (err) {
+        console.error("Logout error:", err);
+        return res.status(500).json({ message: "Logout failed" });
+      }
+      res.clearCookie('connect.sid');
+      res.json({ message: "Logged out successfully" });
+    });
+  });
+
   // Auth routes
   app.get('/api/auth/user', isAuthenticated, async (req: any, res) => {
     try {
@@ -115,6 +224,210 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error updating role:", error);
       res.status(500).json({ error: "Failed to update role" });
+    }
+  });
+
+  // Magic link / password reset routes
+  const magicLinkRequestSchema = z.object({
+    email: z.string().email(),
+    type: z.enum(['login', 'reset']).default('login'),
+  });
+
+  app.post('/api/auth/magic-link', async (req, res) => {
+    try {
+      const { email, type } = magicLinkRequestSchema.parse(req.body);
+      
+      // Check if user exists
+      const user = await storage.getUserByEmail(email);
+      if (!user) {
+        // Don't reveal if email exists or not
+        return res.json({ message: "If an account exists with this email, you will receive a link shortly." });
+      }
+      
+      // Generate token
+      const token = crypto.randomBytes(32).toString('hex');
+      const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
+      
+      await storage.createMagicLinkToken(email, token, expiresAt);
+      
+      // Build magic link URL
+      const baseUrl = `${req.protocol}://${req.get('host')}`;
+      const magicLink = `${baseUrl}/auth/verify?token=${token}&type=${type}`;
+      
+      // Send email based on type
+      let sent = false;
+      if (type === 'reset') {
+        sent = await sendPasswordResetEmail({ email, firstName: user.firstName || undefined, magicLink });
+      } else {
+        sent = await sendMagicLinkEmail({ email, firstName: user.firstName || undefined, magicLink });
+      }
+      
+      if (sent) {
+        await storage.logEmail(user.id, email, type === 'reset' ? 'password_reset' : 'magic_link');
+      }
+      
+      res.json({ message: "If an account exists with this email, you will receive a link shortly." });
+    } catch (error) {
+      console.error("Error sending magic link:", error);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Invalid email address" });
+      }
+      res.status(500).json({ error: "Failed to send magic link" });
+    }
+  });
+
+  app.get('/api/auth/verify-token', async (req, res) => {
+    try {
+      const { token } = req.query;
+      
+      if (!token || typeof token !== 'string') {
+        return res.status(400).json({ valid: false, error: "Token is required" });
+      }
+      
+      const magicToken = await storage.getMagicLinkToken(token);
+      
+      if (!magicToken) {
+        return res.json({ valid: false, error: "Invalid token" });
+      }
+      
+      if (magicToken.used) {
+        return res.json({ valid: false, error: "Token has already been used" });
+      }
+      
+      if (new Date() > magicToken.expiresAt) {
+        return res.json({ valid: false, error: "Token has expired" });
+      }
+      
+      // Get user info
+      const user = await storage.getUserByEmail(magicToken.email);
+      
+      res.json({ 
+        valid: true, 
+        email: magicToken.email,
+        firstName: user?.firstName || null 
+      });
+    } catch (error) {
+      console.error("Error verifying token:", error);
+      res.status(500).json({ valid: false, error: "Failed to verify token" });
+    }
+  });
+
+  app.post('/api/auth/use-magic-link', async (req, res) => {
+    try {
+      const { token } = req.body;
+      
+      if (!token || typeof token !== 'string') {
+        return res.status(400).json({ success: false, error: "Token is required" });
+      }
+      
+      const magicToken = await storage.getMagicLinkToken(token);
+      
+      if (!magicToken) {
+        return res.status(400).json({ success: false, error: "Invalid token" });
+      }
+      
+      if (magicToken.used) {
+        return res.status(400).json({ success: false, error: "Token has already been used" });
+      }
+      
+      if (new Date() > magicToken.expiresAt) {
+        return res.status(400).json({ success: false, error: "Token has expired" });
+      }
+      
+      // Mark token as used
+      await storage.markMagicLinkTokenUsed(token);
+      
+      // Get user and log them in
+      const user = await storage.getUserByEmail(magicToken.email);
+      
+      if (!user) {
+        return res.status(400).json({ success: false, error: "User not found" });
+      }
+      
+      // Create session for the user
+      (req.session as any).userId = user.id;
+      (req.session as any).user = {
+        claims: { sub: user.id }
+      };
+      
+      // Mark email as verified
+      await storage.verifyUserEmail(user.email!);
+      
+      res.json({ 
+        success: true, 
+        message: "Email verified successfully",
+        user: {
+          id: user.id,
+          email: user.email,
+          firstName: user.firstName,
+          lastName: user.lastName,
+        }
+      });
+    } catch (error) {
+      console.error("Error using magic link:", error);
+      res.status(500).json({ success: false, error: "Failed to use magic link" });
+    }
+  });
+
+  // Reset password (after receiving magic link)
+  const resetPasswordSchema = z.object({
+    token: z.string(),
+    newPassword: z.string().min(8, "Password must be at least 8 characters"),
+  });
+
+  app.post('/api/auth/reset-password', async (req, res) => {
+    try {
+      const { token, newPassword } = resetPasswordSchema.parse(req.body);
+      
+      const magicToken = await storage.getMagicLinkToken(token);
+      
+      if (!magicToken) {
+        return res.status(400).json({ success: false, error: "Invalid token" });
+      }
+      
+      if (magicToken.used) {
+        return res.status(400).json({ success: false, error: "Token has already been used" });
+      }
+      
+      if (new Date() > magicToken.expiresAt) {
+        return res.status(400).json({ success: false, error: "Token has expired" });
+      }
+      
+      // Get user
+      const user = await storage.getUserByEmail(magicToken.email);
+      if (!user) {
+        return res.status(400).json({ success: false, error: "User not found" });
+      }
+      
+      // Hash and update password
+      const hashedPassword = await hashPassword(newPassword);
+      await storage.updateUserPassword(user.id, hashedPassword);
+      
+      // Mark token as used
+      await storage.markMagicLinkTokenUsed(token);
+      
+      // Create session
+      (req.session as any).userId = user.id;
+      (req.session as any).user = {
+        claims: { sub: user.id }
+      };
+      
+      res.json({ 
+        success: true, 
+        message: "Password reset successfully",
+        user: {
+          id: user.id,
+          email: user.email,
+          firstName: user.firstName,
+          lastName: user.lastName,
+        }
+      });
+    } catch (error: any) {
+      console.error("Error resetting password:", error);
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ success: false, error: error.errors[0].message });
+      }
+      res.status(500).json({ success: false, error: "Failed to reset password" });
     }
   });
 

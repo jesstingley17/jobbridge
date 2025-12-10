@@ -114,7 +114,7 @@ export default function Pricing() {
 
   const handleSubscribe = (product: StripeProduct) => {
     if (!isAuthenticated) {
-      window.location.href = "/api/login";
+      window.location.href = "/auth";
       return;
     }
 

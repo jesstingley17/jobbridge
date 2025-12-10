@@ -73,7 +73,7 @@ export default function Community() {
       <div className="container mx-auto px-4 py-16 text-center">
         <h1 className="text-2xl font-bold mb-4">Please log in to access the community</h1>
         <Button asChild>
-          <a href="/api/login" data-testid="link-login-community">Log In</a>
+          <a href="/auth" data-testid="link-login-community">Log In</a>
         </Button>
       </div>
     );

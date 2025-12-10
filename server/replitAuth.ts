@@ -7,6 +7,7 @@ import type { Express, RequestHandler } from "express";
 import memoize from "memoizee";
 import connectPg from "connect-pg-simple";
 import { storage } from "./storage";
+import { sendWelcomeEmail } from "./email";
 
 const getOidcConfig = memoize(
   async () => {
@@ -51,13 +52,32 @@ function updateUserSession(
 }
 
 async function upsertUser(claims: any) {
-  await storage.upsertUser({
+  const email = claims["email"];
+  const firstName = claims["first_name"];
+  
+  // Check if welcome email has already been sent for this email
+  const welcomeEmailSent = email ? await storage.hasWelcomeEmailBeenSent(email) : true;
+  
+  const user = await storage.upsertUser({
     id: claims["sub"],
-    email: claims["email"],
-    firstName: claims["first_name"],
+    email,
+    firstName,
     lastName: claims["last_name"],
     profileImageUrl: claims["profile_image_url"],
   });
+  
+  // Send welcome email to new users
+  if (email && !welcomeEmailSent) {
+    try {
+      const sent = await sendWelcomeEmail({ email, firstName });
+      if (sent) {
+        await storage.logEmail(user.id, email, 'welcome');
+        console.log('Welcome email sent to new user:', email);
+      }
+    } catch (error) {
+      console.error('Failed to send welcome email:', error);
+    }
+  }
 }
 
 export async function setupAuth(app: Express) {

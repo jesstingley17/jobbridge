@@ -116,7 +116,7 @@ export function Navbar() {
                   </DropdownMenu>
                 ) : (
                   <Button asChild data-testid="button-login">
-                    <a href="/api/login">Log in</a>
+                    <a href="/auth">Log in</a>
                   </Button>
                 )
               )}

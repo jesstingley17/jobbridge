@@ -14,10 +14,11 @@ export const sessions = pgTable(
   (table) => [index("IDX_session_expire").on(table.expire)],
 );
 
-// User storage table (required for Replit Auth)
+// User storage table (supports both Replit Auth and email/password auth)
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   email: varchar("email").unique(),
+  password: varchar("password"), // hashed password for email/password auth
   firstName: varchar("first_name"),
   lastName: varchar("last_name"),
   profileImageUrl: varchar("profile_image_url"),
@@ -27,12 +28,29 @@ export const users = pgTable("users", {
   subscriptionTier: varchar("subscription_tier").default("free"), // free, pro, enterprise
   monthlyApplicationCount: integer("monthly_application_count").default(0),
   applicationCountResetDate: timestamp("application_count_reset_date").defaultNow(),
+  emailVerified: boolean("email_verified").default(false),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
 export type UpsertUser = typeof users.$inferInsert;
 export type User = typeof users.$inferSelect;
+
+// Registration schema for email/password signup
+export const registerUserSchema = z.object({
+  email: z.string().email(),
+  password: z.string().min(8, "Password must be at least 8 characters"),
+  firstName: z.string().min(1, "First name is required"),
+  lastName: z.string().optional(),
+});
+export type RegisterUser = z.infer<typeof registerUserSchema>;
+
+// Login schema
+export const loginUserSchema = z.object({
+  email: z.string().email(),
+  password: z.string().min(1, "Password is required"),
+});
+export type LoginUser = z.infer<typeof loginUserSchema>;
 
 export const userRoles = ["developer", "participant", "employer"] as const;
 export type UserRole = typeof userRoles[number];
@@ -348,3 +366,28 @@ export const jobMatchScoreRequestSchema = z.object({
   userExperience: z.string().optional(),
 });
 export type JobMatchScoreRequest = z.infer<typeof jobMatchScoreRequestSchema>;
+
+// Magic link tokens for passwordless authentication
+export const magicLinkTokens = pgTable("magic_link_tokens", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  email: varchar("email").notNull(),
+  token: varchar("token").notNull().unique(),
+  expiresAt: timestamp("expires_at").notNull(),
+  used: boolean("used").default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertMagicLinkTokenSchema = createInsertSchema(magicLinkTokens).omit({ id: true, createdAt: true, used: true });
+export type InsertMagicLinkToken = z.infer<typeof insertMagicLinkTokenSchema>;
+export type MagicLinkToken = typeof magicLinkTokens.$inferSelect;
+
+// Track if welcome email was sent
+export const emailLogs = pgTable("email_logs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").references(() => users.id),
+  email: varchar("email").notNull(),
+  emailType: varchar("email_type").notNull(),
+  sentAt: timestamp("sent_at").defaultNow(),
+});
+
+export type EmailLog = typeof emailLogs.$inferSelect;

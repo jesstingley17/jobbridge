@@ -1,5 +1,5 @@
 import { 
-  users, type User, type UpsertUser,
+  users, type User, type UpsertUser, type RegisterUser,
   jobs, type Job, type InsertJob,
   applications, type Application, type InsertApplication,
   resumes, type Resume, type InsertResume,
@@ -11,8 +11,11 @@ import {
   mentorConnections, type MentorConnection,
   peerConnections, type PeerConnection, type InsertPeerConnection,
   messages, type Message, type InsertMessage,
-  supportTickets, type SupportTicket, type InsertSupportTicket
+  supportTickets, type SupportTicket, type InsertSupportTicket,
+  magicLinkTokens, type MagicLinkToken,
+  emailLogs, type EmailLog
 } from "@shared/schema";
+import bcrypt from "bcrypt";
 import { db } from "./db";
 import { eq, ilike, or, and, desc, sql } from "drizzle-orm";
 
@@ -78,6 +81,21 @@ export interface IStorage {
   
   // Seed data
   seedInitialData(): Promise<void>;
+  
+  // Magic link token operations
+  createMagicLinkToken(email: string, token: string, expiresAt: Date): Promise<MagicLinkToken>;
+  getMagicLinkToken(token: string): Promise<MagicLinkToken | undefined>;
+  markMagicLinkTokenUsed(token: string): Promise<void>;
+  getUserByEmail(email: string): Promise<User | undefined>;
+  
+  // Email log operations
+  logEmail(userId: string | null, email: string, emailType: string): Promise<EmailLog>;
+  hasWelcomeEmailBeenSent(email: string): Promise<boolean>;
+  
+  // Password auth operations
+  createUserWithPassword(userData: RegisterUser & { hashedPassword: string }): Promise<User>;
+  updateUserPassword(userId: string, hashedPassword: string): Promise<void>;
+  verifyUserEmail(email: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -435,6 +453,95 @@ export class DatabaseStorage implements IStorage {
   async seedInitialData(): Promise<void> {
     // No longer seeding mock data
   }
+
+  // Magic link token operations
+  async createMagicLinkToken(email: string, token: string, expiresAt: Date): Promise<MagicLinkToken> {
+    const [magicToken] = await db
+      .insert(magicLinkTokens)
+      .values({ email, token, expiresAt })
+      .returning();
+    return magicToken;
+  }
+
+  async getMagicLinkToken(token: string): Promise<MagicLinkToken | undefined> {
+    const [magicToken] = await db
+      .select()
+      .from(magicLinkTokens)
+      .where(eq(magicLinkTokens.token, token));
+    return magicToken;
+  }
+
+  async markMagicLinkTokenUsed(token: string): Promise<void> {
+    await db
+      .update(magicLinkTokens)
+      .set({ used: true })
+      .where(eq(magicLinkTokens.token, token));
+  }
+
+  async getUserByEmail(email: string): Promise<User | undefined> {
+    const [user] = await db
+      .select()
+      .from(users)
+      .where(eq(users.email, email));
+    return user;
+  }
+
+  // Email log operations
+  async logEmail(userId: string | null, email: string, emailType: string): Promise<EmailLog> {
+    const [log] = await db
+      .insert(emailLogs)
+      .values({ userId, email, emailType })
+      .returning();
+    return log;
+  }
+
+  async hasWelcomeEmailBeenSent(email: string): Promise<boolean> {
+    const [log] = await db
+      .select()
+      .from(emailLogs)
+      .where(and(
+        eq(emailLogs.email, email),
+        eq(emailLogs.emailType, 'welcome')
+      ));
+    return !!log;
+  }
+
+  // Password auth operations
+  async createUserWithPassword(userData: RegisterUser & { hashedPassword: string }): Promise<User> {
+    const [user] = await db
+      .insert(users)
+      .values({
+        email: userData.email,
+        password: userData.hashedPassword,
+        firstName: userData.firstName,
+        lastName: userData.lastName || null,
+        emailVerified: false,
+      })
+      .returning();
+    return user;
+  }
+
+  async updateUserPassword(userId: string, hashedPassword: string): Promise<void> {
+    await db
+      .update(users)
+      .set({ password: hashedPassword, updatedAt: new Date() })
+      .where(eq(users.id, userId));
+  }
+
+  async verifyUserEmail(email: string): Promise<void> {
+    await db
+      .update(users)
+      .set({ emailVerified: true, updatedAt: new Date() })
+      .where(eq(users.email, email));
+  }
 }
 
 export const storage = new DatabaseStorage();
+
+export async function hashPassword(password: string): Promise<string> {
+  return bcrypt.hash(password, 10);
+}
+
+export async function verifyPassword(password: string, hashedPassword: string): Promise<boolean> {
+  return bcrypt.compare(password, hashedPassword);
+}

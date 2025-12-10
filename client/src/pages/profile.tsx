@@ -168,7 +168,7 @@ export default function Profile() {
           </CardHeader>
           <CardContent className="flex justify-center">
             <Button asChild data-testid="button-login-prompt">
-              <a href="/api/login">Log in with Replit</a>
+              <a href="/auth">Log in</a>
             </Button>
           </CardContent>
         </Card>
