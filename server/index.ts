@@ -1,4 +1,5 @@
 import express, { type Request, Response, NextFunction } from "express";
+import compression from "compression";
 import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
@@ -76,6 +77,20 @@ app.post(
     }
   }
 );
+
+// Enable compression for all responses (must be early in middleware chain)
+app.use(compression({
+  filter: (req, res) => {
+    // Don't compress responses if client doesn't support it
+    if (req.headers['x-no-compression']) {
+      return false;
+    }
+    // Use compression filter for all other requests
+    return compression.filter(req, res);
+  },
+  level: 6, // Compression level (0-9, 6 is a good balance)
+  threshold: 1024, // Only compress responses larger than 1KB
+}));
 
 // Canonical domain redirects (must be before other middleware)
 // Redirect HTTP to HTTPS and www to non-www
