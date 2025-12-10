@@ -446,7 +446,25 @@ export default function Jobs() {
       });
       return;
     }
-    setApplyJob(job);
+    // Convert ExtendedJob to Job format if needed
+    const jobForState: Job = 'createdAt' in job ? job as Job : {
+      id: String(job.id),
+      title: job.title,
+      company: job.company,
+      location: job.location,
+      type: job.type,
+      salary: job.salary ?? null,
+      description: job.description,
+      requirements: job.requirements ?? '',
+      accommodations: null,
+      postedDate: job.postedDate ?? '',
+      accessibilityFeatures: job.accessibilityFeatures ?? null,
+      externalId: null,
+      externalSource: job.externalSource ?? null,
+      applyUrl: null,
+      createdAt: null,
+    };
+    setApplyJob(jobForState);
   };
 
   const toggleSave = (jobId: number) => {
@@ -618,7 +636,7 @@ export default function Jobs() {
                   postedDate: job.postedDate,
                   requirements: job.requirements,
                   externalSource: job.externalSource,
-                  accessibilityFeatures: job.accessibilityFeatures,
+                  accessibilityFeatures: job.accessibilityFeatures ?? undefined,
                 };
                 return (
                   <JobCard
