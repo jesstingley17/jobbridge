@@ -38,17 +38,20 @@ ${pages.map(page => `  <url>
 
   // Also serve robots.txt
   app.get('/robots.txt', (req, res) => {
-    res.setHeader('Content-Type', 'text/plain');
-    const robots = `User-agent: *
-Allow: /
-Disallow: /api/
-Disallow: /dashboard/
-Disallow: /profile/
-Disallow: /applications/
-Disallow: /auth/verify
-
-Sitemap: ${baseUrl}/sitemap.xml
-`;
+    res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+    // Ensure proper robots.txt format - each directive must have a colon
+    const robots = [
+      'User-agent: *',
+      'Allow: /',
+      'Disallow: /api/',
+      'Disallow: /dashboard/',
+      'Disallow: /profile/',
+      'Disallow: /applications/',
+      'Disallow: /auth/verify',
+      '',
+      `Sitemap: ${baseUrl}/sitemap.xml`,
+      ''
+    ].join('\n');
     res.send(robots);
   });
 }
