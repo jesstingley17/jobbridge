@@ -403,3 +403,26 @@ export const emailLogs = pgTable("email_logs", {
 });
 
 export type EmailLog = typeof emailLogs.$inferSelect;
+
+// Blog posts table (synced from Contentful)
+export const blogPosts = pgTable("blog_posts", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  contentfulId: varchar("contentful_id").unique(), // Contentful entry ID
+  title: text("title").notNull(),
+  slug: varchar("slug").notNull().unique(),
+  excerpt: text("excerpt"),
+  content: text("content").notNull(),
+  authorName: varchar("author_name").default("The JobBridge Team"),
+  featuredImage: text("featured_image"),
+  published: boolean("published").default(true),
+  publishedAt: timestamp("published_at").defaultNow(),
+  tags: text("tags").array(),
+  views: integer("views").default(0),
+  contentfulUpdatedAt: timestamp("contentful_updated_at"), // Track Contentful updates
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertBlogPostSchema = createInsertSchema(blogPosts).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertBlogPost = z.infer<typeof insertBlogPostSchema>;
+export type BlogPost = typeof blogPosts.$inferSelect;

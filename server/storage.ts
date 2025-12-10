@@ -14,7 +14,8 @@ import {
   supportTickets, type SupportTicket, type InsertSupportTicket,
   magicLinkTokens, type MagicLinkToken,
   emailLogs, type EmailLog,
-  notes, type Note, type InsertNote
+  notes, type Note, type InsertNote,
+  blogPosts, type BlogPost, type InsertBlogPost
 } from "@shared/schema";
 import bcrypt from "bcrypt";
 import { db } from "./db";
@@ -102,6 +103,13 @@ export interface IStorage {
   getNotes(): Promise<Note[]>;
   createNote(note: InsertNote): Promise<Note>;
   deleteNote(id: number): Promise<void>;
+  
+  // Blog post operations
+  getBlogPosts(search?: string, tag?: string): Promise<BlogPost[]>;
+  getBlogPostBySlug(slug: string): Promise<BlogPost | undefined>;
+  getBlogPostByContentfulId(contentfulId: string): Promise<BlogPost | undefined>;
+  upsertBlogPost(post: InsertBlogPost): Promise<BlogPost>;
+  incrementBlogPostViews(slug: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -600,6 +608,79 @@ export class DatabaseStorage implements IStorage {
 
   async deleteNote(id: number): Promise<void> {
     await db.delete(notes).where(eq(notes.id, id));
+  }
+
+  // Blog post operations
+  async getBlogPosts(search?: string, tag?: string): Promise<BlogPost[]> {
+    let conditions = [eq(blogPosts.published, true)];
+    
+    if (search) {
+      conditions.push(
+        or(
+          ilike(blogPosts.title, `%${search}%`),
+          ilike(blogPosts.excerpt || sql`''`, `%${search}%`),
+          ilike(blogPosts.content, `%${search}%`)
+        )!
+      );
+    }
+    
+    const posts = await db
+      .select()
+      .from(blogPosts)
+      .where(and(...conditions))
+      .orderBy(desc(blogPosts.publishedAt));
+    
+    if (tag) {
+      return posts.filter(post => post.tags?.includes(tag));
+    }
+    
+    return posts;
+  }
+
+  async getBlogPostBySlug(slug: string): Promise<BlogPost | undefined> {
+    const [post] = await db
+      .select()
+      .from(blogPosts)
+      .where(and(eq(blogPosts.slug, slug), eq(blogPosts.published, true)));
+    return post;
+  }
+
+  async getBlogPostByContentfulId(contentfulId: string): Promise<BlogPost | undefined> {
+    const [post] = await db
+      .select()
+      .from(blogPosts)
+      .where(eq(blogPosts.contentfulId, contentfulId));
+    return post;
+  }
+
+  async upsertBlogPost(post: InsertBlogPost): Promise<BlogPost> {
+    if (post.contentfulId) {
+      // Check if post exists by Contentful ID
+      const existing = await this.getBlogPostByContentfulId(post.contentfulId);
+      if (existing) {
+        // Update existing post
+        const [updated] = await db
+          .update(blogPosts)
+          .set({
+            ...post,
+            updatedAt: new Date(),
+          })
+          .where(eq(blogPosts.contentfulId, post.contentfulId))
+          .returning();
+        return updated;
+      }
+    }
+    
+    // Insert new post
+    const [newPost] = await db.insert(blogPosts).values(post).returning();
+    return newPost;
+  }
+
+  async incrementBlogPostViews(slug: string): Promise<void> {
+    await db
+      .update(blogPosts)
+      .set({ views: sql`${blogPosts.views} + 1` })
+      .where(eq(blogPosts.slug, slug));
   }
 }
 

@@ -13,6 +13,12 @@ import { sendMagicLinkEmail, sendPasswordResetEmail } from "./email";
 import crypto from "crypto";
 import { generateAIText, getAIClient } from "./aiGateway";
 import { 
+  fetchContentfulPosts, 
+  fetchContentfulPostBySlug, 
+  convertContentfulPostToDbFormat,
+  syncContentfulPosts 
+} from "./contentful";
+import { 
   generateResumeRequestSchema, 
   generateInterviewQuestionsRequestSchema,
   analyzeAnswerRequestSchema,
@@ -1693,6 +1699,114 @@ Return JSON with:
     } catch (error) {
       console.error("Error fetching subscription:", error);
       res.status(500).json({ error: "Failed to fetch subscription" });
+    }
+  });
+
+  // Blog API routes (Contentful integration)
+  app.get("/api/blog/posts", async (req, res) => {
+    try {
+      const search = req.query.search as string | undefined;
+      const tag = req.query.tag as string | undefined;
+      
+      // Sync from Contentful in background (non-blocking)
+      syncContentfulPosts(storage.upsertBlogPost.bind(storage))
+        .then(({ synced, errors }) => {
+          if (synced > 0 || errors > 0) {
+            console.log(`Contentful sync: ${synced} synced, ${errors} errors`);
+          }
+        })
+        .catch(err => console.error("Contentful sync error:", err));
+      
+      // Return posts from database
+      const posts = await storage.getBlogPosts(search, tag);
+      res.json({ posts });
+    } catch (error) {
+      console.error("Error fetching blog posts:", error);
+      res.status(500).json({ error: "Failed to fetch blog posts" });
+    }
+  });
+
+  app.get("/api/blog/posts/:slug", async (req, res) => {
+    try {
+      const { slug } = req.params;
+      
+      // Try to get from database first
+      let post = await storage.getBlogPostBySlug(slug);
+      
+      // If not found, try to fetch from Contentful and sync
+      if (!post) {
+        const contentfulPost = await fetchContentfulPostBySlug(slug);
+        if (contentfulPost) {
+          const dbPost = convertContentfulPostToDbFormat(contentfulPost);
+          post = await storage.upsertBlogPost(dbPost);
+        }
+      }
+      
+      if (!post) {
+        return res.status(404).json({ error: "Post not found" });
+      }
+      
+      // Increment views
+      await storage.incrementBlogPostViews(slug);
+      post.views = (post.views || 0) + 1;
+      
+      res.json({ post });
+    } catch (error) {
+      console.error("Error fetching blog post:", error);
+      res.status(500).json({ error: "Failed to fetch blog post" });
+    }
+  });
+
+  // Contentful webhook endpoint for automatic sync
+  app.post("/api/contentful/webhook", async (req, res) => {
+    try {
+      // Verify webhook secret if configured
+      const webhookSecret = process.env.CONTENTFUL_WEBHOOK_SECRET;
+      if (webhookSecret) {
+        const signature = req.headers['x-contentful-signature'];
+        if (signature !== webhookSecret) {
+          return res.status(401).json({ error: "Unauthorized" });
+        }
+      }
+
+      const { sys, fields } = req.body;
+      
+      // Only process blog post entries
+      if (sys?.contentType?.sys?.id === 'blogPost') {
+        const contentfulPost = {
+          sys: {
+            id: sys.id,
+            createdAt: sys.createdAt,
+            updatedAt: sys.updatedAt,
+          },
+          fields: fields || {},
+        };
+        
+        const dbPost = convertContentfulPostToDbFormat(contentfulPost as any);
+        await storage.upsertBlogPost(dbPost);
+        
+        console.log(`Synced blog post from Contentful: ${dbPost.slug}`);
+      }
+      
+      res.status(200).json({ success: true });
+    } catch (error) {
+      console.error("Error processing Contentful webhook:", error);
+      res.status(500).json({ error: "Failed to process webhook" });
+    }
+  });
+
+  // Manual sync endpoint (admin only)
+  app.post("/api/contentful/sync", isAuthenticated, async (req: any, res) => {
+    try {
+      const result = await syncContentfulPosts(storage.upsertBlogPost.bind(storage));
+      res.json({ 
+        success: true, 
+        synced: result.synced, 
+        errors: result.errors 
+      });
+    } catch (error) {
+      console.error("Error syncing Contentful posts:", error);
+      res.status(500).json({ error: "Failed to sync posts" });
     }
   });
 
