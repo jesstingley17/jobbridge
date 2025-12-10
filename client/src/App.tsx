@@ -21,12 +21,17 @@ import Community from "@/pages/community";
 import Pricing from "@/pages/pricing";
 import Auth from "@/pages/auth";
 import ResetPassword from "@/pages/reset-password";
+import About from "@/pages/about";
+import Blog from "@/pages/blog";
+import BlogPost from "@/pages/blog-post";
+import Contact from "@/pages/contact";
 import NotFound from "@/pages/not-found";
 
 function Router() {
   return (
     <Switch>
       <Route path="/" component={Home} />
+      <Route path="/about" component={About} />
       <Route path="/features" component={Features} />
       <Route path="/jobs" component={Jobs} />
       <Route path="/resume" component={Resume} />
@@ -38,6 +43,9 @@ function Router() {
       <Route path="/select-role" component={SelectRole} />
       <Route path="/community" component={Community} />
       <Route path="/pricing" component={Pricing} />
+      <Route path="/blog" component={Blog} />
+      <Route path="/blog/:slug" component={BlogPost} />
+      <Route path="/contact" component={Contact} />
       <Route path="/auth" component={Auth} />
       <Route path="/auth/verify" component={ResetPassword} />
       <Route component={NotFound} />
