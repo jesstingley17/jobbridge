@@ -104,7 +104,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Send welcome email
       try {
-        await sendWelcomeEmail(user.email!, user.firstName || 'User');
+        await sendWelcomeEmail({ email: user.email!, firstName: user.firstName || undefined });
       } catch (emailError) {
         console.error("Failed to send welcome email:", emailError);
       }
@@ -344,16 +344,90 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ success: false, error: "User not found" });
       }
       
-      // For now, redirect to Replit auth (since sessions are managed by Replit OAuth)
-      // The magic link primarily serves as email verification
+      // Create session for the user
+      (req.session as any).userId = user.id;
+      (req.session as any).user = {
+        claims: { sub: user.id }
+      };
+      
+      // Mark email as verified
+      await storage.verifyUserEmail(user.email!);
+      
       res.json({ 
         success: true, 
         message: "Email verified successfully",
-        redirectTo: "/api/login"
+        user: {
+          id: user.id,
+          email: user.email,
+          firstName: user.firstName,
+          lastName: user.lastName,
+        }
       });
     } catch (error) {
       console.error("Error using magic link:", error);
       res.status(500).json({ success: false, error: "Failed to use magic link" });
+    }
+  });
+
+  // Reset password (after receiving magic link)
+  const resetPasswordSchema = z.object({
+    token: z.string(),
+    newPassword: z.string().min(8, "Password must be at least 8 characters"),
+  });
+
+  app.post('/api/auth/reset-password', async (req, res) => {
+    try {
+      const { token, newPassword } = resetPasswordSchema.parse(req.body);
+      
+      const magicToken = await storage.getMagicLinkToken(token);
+      
+      if (!magicToken) {
+        return res.status(400).json({ success: false, error: "Invalid token" });
+      }
+      
+      if (magicToken.used) {
+        return res.status(400).json({ success: false, error: "Token has already been used" });
+      }
+      
+      if (new Date() > magicToken.expiresAt) {
+        return res.status(400).json({ success: false, error: "Token has expired" });
+      }
+      
+      // Get user
+      const user = await storage.getUserByEmail(magicToken.email);
+      if (!user) {
+        return res.status(400).json({ success: false, error: "User not found" });
+      }
+      
+      // Hash and update password
+      const hashedPassword = await hashPassword(newPassword);
+      await storage.updateUserPassword(user.id, hashedPassword);
+      
+      // Mark token as used
+      await storage.markMagicLinkTokenUsed(token);
+      
+      // Create session
+      (req.session as any).userId = user.id;
+      (req.session as any).user = {
+        claims: { sub: user.id }
+      };
+      
+      res.json({ 
+        success: true, 
+        message: "Password reset successfully",
+        user: {
+          id: user.id,
+          email: user.email,
+          firstName: user.firstName,
+          lastName: user.lastName,
+        }
+      });
+    } catch (error: any) {
+      console.error("Error resetting password:", error);
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ success: false, error: error.errors[0].message });
+      }
+      res.status(500).json({ success: false, error: "Failed to reset password" });
     }
   });
 
