@@ -348,3 +348,28 @@ export const jobMatchScoreRequestSchema = z.object({
   userExperience: z.string().optional(),
 });
 export type JobMatchScoreRequest = z.infer<typeof jobMatchScoreRequestSchema>;
+
+// Magic link tokens for passwordless authentication
+export const magicLinkTokens = pgTable("magic_link_tokens", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  email: varchar("email").notNull(),
+  token: varchar("token").notNull().unique(),
+  expiresAt: timestamp("expires_at").notNull(),
+  used: boolean("used").default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertMagicLinkTokenSchema = createInsertSchema(magicLinkTokens).omit({ id: true, createdAt: true, used: true });
+export type InsertMagicLinkToken = z.infer<typeof insertMagicLinkTokenSchema>;
+export type MagicLinkToken = typeof magicLinkTokens.$inferSelect;
+
+// Track if welcome email was sent
+export const emailLogs = pgTable("email_logs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").references(() => users.id),
+  email: varchar("email").notNull(),
+  emailType: varchar("email_type").notNull(),
+  sentAt: timestamp("sent_at").defaultNow(),
+});
+
+export type EmailLog = typeof emailLogs.$inferSelect;
