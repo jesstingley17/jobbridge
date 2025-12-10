@@ -435,6 +435,7 @@ export default function Jobs() {
   const [selectedFilters, setSelectedFilters] = useState<string[]>([]);
   const [showFilters, setShowFilters] = useState(false);
   const [applyJob, setApplyJob] = useState<Job | null>(null);
+  const [savedJobs, setSavedJobs] = useState<string[]>([]);
 
   const handleApplyClick = (job: Job) => {
     if (!isAuthenticated) {
@@ -446,6 +447,13 @@ export default function Jobs() {
       return;
     }
     setApplyJob(job);
+  };
+
+  const toggleSave = (jobId: number) => {
+    const jobIdStr = String(jobId);
+    setSavedJobs((prev) =>
+      prev.includes(jobIdStr) ? prev.filter((id) => id !== jobIdStr) : [...prev, jobIdStr]
+    );
   };
 
   const buildApiUrl = () => {
@@ -530,217 +538,103 @@ export default function Jobs() {
   };
 
   return (
-    <div className="flex flex-col">
-      {/* Hero */}
-      <section className="bg-gradient-to-b from-primary/5 via-accent/5 to-background py-12 md:py-16">
+    <div className="flex flex-col min-h-screen">
+      {/* Search Header */}
+      <section className="bg-gradient-to-b from-primary/5 to-background py-12 md:py-16">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="mx-auto max-w-3xl text-center">
-            <h1 className="text-3xl font-bold tracking-tight md:text-4xl lg:text-5xl">
-              Find Your <span className="text-primary">Perfect Job</span>
-            </h1>
-            <p className="mt-4 text-lg text-muted-foreground">
-              Search through disability-friendly employers and accessible workplaces.
-            </p>
-          </div>
+          <h1 className="text-center tracking-tight">
+            Find Your <span className="text-primary">Dream Job</span>
+          </h1>
+          <p className="mt-4 text-center text-muted-foreground">
+            Discover opportunities from inclusive employers
+          </p>
 
           {/* Search Bar */}
-          <div className="mx-auto mt-8 max-w-4xl">
-            <Card className="overflow-visible">
-              <CardContent className="p-4">
-                <div className="flex flex-col gap-4 md:flex-row">
-                  <div className="flex-1">
-                    <Label htmlFor="job-search" className="sr-only">
-                      Search jobs
-                    </Label>
-                    <div className="relative">
-                      <Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
-                      <Input
-                        id="job-search"
-                        type="search"
-                        placeholder="Job title, company, or keywords"
-                        className="pl-10"
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        data-testid="input-job-search"
-                      />
-                    </div>
-                  </div>
-                  <div className="flex-1">
-                    <Label htmlFor="location-search" className="sr-only">
-                      Location
-                    </Label>
-                    <div className="relative">
-                      <MapPin className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
-                      <Input
-                        id="location-search"
-                        type="search"
-                        placeholder="City, state, or remote"
-                        className="pl-10"
-                        value={locationQuery}
-                        onChange={(e) => setLocationQuery(e.target.value)}
-                        data-testid="input-location-search"
-                      />
-                    </div>
-                  </div>
-                  <Button className="gap-2" data-testid="button-search-jobs">
-                    <Search className="h-4 w-4" aria-hidden="true" />
-                    Search
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
+          <div className="mt-8 mx-auto max-w-3xl">
+            <div className="flex flex-col gap-3 md:flex-row">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
+                <input
+                  type="search"
+                  placeholder="Search jobs, titles, keywords..."
+                  className="w-full rounded-md border bg-background pl-10 pr-4 py-3 focus:outline-none focus:ring-2 focus:ring-ring"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                />
+              </div>
+              <Button size="lg" className="md:w-auto">
+                <Search className="h-5 w-5 mr-2" />
+                Search
+              </Button>
+            </div>
+
+            <div className="mt-4 flex flex-wrap gap-2">
+              <Button variant="outline" size="sm">
+                <MapPin className="h-4 w-4 mr-2" />
+                Remote Only
+              </Button>
+              <Button variant="outline" size="sm">
+                <Briefcase className="h-4 w-4 mr-2" />
+                Full-time
+              </Button>
+              <Button variant="outline" size="sm">
+                <Filter className="h-4 w-4 mr-2" />
+                More Filters
+              </Button>
+            </div>
           </div>
         </div>
       </section>
 
-      {/* Main Content */}
-      <section className="py-8 md:py-12" aria-labelledby="job-listings-heading">
+      {/* Jobs List */}
+      <section className="flex-1 py-12">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="flex flex-col gap-8 lg:flex-row">
-            {/* Filters Sidebar */}
-            <aside className="lg:w-72">
-              <div className="sticky top-20">
-                <div className="mb-4 flex items-center justify-between lg:hidden">
-                  <Button
-                    variant="outline"
-                    className="gap-2"
-                    onClick={() => setShowFilters(!showFilters)}
-                    aria-expanded={showFilters}
-                    data-testid="button-toggle-filters"
-                  >
-                    <Filter className="h-4 w-4" aria-hidden="true" />
-                    Filters
-                    {selectedFilters.length > 0 && (
-                      <Badge variant="secondary" className="ml-1">
-                        {selectedFilters.length}
-                      </Badge>
-                    )}
-                  </Button>
-                </div>
+          <div className="mb-6 flex items-center justify-between">
+            <p className="text-muted-foreground">
+              Showing {isLoading ? "..." : filteredJobs?.length || 0} jobs
+            </p>
+            <Button variant="outline" size="sm">
+              Sort by: Recent
+            </Button>
+          </div>
 
-                <Card className={`overflow-visible ${showFilters ? "block" : "hidden lg:block"}`}>
-                  <CardHeader className="flex flex-row items-center justify-between gap-4 pb-4">
-                    <h2 className="font-semibold">Filters</h2>
-                    {selectedFilters.length > 0 && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setSelectedFilters([])}
-                        data-testid="button-clear-filters"
-                      >
-                        Clear all
-                      </Button>
-                    )}
-                  </CardHeader>
-                  <CardContent className="space-y-6">
-                    <div>
-                      <Label htmlFor="job-type">Job Type</Label>
-                      <Select value={jobType} onValueChange={setJobType}>
-                        <SelectTrigger id="job-type" className="mt-2" data-testid="select-job-type">
-                          <SelectValue placeholder="Select type" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {jobTypes.map((type) => (
-                            <SelectItem key={type.value} value={type.value}>
-                              {type.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
+          <div className="grid gap-6">
+            {isLoading ? (
+              <>
+                <JobCardSkeleton />
+                <JobCardSkeleton />
+                <JobCardSkeleton />
+              </>
+            ) : filteredJobs && filteredJobs.length > 0 ? (
+              filteredJobs.map((job) => (
+                <JobCard
+                  key={job.id}
+                  job={job}
+                  isSaved={savedJobs.includes(String(job.id))}
+                  onToggleSave={toggleSave}
+                  onApply={handleApplyClick}
+                />
+              ))
+            ) : (
+              <Card className="overflow-visible">
+                <CardContent className="flex flex-col items-center justify-center py-16 text-center">
+                  <Search className="mb-4 h-12 w-12 text-muted-foreground/50" aria-hidden="true" />
+                  <h3 className="text-lg font-semibold">No jobs found</h3>
+                  <p className="mt-2 text-muted-foreground">
+                    Try adjusting your search or filters to find more opportunities.
+                  </p>
+                </CardContent>
+              </Card>
+            )}
+          </div>
 
-                    <div>
-                      <h3 className="mb-3 text-sm font-medium">Accessibility Features</h3>
-                      <div className="space-y-3">
-                        {accessibilityFilters.map((filter) => (
-                          <div key={filter.id} className="flex items-center gap-3">
-                            <Checkbox
-                              id={filter.id}
-                              checked={selectedFilters.includes(filter.id)}
-                              onCheckedChange={() => toggleFilter(filter.id)}
-                              data-testid={`checkbox-filter-${filter.id}`}
-                            />
-                            <Label
-                              htmlFor={filter.id}
-                              className="text-sm font-normal text-muted-foreground cursor-pointer"
-                            >
-                              {filter.label}
-                            </Label>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
-            </aside>
-
-            {/* Job Listings */}
-            <main className="flex-1" id="main-content">
-              <h2 id="job-listings-heading" className="sr-only">Job Listings</h2>
-              
-              <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
-                <p className="text-sm text-muted-foreground" data-testid="text-job-count">
-                  {isLoading ? "Loading..." : `${filteredJobs?.length || 0} jobs found`}
-                </p>
-                <Select defaultValue="recent">
-                  <SelectTrigger className="w-44" data-testid="select-sort">
-                    <SelectValue placeholder="Sort by" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="recent">Most Recent</SelectItem>
-                    <SelectItem value="relevant">Most Relevant</SelectItem>
-                    <SelectItem value="salary-high">Salary: High to Low</SelectItem>
-                    <SelectItem value="salary-low">Salary: Low to High</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* Active Filters */}
-              {selectedFilters.length > 0 && (
-                <div className="mb-4 flex flex-wrap gap-2">
-                  {selectedFilters.map((filterId) => {
-                    const filter = accessibilityFilters.find((f) => f.id === filterId);
-                    return (
-                      <Badge key={filterId} variant="secondary" className="gap-1">
-                        {filter?.label}
-                        <button
-                          onClick={() => toggleFilter(filterId)}
-                          className="ml-1"
-                          aria-label={`Remove ${filter?.label} filter`}
-                        >
-                          <X className="h-3 w-3" aria-hidden="true" />
-                        </button>
-                      </Badge>
-                    );
-                  })}
-                </div>
-              )}
-
-              <div className="space-y-4">
-                {isLoading ? (
-                  <>
-                    <JobCardSkeleton />
-                    <JobCardSkeleton />
-                    <JobCardSkeleton />
-                  </>
-                ) : filteredJobs && filteredJobs.length > 0 ? (
-                  filteredJobs.map((job) => (
-                    <JobCard key={job.id} job={job} onApply={handleApplyClick} />
-                  ))
-                ) : (
-                  <Card className="overflow-visible">
-                    <CardContent className="flex flex-col items-center justify-center py-16 text-center">
-                      <Search className="mb-4 h-12 w-12 text-muted-foreground/50" aria-hidden="true" />
-                      <h3 className="text-lg font-semibold">No jobs found</h3>
-                      <p className="mt-2 text-muted-foreground">
-                        Try adjusting your search or filters to find more opportunities.
-                      </p>
-                    </CardContent>
-                  </Card>
-                )}
-              </div>
-            </main>
+          {/* Pagination */}
+          <div className="mt-8 flex justify-center gap-2">
+            <Button variant="outline">Previous</Button>
+            <Button variant="secondary">1</Button>
+            <Button variant="outline">2</Button>
+            <Button variant="outline">3</Button>
+            <Button variant="outline">Next</Button>
           </div>
         </div>
       </section>
