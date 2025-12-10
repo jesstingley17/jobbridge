@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -42,11 +42,22 @@ import {
   FileText,
   Send,
   CheckCircle,
+  Target,
+  Lightbulb,
+  Sparkles as SparklesIcon,
+  BarChart3,
+  Zap,
 } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
+import { useSubscriptionContext } from "@/contexts/subscription-context";
 import type { Job } from "@shared/schema";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 
 const accessibilityFilters = [
   { id: "remote", label: "Remote Work Available" },
@@ -98,10 +109,14 @@ function ApplyDialog({
   onOpenChange: (open: boolean) => void;
 }) {
   const { toast } = useToast();
+  const { hasFeature, handleApiError } = useSubscriptionContext();
   const [generateCoverLetter, setGenerateCoverLetter] = useState(true);
   const [coverLetter, setCoverLetter] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
+  const [showTips, setShowTips] = useState(false);
+  const [applicationTips, setApplicationTips] = useState<Array<{ tip: string; importance: string; example: string }> | null>(null);
+  const [isLoadingTips, setIsLoadingTips] = useState(false);
 
   const generateMutation = useMutation({
     mutationFn: async () => {
@@ -166,12 +181,53 @@ function ApplyDialog({
     submitMutation.mutate();
   };
 
+  const loadApplicationTips = useMutation({
+    mutationFn: async () => {
+      const profileResponse = await apiRequest("GET", "/api/profile");
+      const profile = await profileResponse.json();
+      const response = await apiRequest("POST", "/api/ai/application-tips", {
+        jobTitle: job.title,
+        company: job.company,
+        jobDescription: job.description,
+        userSkills: profile?.skills || [],
+      });
+      return response.json();
+    },
+    onSuccess: (data) => {
+      setApplicationTips(data.tips || []);
+      setIsLoadingTips(false);
+    },
+    onError: (error) => {
+      if (handleApiError(error)) {
+        setIsLoadingTips(false);
+        return;
+      }
+      toast({
+        title: "Failed to Load Tips",
+        description: "Could not load application tips.",
+        variant: "destructive",
+      });
+      setIsLoadingTips(false);
+    },
+  });
+
+  const handleLoadTips = () => {
+    if (!hasFeature("aiApplicationTips")) return;
+    setShowTips(true);
+    if (!applicationTips) {
+      setIsLoadingTips(true);
+      loadApplicationTips.mutate();
+    }
+  };
+
   const handleClose = () => {
     onOpenChange(false);
     setTimeout(() => {
       setCoverLetter("");
       setIsSubmitted(false);
       setGenerateCoverLetter(true);
+      setShowTips(false);
+      setApplicationTips(null);
     }, 300);
   };
 
@@ -221,6 +277,52 @@ function ApplyDialog({
         </DialogHeader>
 
         <div className="space-y-6 py-4">
+          {/* AI Application Tips */}
+          {hasFeature("aiApplicationTips") && (
+            <Collapsible open={showTips} onOpenChange={setShowTips}>
+              <div className="rounded-lg border p-4">
+                <CollapsibleTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    className="w-full justify-between p-0 h-auto"
+                    onClick={handleLoadTips}
+                  >
+                    <div className="flex items-center gap-3">
+                      <Lightbulb className="h-5 w-5 text-primary" aria-hidden="true" />
+                      <div className="text-left">
+                        <p className="font-medium">AI Application Tips</p>
+                        <p className="text-sm text-muted-foreground">Get personalized tips for this application</p>
+                      </div>
+                    </div>
+                    <Zap className="h-4 w-4" aria-hidden="true" />
+                  </Button>
+                </CollapsibleTrigger>
+                <CollapsibleContent className="mt-4">
+                  {isLoadingTips ? (
+                    <div className="flex items-center justify-center py-8">
+                      <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" aria-hidden="true" />
+                    </div>
+                  ) : applicationTips && applicationTips.length > 0 ? (
+                    <div className="space-y-4">
+                      {applicationTips.map((tip, index) => (
+                        <Card key={index} className="border-l-4 border-l-primary">
+                          <CardContent className="p-4">
+                            <h4 className="font-semibold mb-2">{tip.tip}</h4>
+                            <p className="text-sm text-muted-foreground mb-2">{tip.importance}</p>
+                            <p className="text-sm">
+                              <span className="font-medium">Example: </span>
+                              {tip.example}
+                            </p>
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+                  ) : null}
+                </CollapsibleContent>
+              </div>
+            </Collapsible>
+          )}
+
           <div className="flex items-center justify-between rounded-lg border p-4">
             <div className="flex items-center gap-3">
               <Sparkles className="h-5 w-5 text-primary" aria-hidden="true" />
@@ -319,6 +421,236 @@ function ApplyDialog({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  );
+}
+
+// Job Card Component with AI Features
+function JobCard({ job, onApply }: { job: Job; onApply: (job: Job) => void }) {
+  const { toast } = useToast();
+  const { isAuthenticated } = useAuth();
+  const [matchScore, setMatchScore] = useState<{ score: number; matchedSkills: string[]; missingSkills: string[]; strengths: string; recommendation: string } | null>(null);
+  const [isLoadingScore, setIsLoadingScore] = useState(false);
+  const [simplifiedDescription, setSimplifiedDescription] = useState<string | null>(null);
+  const [isSimplifying, setIsSimplifying] = useState(false);
+  const [showSimplified, setShowSimplified] = useState(false);
+
+  const loadMatchScore = useMutation({
+    mutationFn: async () => {
+      const profileResponse = await apiRequest("GET", "/api/profile");
+      const profile = await profileResponse.json();
+      const resumesResponse = await apiRequest("GET", "/api/resumes");
+      const resumes = await resumesResponse.json();
+      const allSkills = Array.from(new Set([
+        ...(profile?.skills || []),
+        ...(resumes?.flatMap((r: any) => r.skills || []) || [])
+      ]));
+      const response = await apiRequest("POST", "/api/ai/match-score", {
+        jobTitle: job.title,
+        jobDescription: job.description,
+        jobRequirements: job.requirements,
+        userSkills: [...new Set(allSkills)],
+        userExperience: profile?.bio || "",
+      });
+      return response.json();
+    },
+    onSuccess: (data) => {
+      setMatchScore(data);
+      setIsLoadingScore(false);
+    },
+    onError: () => {
+      setIsLoadingScore(false);
+    },
+  });
+
+  const simplifyDescription = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest("POST", "/api/ai/simplify-job", {
+        jobTitle: job.title,
+        description: job.description,
+        requirements: job.requirements,
+      });
+      return response.json();
+    },
+    onSuccess: (data) => {
+      setSimplifiedDescription(data.simplified);
+      setIsSimplifying(false);
+      setShowSimplified(true);
+    },
+    onError: () => {
+      toast({
+        title: "Failed to Simplify",
+        description: "Could not simplify job description.",
+        variant: "destructive",
+      });
+      setIsSimplifying(false);
+    },
+  });
+
+  const handleLoadScore = () => {
+    if (!isAuthenticated || matchScore) return;
+    setIsLoadingScore(true);
+    loadMatchScore.mutate();
+  };
+
+  const handleSimplify = () => {
+    if (simplifiedDescription) {
+      setShowSimplified(!showSimplified);
+      return;
+    }
+    setIsSimplifying(true);
+    simplifyDescription.mutate();
+  };
+
+  // Auto-load match score for authenticated users
+  useEffect(() => {
+    if (isAuthenticated && !matchScore && !isLoadingScore) {
+      handleLoadScore();
+    }
+  }, [isAuthenticated]);
+
+  const getScoreColor = (score: number) => {
+    if (score >= 80) return "text-green-600 bg-green-50 border-green-200";
+    if (score >= 60) return "text-blue-600 bg-blue-50 border-blue-200";
+    if (score >= 40) return "text-yellow-600 bg-yellow-50 border-yellow-200";
+    return "text-orange-600 bg-orange-50 border-orange-200";
+  };
+
+  return (
+    <Card className="overflow-visible hover-elevate" data-testid={`card-job-${job.id}`}>
+      <CardContent className="p-6">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div className="flex-1">
+            <div className="flex items-start gap-4">
+              <div className="hidden h-12 w-12 items-center justify-center rounded-md bg-primary/10 sm:flex">
+                {job.externalSource ? (
+                  <Globe className="h-6 w-6 text-primary" aria-hidden="true" />
+                ) : (
+                  <Building2 className="h-6 w-6 text-primary" aria-hidden="true" />
+                )}
+              </div>
+              <div className="flex-1">
+                <div className="flex items-center gap-2 flex-wrap mb-2">
+                  <h3 className="text-lg font-semibold">
+                    <button className="text-left hover:text-primary transition-colors" data-testid={`link-job-title-${job.id}`}>
+                      {job.title}
+                    </button>
+                  </h3>
+                  {job.externalSource && (
+                    <Badge variant="outline" className="gap-1 text-xs" data-testid={`badge-source-${job.id}`}>
+                      <ExternalLink className="h-3 w-3" aria-hidden="true" />
+                      {job.externalSource === "indeed" ? "Indeed" : job.externalSource}
+                    </Badge>
+                  )}
+                  {isAuthenticated && matchScore && (
+                    <Badge className={`gap-1 ${getScoreColor(matchScore.score)}`} variant="outline">
+                      <Target className="h-3 w-3" aria-hidden="true" />
+                      {matchScore.score}% Match
+                    </Badge>
+                  )}
+                  {isAuthenticated && isLoadingScore && (
+                    <Badge variant="outline" className="gap-1">
+                      <Loader2 className="h-3 w-3 animate-spin" aria-hidden="true" />
+                      Calculating...
+                    </Badge>
+                  )}
+                </div>
+                <p className="text-muted-foreground">{job.company}</p>
+                <div className="mt-2 flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
+                  <span className="flex items-center gap-1">
+                    <MapPin className="h-4 w-4" aria-hidden="true" />
+                    {job.location}
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <Briefcase className="h-4 w-4" aria-hidden="true" />
+                    {job.type}
+                  </span>
+                  {job.salary && (
+                    <span className="flex items-center gap-1">
+                      <DollarSign className="h-4 w-4" aria-hidden="true" />
+                      {job.salary}
+                    </span>
+                  )}
+                  <span className="flex items-center gap-1">
+                    <Clock className="h-4 w-4" aria-hidden="true" />
+                    {job.postedDate}
+                  </span>
+                </div>
+              </div>
+            </div>
+            <div className="mt-4">
+              {showSimplified && simplifiedDescription ? (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm font-medium text-primary">Simplified Description</p>
+                    <Button variant="ghost" size="sm" onClick={() => setShowSimplified(false)}>
+                      Show Original
+                    </Button>
+                  </div>
+                  <div className="rounded-lg border p-4 bg-muted/50">
+                    <div className="prose prose-sm max-w-none whitespace-pre-wrap text-sm">
+                      {simplifiedDescription}
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div>
+                  <p className="text-sm text-muted-foreground line-clamp-2">
+                    {job.description}
+                  </p>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="mt-2 gap-2"
+                    onClick={handleSimplify}
+                    disabled={isSimplifying}
+                  >
+                    {isSimplifying ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+                        Simplifying...
+                      </>
+                    ) : (
+                      <>
+                        <SparklesIcon className="h-4 w-4" aria-hidden="true" />
+                        Simplify Description
+                      </>
+                    )}
+                  </Button>
+                </div>
+              )}
+            </div>
+            {isAuthenticated && matchScore && (
+              <div className="mt-4 rounded-lg border p-3 bg-muted/30">
+                <p className="text-xs font-medium mb-1">Match Analysis</p>
+                <p className="text-xs text-muted-foreground mb-2">{matchScore.strengths}</p>
+                <p className="text-xs text-muted-foreground">{matchScore.recommendation}</p>
+              </div>
+            )}
+            {job.accessibilityFeatures && job.accessibilityFeatures.length > 0 && (
+              <div className="mt-4 flex flex-wrap gap-2">
+                {job.accessibilityFeatures.map((feature) => (
+                  <Badge key={feature} variant="secondary" className="gap-1">
+                    <Accessibility className="h-3 w-3" aria-hidden="true" />
+                    {feature}
+                  </Badge>
+                ))}
+              </div>
+            )}
+          </div>
+          <div className="flex gap-2 sm:flex-col">
+            <Button 
+              onClick={() => onApply(job)} 
+              data-testid={`button-apply-${job.id}`}
+            >
+              Apply Now
+            </Button>
+            <Button variant="ghost" size="icon" aria-label="Save job" data-testid={`button-save-${job.id}`}>
+              <Heart className="h-5 w-5" aria-hidden="true" />
+            </Button>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -622,83 +954,7 @@ export default function Jobs() {
                   </>
                 ) : filteredJobs && filteredJobs.length > 0 ? (
                   filteredJobs.map((job) => (
-                    <Card key={job.id} className="overflow-visible hover-elevate" data-testid={`card-job-${job.id}`}>
-                      <CardContent className="p-6">
-                        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                          <div className="flex-1">
-                            <div className="flex items-start gap-4">
-                              <div className="hidden h-12 w-12 items-center justify-center rounded-md bg-primary/10 sm:flex">
-                                {job.externalSource ? (
-                                  <Globe className="h-6 w-6 text-primary" aria-hidden="true" />
-                                ) : (
-                                  <Building2 className="h-6 w-6 text-primary" aria-hidden="true" />
-                                )}
-                              </div>
-                              <div>
-                                <div className="flex items-center gap-2 flex-wrap">
-                                  <h3 className="text-lg font-semibold">
-                                    <button className="text-left hover:text-primary transition-colors" data-testid={`link-job-title-${job.id}`}>
-                                      {job.title}
-                                    </button>
-                                  </h3>
-                                  {job.externalSource && (
-                                    <Badge variant="outline" className="gap-1 text-xs" data-testid={`badge-source-${job.id}`}>
-                                      <ExternalLink className="h-3 w-3" aria-hidden="true" />
-                                      {job.externalSource === "indeed" ? "Indeed" : job.externalSource}
-                                    </Badge>
-                                  )}
-                                </div>
-                                <p className="text-muted-foreground">{job.company}</p>
-                                <div className="mt-2 flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
-                                  <span className="flex items-center gap-1">
-                                    <MapPin className="h-4 w-4" aria-hidden="true" />
-                                    {job.location}
-                                  </span>
-                                  <span className="flex items-center gap-1">
-                                    <Briefcase className="h-4 w-4" aria-hidden="true" />
-                                    {job.type}
-                                  </span>
-                                  {job.salary && (
-                                    <span className="flex items-center gap-1">
-                                      <DollarSign className="h-4 w-4" aria-hidden="true" />
-                                      {job.salary}
-                                    </span>
-                                  )}
-                                  <span className="flex items-center gap-1">
-                                    <Clock className="h-4 w-4" aria-hidden="true" />
-                                    {job.postedDate}
-                                  </span>
-                                </div>
-                              </div>
-                            </div>
-                            <p className="mt-4 text-sm text-muted-foreground line-clamp-2">
-                              {job.description}
-                            </p>
-                            {job.accessibilityFeatures && job.accessibilityFeatures.length > 0 && (
-                              <div className="mt-4 flex flex-wrap gap-2">
-                                {job.accessibilityFeatures.map((feature) => (
-                                  <Badge key={feature} variant="secondary" className="gap-1">
-                                    <Accessibility className="h-3 w-3" aria-hidden="true" />
-                                    {feature}
-                                  </Badge>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-                          <div className="flex gap-2 sm:flex-col">
-                            <Button 
-                              onClick={() => handleApplyClick(job)} 
-                              data-testid={`button-apply-${job.id}`}
-                            >
-                              Apply Now
-                            </Button>
-                            <Button variant="ghost" size="icon" aria-label="Save job" data-testid={`button-save-${job.id}`}>
-                              <Heart className="h-5 w-5" aria-hidden="true" />
-                            </Button>
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
+                    <JobCard key={job.id} job={job} onApply={handleApplyClick} />
                   ))
                 ) : (
                   <Card className="overflow-visible">

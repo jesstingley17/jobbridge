@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
@@ -5,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useSubscriptionContext } from "@/contexts/subscription-context";
 import {
   Select,
   SelectContent,
@@ -32,6 +34,9 @@ import {
   ArrowRight,
   BarChart3,
   Target,
+  Sparkles,
+  Loader2,
+  Search,
 } from "lucide-react";
 import type { Application } from "@shared/schema";
 
@@ -74,6 +79,10 @@ function ApplicationCardSkeleton() {
 
 export default function Dashboard() {
   const { toast } = useToast();
+  const { hasFeature, handleApiError } = useSubscriptionContext();
+  const [showRecommendations, setShowRecommendations] = useState(false);
+  const [recommendations, setRecommendations] = useState<Array<{ role: string; reason: string; searchTerms: string[] }> | null>(null);
+  const [isLoadingRecommendations, setIsLoadingRecommendations] = useState(false);
 
   const { data: applications, isLoading } = useQuery<Application[]>({
     queryKey: ["/api/applications"],
@@ -107,6 +116,50 @@ export default function Dashboard() {
     : 0;
 
   const recentApplications = applications?.slice(0, 5) || [];
+
+  const loadRecommendations = useMutation({
+    mutationFn: async () => {
+      const profileResponse = await apiRequest("GET", "/api/profile");
+      const profile = await profileResponse.json();
+      const resumesResponse = await apiRequest("GET", "/api/resumes");
+      const resumes = await resumesResponse.json();
+      const allSkills = Array.from(new Set([
+        ...(profile?.skills || []),
+        ...(resumes?.flatMap((r: any) => r.skills || []) || [])
+      ]));
+      const response = await apiRequest("POST", "/api/ai/recommendations", {
+        skills: allSkills,
+        preferredJobTypes: profile?.preferredJobTypes || [],
+        preferredLocations: profile?.preferredLocations || [],
+      });
+      return response.json();
+    },
+    onSuccess: (data) => {
+      setRecommendations(data.recommendations || []);
+      setIsLoadingRecommendations(false);
+    },
+    onError: (error) => {
+      if (handleApiError(error)) {
+        setIsLoadingRecommendations(false);
+        return;
+      }
+      toast({
+        title: "Failed to Load Recommendations",
+        description: "Could not load job recommendations.",
+        variant: "destructive",
+      });
+      setIsLoadingRecommendations(false);
+    },
+  });
+
+  const handleLoadRecommendations = () => {
+    if (!hasFeature("aiJobRecommendations")) return;
+    setShowRecommendations(true);
+    if (!recommendations) {
+      setIsLoadingRecommendations(true);
+      loadRecommendations.mutate();
+    }
+  };
 
   return (
     <div className="flex flex-col">
@@ -306,6 +359,71 @@ export default function Dashboard() {
 
             {/* Quick Actions */}
             <div className="space-y-6">
+              {/* AI Job Recommendations */}
+              {hasFeature("aiJobRecommendations") && (
+                <Card className="overflow-visible">
+                  <CardHeader>
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="text-base flex items-center gap-2">
+                        <Sparkles className="h-4 w-4 text-primary" aria-hidden="true" />
+                        AI Job Recommendations
+                      </CardTitle>
+                      {!showRecommendations && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={handleLoadRecommendations}
+                          disabled={isLoadingRecommendations}
+                        >
+                          {isLoadingRecommendations ? (
+                            <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+                          ) : (
+                            "Load"
+                          )}
+                        </Button>
+                      )}
+                    </div>
+                  </CardHeader>
+                  {showRecommendations && (
+                    <CardContent>
+                      {isLoadingRecommendations ? (
+                        <div className="flex items-center justify-center py-8">
+                          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" aria-hidden="true" />
+                        </div>
+                      ) : recommendations && recommendations.length > 0 ? (
+                        <div className="space-y-3">
+                          {recommendations.map((rec, index) => (
+                            <Card key={index} className="border-l-4 border-l-primary">
+                              <CardContent className="p-4">
+                                <h4 className="font-semibold mb-1">{rec.role}</h4>
+                                <p className="text-sm text-muted-foreground mb-3">{rec.reason}</p>
+                                <div className="flex flex-wrap gap-2">
+                                  {rec.searchTerms.map((term, i) => (
+                                    <Badge key={i} variant="secondary" className="text-xs">
+                                      {term}
+                                    </Badge>
+                                  ))}
+                                </div>
+                                <Link href={`/jobs?query=${encodeURIComponent(rec.role)}`}>
+                                  <Button variant="ghost" size="sm" className="mt-3 gap-2">
+                                    Search Jobs
+                                    <Search className="h-3 w-3" aria-hidden="true" />
+                                  </Button>
+                                </Link>
+                              </CardContent>
+                            </Card>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-sm text-muted-foreground text-center py-4">
+                          No recommendations available. Update your profile to get personalized suggestions.
+                        </p>
+                      )}
+                    </CardContent>
+                  )}
+                </Card>
+              )}
+
               <Card className="overflow-visible">
                 <CardHeader>
                   <CardTitle className="text-base">Quick Actions</CardTitle>

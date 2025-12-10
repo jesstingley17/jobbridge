@@ -10,15 +10,25 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
+import { useSubscriptionContext } from "@/contexts/subscription-context";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Link } from "wouter";
-import { User, Mail, MapPin, Briefcase, ArrowRight, CheckCircle2, Circle, Pencil, Save, X } from "lucide-react";
+import { User, Mail, MapPin, Briefcase, ArrowRight, CheckCircle2, Circle, Pencil, Save, X, Sparkles, Loader2, Target, Clock, BookOpen, AlertCircle } from "lucide-react";
 import type { UserProfile, CareerDimension, UserDimensionScore } from "@shared/schema";
 
 export default function Profile() {
   const { user, isLoading: authLoading, isAuthenticated } = useAuth();
   const { toast } = useToast();
+  const { hasFeature, handleApiError } = useSubscriptionContext();
   const [isEditing, setIsEditing] = useState(false);
+  const [showSkillsGap, setShowSkillsGap] = useState(false);
+  const [targetRole, setTargetRole] = useState("");
+  const [jobDescription, setJobDescription] = useState("");
+  const [skillsGapAnalysis, setSkillsGapAnalysis] = useState<{
+    matchingSkills: string[];
+    skillGaps: Array<{ name: string; priority: string; timeToLearn: string; resources: string[] }>;
+  } | null>(null);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
 
   const { data: profile, isLoading: profileLoading } = useQuery<UserProfile>({
     queryKey: ["/api/profile"],
@@ -92,6 +102,47 @@ export default function Profile() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     updateProfileMutation.mutate(formData);
+  };
+
+  const analyzeSkillsGap = useMutation({
+    mutationFn: async () => {
+      const currentSkills = profile?.skills || [];
+      const response = await apiRequest("POST", "/api/ai/skills-gap", {
+        currentSkills,
+        targetRole,
+        jobDescription: jobDescription || undefined,
+      });
+      return response.json();
+    },
+    onSuccess: (data) => {
+      setSkillsGapAnalysis(data.analysis);
+      setIsAnalyzing(false);
+    },
+    onError: (error) => {
+      if (handleApiError(error)) {
+        setIsAnalyzing(false);
+        return;
+      }
+      toast({
+        title: "Analysis Failed",
+        description: "Could not analyze skills gap.",
+        variant: "destructive",
+      });
+      setIsAnalyzing(false);
+    },
+  });
+
+  const handleAnalyzeSkillsGap = () => {
+    if (!hasFeature("aiSkillsGap") || !targetRole.trim()) {
+      toast({
+        title: "Target Role Required",
+        description: "Please enter a target role to analyze.",
+        variant: "destructive",
+      });
+      return;
+    }
+    setIsAnalyzing(true);
+    analyzeSkillsGap.mutate();
   };
 
   if (authLoading) {
@@ -312,6 +363,129 @@ export default function Profile() {
                   </Button>
                 </div>
               </form>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* AI Skills Gap Analysis */}
+        {hasFeature("aiSkillsGap") && (
+          <Card className="mb-6">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Sparkles className="h-5 w-5 text-primary" />
+                AI Skills Gap Analysis
+              </CardTitle>
+              <CardDescription>
+                Identify skills you need to develop for your target role
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="target-role">Target Role</Label>
+                <Input
+                  id="target-role"
+                  value={targetRole}
+                  onChange={(e) => setTargetRole(e.target.value)}
+                  placeholder="e.g., Software Developer, Project Manager"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="job-description">Job Description (Optional)</Label>
+                <Textarea
+                  id="job-description"
+                  value={jobDescription}
+                  onChange={(e) => setJobDescription(e.target.value)}
+                  placeholder="Paste a job description for more accurate analysis..."
+                  rows={3}
+                />
+              </div>
+              <Button
+                onClick={handleAnalyzeSkillsGap}
+                disabled={isAnalyzing || !targetRole.trim()}
+                className="w-full gap-2"
+              >
+                {isAnalyzing ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Analyzing...
+                  </>
+                ) : (
+                  <>
+                    <Target className="h-4 w-4" />
+                    Analyze Skills Gap
+                  </>
+                )}
+              </Button>
+
+              {skillsGapAnalysis && (
+                <div className="mt-6 space-y-4 rounded-lg border p-4">
+                  {skillsGapAnalysis.matchingSkills.length > 0 && (
+                    <div>
+                      <h4 className="font-semibold mb-2 flex items-center gap-2">
+                        <CheckCircle2 className="h-4 w-4 text-green-500" />
+                        Skills You Already Have
+                      </h4>
+                      <div className="flex flex-wrap gap-2">
+                        {skillsGapAnalysis.matchingSkills.map((skill, i) => (
+                          <Badge key={i} variant="secondary" className="bg-green-50 text-green-700">
+                            {skill}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {skillsGapAnalysis.skillGaps.length > 0 && (
+                    <div>
+                      <h4 className="font-semibold mb-2 flex items-center gap-2">
+                        <AlertCircle className="h-4 w-4 text-orange-500" />
+                        Skills to Develop
+                      </h4>
+                      <div className="space-y-3">
+                        {skillsGapAnalysis.skillGaps.map((gap, i) => (
+                          <Card key={i} className="border-l-4 border-l-orange-500">
+                            <CardContent className="p-4">
+                              <div className="flex items-start justify-between mb-2">
+                                <h5 className="font-medium">{gap.name}</h5>
+                                <div className="flex gap-2">
+                                  <Badge
+                                    variant={
+                                      gap.priority === "high"
+                                        ? "destructive"
+                                        : gap.priority === "medium"
+                                        ? "default"
+                                        : "secondary"
+                                    }
+                                  >
+                                    {gap.priority} priority
+                                  </Badge>
+                                  <Badge variant="outline" className="gap-1">
+                                    <Clock className="h-3 w-3" />
+                                    {gap.timeToLearn}
+                                  </Badge>
+                                </div>
+                              </div>
+                              {gap.resources.length > 0 && (
+                                <div className="mt-2">
+                                  <p className="text-xs font-medium text-muted-foreground mb-1">Learning Resources:</p>
+                                  <div className="flex flex-wrap gap-1">
+                                    {gap.resources.map((resource, j) => (
+                                      <Badge key={j} variant="outline" className="text-xs gap-1">
+                                        <BookOpen className="h-3 w-3" />
+                                        {resource}
+                                      </Badge>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                            </CardContent>
+                          </Card>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
             </CardContent>
           </Card>
         )}
