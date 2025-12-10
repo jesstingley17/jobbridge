@@ -43,19 +43,56 @@ CONTENTFUL_ENVIRONMENT=master  # Optional, defaults to 'master'
 CONTENTFUL_WEBHOOK_SECRET=your_webhook_secret  # Optional, for webhook security
 ```
 
-## 5. Configure Webhook (Optional but Recommended)
+## 5. Create Vercel Deploy Hook (For Automatic Deployments)
+
+When you publish content in Contentful, you can automatically trigger a Vercel deployment:
+
+1. Go to your **Vercel Dashboard** → Select your project
+2. Navigate to **Settings** → **Git**
+3. Scroll down to **Deploy Hooks** section
+4. Click **Add Hook**
+5. Configure:
+   - **Name**: `Contentful Deploy Hook` (or any name you prefer)
+   - **Branch**: `main` (or your production branch)
+   - **Build Command**: Leave default (uses your `vercel.json` config)
+6. Click **Create Hook**
+7. **Copy the Deploy Hook URL** (looks like: `https://api.vercel.com/v1/integrations/deploy/...`)
+
+## 6. Configure Contentful Webhook for Vercel
 
 1. In Contentful, go to **Settings** → **Webhooks**
 2. Click **Add webhook**
-3. Set the webhook URL to: `https://your-domain.com/api/contentful/webhook`
-4. Select events:
-   - Entry publish
-   - Entry unpublish
-   - Entry update
-5. Set the webhook secret (use a random string)
-6. Save the webhook
+3. Select the **Vercel** template (or create custom)
+4. Configure:
+   - **Name**: `Vercel Deploy Hook`
+   - **Vercel deploy hook URL**: Paste the URL from step 5.7
+   - **Trigger**: Select when to deploy:
+     - ✅ Entry publish
+     - ✅ Entry unpublish
+     - ✅ Entry delete (optional)
+   - **Environment**: `master` (or your content environment)
+5. Click **Save webhook**
 
-## 6. Create Your First Blog Post
+Now, whenever you publish or unpublish a blog post in Contentful, it will automatically trigger a new Vercel deployment!
+
+## 7. Configure Contentful Webhook for Database Sync (Optional)
+
+For real-time database syncing (separate from Vercel deployments):
+
+1. In Contentful, go to **Settings** → **Webhooks**
+2. Click **Add webhook** (create a second webhook)
+3. Configure:
+   - **Name**: `Database Sync Webhook`
+   - **URL**: `https://your-domain.com/api/contentful/webhook`
+   - **Trigger**:
+     - ✅ Entry publish
+     - ✅ Entry unpublish
+     - ✅ Entry update
+   - **Environment**: `master`
+   - **Webhook secret**: Generate a random string (add to `CONTENTFUL_WEBHOOK_SECRET` env var)
+4. Click **Save webhook**
+
+## 8. Create Your First Blog Post
 
 1. Go to **Content** → **Add entry**
 2. Select `blogPost` content type
@@ -67,7 +104,7 @@ CONTENTFUL_WEBHOOK_SECRET=your_webhook_secret  # Optional, for webhook security
    - Published Date: Today's date
 4. Click **Publish**
 
-## 7. Sync Posts
+## 9. Sync Posts
 
 Posts will automatically sync when:
 - Someone visits `/blog` (background sync)
@@ -75,7 +112,7 @@ Posts will automatically sync when:
 - A webhook is triggered (if configured)
 - You manually trigger sync via `/api/contentful/sync` (requires authentication)
 
-## 8. Manual Sync (Admin Only)
+## 10. Manual Sync (Admin Only)
 
 To manually sync all posts from Contentful:
 
