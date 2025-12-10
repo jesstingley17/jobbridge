@@ -1611,7 +1611,7 @@ Return JSON with:
       }
 
       const stripe = getUncachableStripeClient();
-      const baseUrl = `https://${process.env.REPLIT_DOMAINS?.split(',')[0]}`;
+      const baseUrl = process.env.CLIENT_URL || `https://${process.env.REPLIT_DOMAINS?.split(',')[0]}` || 'http://localhost:5000';
       
       const session = await stripe.billingPortal.sessions.create({
         customer: user.stripeCustomerId,
