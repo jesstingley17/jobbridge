@@ -30,10 +30,11 @@ export function Logo({
   const dimensions = iconSizes[size];
 
   // If using image file, render simple image-based logo
+  // Note: The logo image already includes the text, so we don't show text separately
   if (useImage) {
     return (
-      <div className={`flex items-center ${variant === "vertical" ? "flex-col gap-2" : "gap-3"} ${className}`}>
-        {/* Logo Image - try multiple formats */}
+      <div className={className}>
+        {/* Logo Image - includes both graphic and text, so no separate text needed */}
         <img
           src="/logo.png"
           alt="The JobBridge Logo"
@@ -71,21 +72,6 @@ export function Logo({
             }
           }}
         />
-        
-        {/* JOBBRIDGE Text - Bold orange, positioned below when vertical */}
-        {showText && (
-          <span 
-            className={`font-bold tracking-tight ${textSizes[size]} ${variant === "vertical" ? "mt-2" : ""}`}
-            style={{ 
-              color: '#F97316',
-              textShadow: '0 1px 2px rgba(0,0,0,0.1)',
-              fontWeight: 700,
-              letterSpacing: '-0.01em'
-            }}
-          >
-            JOBBRIDGE
-          </span>
-        )}
       </div>
     );
   }
