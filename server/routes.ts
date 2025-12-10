@@ -9,6 +9,8 @@ import { getUncachableStripeClient, getStripePublishableKey } from "./stripeClie
 import { sql } from "drizzle-orm";
 import { db } from "./db";
 import { requireFeature, requireApplicationQuota, incrementApplicationCount, getUserSubscriptionStatus } from "./subscriptionMiddleware";
+import { sendMagicLinkEmail, sendPasswordResetEmail } from "./email";
+import crypto from "crypto";
 import { 
   generateResumeRequestSchema, 
   generateInterviewQuestionsRequestSchema,
@@ -115,6 +117,136 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error updating role:", error);
       res.status(500).json({ error: "Failed to update role" });
+    }
+  });
+
+  // Magic link / password reset routes
+  const magicLinkRequestSchema = z.object({
+    email: z.string().email(),
+    type: z.enum(['login', 'reset']).default('login'),
+  });
+
+  app.post('/api/auth/magic-link', async (req, res) => {
+    try {
+      const { email, type } = magicLinkRequestSchema.parse(req.body);
+      
+      // Check if user exists
+      const user = await storage.getUserByEmail(email);
+      if (!user) {
+        // Don't reveal if email exists or not
+        return res.json({ message: "If an account exists with this email, you will receive a link shortly." });
+      }
+      
+      // Generate token
+      const token = crypto.randomBytes(32).toString('hex');
+      const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
+      
+      await storage.createMagicLinkToken(email, token, expiresAt);
+      
+      // Build magic link URL
+      const baseUrl = `${req.protocol}://${req.get('host')}`;
+      const magicLink = `${baseUrl}/auth/verify?token=${token}&type=${type}`;
+      
+      // Send email based on type
+      let sent = false;
+      if (type === 'reset') {
+        sent = await sendPasswordResetEmail({ email, firstName: user.firstName || undefined, magicLink });
+      } else {
+        sent = await sendMagicLinkEmail({ email, firstName: user.firstName || undefined, magicLink });
+      }
+      
+      if (sent) {
+        await storage.logEmail(user.id, email, type === 'reset' ? 'password_reset' : 'magic_link');
+      }
+      
+      res.json({ message: "If an account exists with this email, you will receive a link shortly." });
+    } catch (error) {
+      console.error("Error sending magic link:", error);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Invalid email address" });
+      }
+      res.status(500).json({ error: "Failed to send magic link" });
+    }
+  });
+
+  app.get('/api/auth/verify-token', async (req, res) => {
+    try {
+      const { token } = req.query;
+      
+      if (!token || typeof token !== 'string') {
+        return res.status(400).json({ valid: false, error: "Token is required" });
+      }
+      
+      const magicToken = await storage.getMagicLinkToken(token);
+      
+      if (!magicToken) {
+        return res.json({ valid: false, error: "Invalid token" });
+      }
+      
+      if (magicToken.used) {
+        return res.json({ valid: false, error: "Token has already been used" });
+      }
+      
+      if (new Date() > magicToken.expiresAt) {
+        return res.json({ valid: false, error: "Token has expired" });
+      }
+      
+      // Get user info
+      const user = await storage.getUserByEmail(magicToken.email);
+      
+      res.json({ 
+        valid: true, 
+        email: magicToken.email,
+        firstName: user?.firstName || null 
+      });
+    } catch (error) {
+      console.error("Error verifying token:", error);
+      res.status(500).json({ valid: false, error: "Failed to verify token" });
+    }
+  });
+
+  app.post('/api/auth/use-magic-link', async (req, res) => {
+    try {
+      const { token } = req.body;
+      
+      if (!token || typeof token !== 'string') {
+        return res.status(400).json({ success: false, error: "Token is required" });
+      }
+      
+      const magicToken = await storage.getMagicLinkToken(token);
+      
+      if (!magicToken) {
+        return res.status(400).json({ success: false, error: "Invalid token" });
+      }
+      
+      if (magicToken.used) {
+        return res.status(400).json({ success: false, error: "Token has already been used" });
+      }
+      
+      if (new Date() > magicToken.expiresAt) {
+        return res.status(400).json({ success: false, error: "Token has expired" });
+      }
+      
+      // Mark token as used
+      await storage.markMagicLinkTokenUsed(token);
+      
+      // Get user and log them in
+      const user = await storage.getUserByEmail(magicToken.email);
+      
+      if (!user) {
+        return res.status(400).json({ success: false, error: "User not found" });
+      }
+      
+      // For now, redirect to Replit auth (since sessions are managed by Replit OAuth)
+      // The magic link primarily serves as email verification
+      res.json({ 
+        success: true, 
+        message: "Email verified successfully",
+        redirectTo: "/api/login"
+      });
+    } catch (error) {
+      console.error("Error using magic link:", error);
+      res.status(500).json({ success: false, error: "Failed to use magic link" });
     }
   });
 
