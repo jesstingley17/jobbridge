@@ -29,7 +29,7 @@ import { useSubscriptionContext } from "@/contexts/subscription-context";
 import type { Job } from "@shared/schema";
 
 // Extended Job interface to match Figma design
-interface ExtendedJob {
+export interface ExtendedJob {
   id: string | number;
   title: string;
   company: string;
