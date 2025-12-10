@@ -9,23 +9,6 @@
       "maxDuration": 30
     }
   },
-  "redirects": [
-    {
-      "source": "http://www.thejobbridge-inc.com/:path*",
-      "destination": "https://thejobbridge-inc.com/:path*",
-      "permanent": true
-    },
-    {
-      "source": "http://thejobbridge-inc.com/:path*",
-      "destination": "https://thejobbridge-inc.com/:path*",
-      "permanent": true
-    },
-    {
-      "source": "https://www.thejobbridge-inc.com/:path*",
-      "destination": "https://thejobbridge-inc.com/:path*",
-      "permanent": true
-    }
-  ],
   "rewrites": [
     {
       "source": "/api/(.*)",
@@ -34,6 +17,17 @@
     {
       "source": "/(.*)",
       "destination": "/index.html"
+    }
+  ],
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        {
+          "key": "Strict-Transport-Security",
+          "value": "max-age=31536000; includeSubDomains"
+        }
+      ]
     }
   ]
 }
