@@ -29,6 +29,10 @@ export const users = pgTable("users", {
   monthlyApplicationCount: integer("monthly_application_count").default(0),
   applicationCountResetDate: timestamp("application_count_reset_date").defaultNow(),
   emailVerified: boolean("email_verified").default(false),
+  termsAccepted: boolean("terms_accepted").default(false), // Whether user accepted Terms and Conditions
+  termsAcceptedAt: timestamp("terms_accepted_at"), // When user accepted Terms
+  marketingConsent: boolean("marketing_consent").default(false), // Whether user consented to marketing communications
+  marketingConsentAt: timestamp("marketing_consent_at"), // When user consented to marketing
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -42,6 +46,10 @@ export const registerUserSchema = z.object({
   password: z.string().min(8, "Password must be at least 8 characters"),
   firstName: z.string().min(1, "First name is required"),
   lastName: z.string().optional(),
+  termsAccepted: z.boolean().refine((val) => val === true, {
+    message: "You must accept the Terms and Conditions to create an account",
+  }),
+  marketingConsent: z.boolean().optional().default(false),
 });
 export type RegisterUser = z.infer<typeof registerUserSchema>;
 

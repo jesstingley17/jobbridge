@@ -132,9 +132,9 @@ export default function Contact() {
                       <div>
                         <p className="mb-1 font-medium">Address</p>
                         <p className="text-muted-foreground">
-                          175 S 3rd Street, Suite 200<br />
+                          175 S 3rd Street<br />
                           Columbus, OH 43215<br />
-                          United States
+                          USA
                         </p>
                       </div>
                     </div>

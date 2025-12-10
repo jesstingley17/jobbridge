@@ -7,10 +7,12 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Separator } from "@/components/ui/separator";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Eye, EyeOff, Mail, Lock, User, Loader2, AlertCircle, CheckCircle } from "lucide-react";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Logo } from "@/components/logo";
+import { Link } from "wouter";
 
 export default function Auth() {
   const [, setLocation] = useLocation();
@@ -28,6 +30,8 @@ export default function Auth() {
   const [registerConfirmPassword, setRegisterConfirmPassword] = useState("");
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
+  const [termsAccepted, setTermsAccepted] = useState(false);
+  const [marketingConsent, setMarketingConsent] = useState(false);
   const [registerError, setRegisterError] = useState("");
 
   // Forgot password state
@@ -50,7 +54,7 @@ export default function Auth() {
   });
 
   const registerMutation = useMutation({
-    mutationFn: async (data: { email: string; password: string; firstName: string; lastName?: string }) => {
+    mutationFn: async (data: { email: string; password: string; firstName: string; lastName?: string; termsAccepted: boolean; marketingConsent?: boolean }) => {
       const response = await apiRequest("POST", "/api/auth/register", data);
       return response.json();
     },
@@ -93,11 +97,18 @@ export default function Auth() {
       return;
     }
 
+    if (!termsAccepted) {
+      setRegisterError("You must accept the Terms and Conditions to create an account");
+      return;
+    }
+
     registerMutation.mutate({
       email: registerEmail,
       password: registerPassword,
       firstName,
       lastName: lastName || undefined,
+      termsAccepted: true,
+      marketingConsent: marketingConsent || false,
     });
   };
 
@@ -390,10 +401,53 @@ export default function Auth() {
                       />
                     </div>
 
+                    <div className="space-y-4 pt-2">
+                      <div className="flex items-start space-x-2">
+                        <Checkbox
+                          id="terms-accepted"
+                          checked={termsAccepted}
+                          onCheckedChange={(checked) => setTermsAccepted(checked === true)}
+                          required
+                          className="mt-1"
+                          data-testid="checkbox-terms-accepted"
+                        />
+                        <Label
+                          htmlFor="terms-accepted"
+                          className="text-sm font-normal leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                        >
+                          I agree to the{" "}
+                          <Link href="/terms" className="text-purple-600 dark:text-purple-400 hover:underline" target="_blank">
+                            Terms and Conditions
+                          </Link>{" "}
+                          and{" "}
+                          <Link href="/privacy" className="text-purple-600 dark:text-purple-400 hover:underline" target="_blank">
+                            Privacy Policy
+                          </Link>
+                          <span className="text-destructive"> *</span>
+                        </Label>
+                      </div>
+
+                      <div className="flex items-start space-x-2">
+                        <Checkbox
+                          id="marketing-consent"
+                          checked={marketingConsent}
+                          onCheckedChange={(checked) => setMarketingConsent(checked === true)}
+                          className="mt-1"
+                          data-testid="checkbox-marketing-consent"
+                        />
+                        <Label
+                          htmlFor="marketing-consent"
+                          className="text-sm font-normal leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                        >
+                          I agree to receive marketing communications, newsletters, and promotional emails from The JobBridge, Inc. (Optional)
+                        </Label>
+                      </div>
+                    </div>
+
                     <Button
                       type="submit"
                       className="w-full bg-black text-white hover:bg-black/90 rounded-md h-12 text-base font-medium"
-                      disabled={registerMutation.isPending}
+                      disabled={registerMutation.isPending || !termsAccepted}
                       data-testid="button-register-submit"
                     >
                       {registerMutation.isPending ? (
@@ -406,10 +460,6 @@ export default function Auth() {
                       )}
                     </Button>
                   </form>
-
-                  <p className="text-center text-xs text-muted-foreground">
-                    By creating an account, you agree to our Terms of Service and Privacy Policy.
-                  </p>
                 </TabsContent>
               </Tabs>
             </CardContent>

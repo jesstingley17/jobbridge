@@ -116,6 +116,9 @@ export function Footer() {
               <Link href="/privacy" className="text-sm text-foreground/70 hover:text-teal-600 dark:hover:text-teal-400 transition-colors" data-testid="link-footer-privacy">
                 Privacy Policy
               </Link>
+              <Link href="/cookies" className="text-sm text-foreground/70 hover:text-purple-600 dark:hover:text-purple-400 transition-colors" data-testid="link-footer-cookies">
+                Cookie Policy
+              </Link>
               <Link href="/terms" className="text-sm text-foreground/70 hover:text-purple-600 dark:hover:text-purple-400 transition-colors" data-testid="link-footer-terms">
                 Terms of Service
               </Link>

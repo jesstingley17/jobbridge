@@ -6,6 +6,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { Navbar } from "@/components/navbar";
 import { Footer } from "@/components/footer";
 import { AIChatAssistant } from "@/components/ai-chat-assistant";
+import { CookieConsent } from "@/components/cookie-consent";
 import { SubscriptionProvider } from "@/contexts/subscription-context";
 import Home from "@/pages/home";
 import Features from "@/pages/features";
@@ -26,6 +27,9 @@ import Blog from "@/pages/blog";
 import BlogPost from "@/pages/blog-post";
 import Contact from "@/pages/contact";
 import Notes from "@/pages/notes";
+import Privacy from "@/pages/privacy";
+import Cookies from "@/pages/cookies";
+import Terms from "@/pages/terms";
 import AdminBlog from "@/pages/admin-blog";
 import AdminLogin from "@/pages/admin-login";
 import NotFound from "@/pages/not-found";
@@ -52,6 +56,9 @@ function Router() {
           <Route path="/admin/blog" component={AdminBlog} />
           <Route path="/contact" component={Contact} />
           <Route path="/notes" component={Notes} />
+          <Route path="/privacy" component={Privacy} />
+          <Route path="/cookies" component={Cookies} />
+          <Route path="/terms" component={Terms} />
           <Route path="/auth" component={Auth} />
       <Route path="/auth/verify" component={ResetPassword} />
       <Route component={NotFound} />
@@ -73,6 +80,7 @@ function App() {
           </div>
           <Toaster />
           <AIChatAssistant />
+          <CookieConsent />
         </SubscriptionProvider>
       </TooltipProvider>
     </QueryClientProvider>

@@ -32,6 +32,8 @@ export function Logo({
   // If using image file, render simple image-based logo
   // Note: The logo image already includes the text, so we don't show text separately
   if (useImage) {
+    // Use logo.png - if you've updated the logo, you may need to do a hard refresh (Ctrl+F5 / Cmd+Shift+R)
+    // to see the changes due to browser caching
     return (
       <div className={className}>
         {/* Logo Image - includes both graphic and text, so no separate text needed */}
