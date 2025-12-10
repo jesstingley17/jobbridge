@@ -2,7 +2,7 @@ import { Resend } from 'resend';
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
-const FROM_EMAIL = 'The Job Bridge <noreply@thejobbridge.com>';
+const FROM_EMAIL = 'The Job Bridge <noreply@thejobbridge-inc.com>';
 
 export interface WelcomeEmailParams {
   email: string;
