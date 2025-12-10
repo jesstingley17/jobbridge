@@ -9,6 +9,11 @@
       "maxDuration": 30
     }
   },
+  "git": {
+    "deploymentEnabled": {
+      "main": true
+    }
+  },
   "rewrites": [
     {
       "source": "/api/(.*)",
