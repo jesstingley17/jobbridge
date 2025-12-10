@@ -1,5 +1,6 @@
 import { Link } from "wouter";
-import { Briefcase, Heart, Shield, Accessibility, Mail, Phone } from "lucide-react";
+import { Heart, Shield, Accessibility, Mail, Phone } from "lucide-react";
+import { Logo } from "./logo";
 
 export function Footer() {
   return (
@@ -8,11 +9,8 @@ export function Footer() {
         <div className="grid grid-cols-1 gap-8 md:grid-cols-4">
           {/* Brand Column */}
           <div className="md:col-span-1">
-            <Link href="/" className="flex items-center gap-2" data-testid="link-footer-logo">
-              <div className="flex h-9 w-9 items-center justify-center rounded-md bg-gradient-to-br from-purple-500 to-pink-500">
-                <Briefcase className="h-5 w-5 text-white" aria-hidden="true" />
-              </div>
-              <span className="text-xl font-semibold bg-gradient-to-r from-purple-600 to-teal-600 bg-clip-text text-transparent">The Job Bridge</span>
+            <Link href="/" data-testid="link-footer-logo">
+              <Logo size="md" showText={true} variant="horizontal" />
             </Link>
             <p className="mt-4 text-sm text-foreground/80 leading-relaxed">
               Breaking employment barriers for people with disabilities through AI-powered tools and inclusive hiring solutions.

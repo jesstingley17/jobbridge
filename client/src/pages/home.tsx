@@ -126,7 +126,7 @@ export default function Home() {
           <div className="mx-auto max-w-4xl text-center">
             {/* Large Logo */}
             <div className="mb-8 flex justify-center">
-              <Logo size="lg" />
+              <Logo size="xl" variant="vertical" />
             </div>
 
             {/* CTA Button */}
