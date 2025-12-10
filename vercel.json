@@ -4,6 +4,23 @@
   "outputDirectory": "dist/public",
   "installCommand": "npm install",
   "framework": null,
+  "redirects": [
+    {
+      "source": "http://www.thejobbridge-inc.com/:path*",
+      "destination": "https://thejobbridge-inc.com/:path*",
+      "permanent": true
+    },
+    {
+      "source": "http://thejobbridge-inc.com/:path*",
+      "destination": "https://thejobbridge-inc.com/:path*",
+      "permanent": true
+    },
+    {
+      "source": "https://www.thejobbridge-inc.com/:path*",
+      "destination": "https://thejobbridge-inc.com/:path*",
+      "permanent": true
+    }
+  ],
   "rewrites": [
     {
       "source": "/api/(.*)",

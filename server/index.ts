@@ -77,6 +77,29 @@ app.post(
   }
 );
 
+// Canonical domain redirects (must be before other middleware)
+// Redirect HTTP to HTTPS and www to non-www
+app.use((req, res, next) => {
+  const host = req.get('host') || '';
+  const protocol = req.protocol;
+  const url = req.originalUrl || req.url;
+  
+  // Canonical domain: thejobbridge-inc.com (non-www, HTTPS)
+  const canonicalDomain = 'thejobbridge-inc.com';
+  const isHttps = req.secure || req.get('x-forwarded-proto') === 'https';
+  const hasWww = host.startsWith('www.');
+  
+  // Build canonical URL
+  const canonicalUrl = `https://${canonicalDomain}${url}`;
+  
+  // Redirect if not using canonical protocol/domain
+  if (!isHttps || hasWww || host !== canonicalDomain) {
+    return res.redirect(301, canonicalUrl);
+  }
+  
+  next();
+});
+
 // Now apply JSON middleware for all other routes
 app.use(
   express.json({
