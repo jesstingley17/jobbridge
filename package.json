@@ -114,5 +114,10 @@
   },
   "optionalDependencies": {
     "bufferutil": "^4.0.8"
+  },
+  "overrides": {
+    "esbuild": "^0.25.0",
+    "path-to-regexp": "^6.2.3",
+    "undici": "^6.20.0"
   }
 }
