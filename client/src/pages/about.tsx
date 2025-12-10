@@ -78,12 +78,15 @@ export default function About() {
               </div>
             </div>
             <div className="grid gap-12 lg:grid-cols-2 lg:items-start">
-              {/* Founder Image Placeholder */}
+              {/* Founder Image */}
               <div className="order-2 lg:order-1">
                 <div className="relative aspect-[3/4] w-full max-w-md mx-auto lg:mx-0">
-                  <div className="rounded-lg bg-gradient-to-br from-blue-100 to-blue-200 dark:from-blue-900/30 dark:to-blue-800/30 w-full h-full shadow-lg flex items-center justify-center">
-                    <Users className="h-24 w-24 text-blue-400 dark:text-blue-500" aria-hidden="true" />
-                  </div>
+                  <img
+                    src="/founder-jessica-lee-tingley.jpg"
+                    alt="Jessica-Lee Tingley, Founder of The JobBridge, Inc."
+                    className="rounded-lg w-full h-full object-cover shadow-lg"
+                    loading="lazy"
+                  />
                 </div>
               </div>
               {/* Founder Bio */}
