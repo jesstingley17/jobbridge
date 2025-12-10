@@ -29,18 +29,18 @@ import { useSubscriptionContext } from "@/contexts/subscription-context";
 import type { Job } from "@shared/schema";
 
 // Extended Job interface to match Figma design
-interface ExtendedJob extends Partial<Job> {
+interface ExtendedJob {
   id: string | number;
   title: string;
   company: string;
   location: string;
   type: string;
   description: string;
-  salary?: string;
+  salary?: string | null;
   postedDate?: string;
   posted?: string;
   requirements?: string;
-  externalSource?: string;
+  externalSource?: string | null;
   accessibilityFeatures?: string[];
   matchScore?: number;
   matchAnalysis?: {
@@ -101,7 +101,7 @@ export function JobCard({ job, isSaved, onToggleSave, onApply }: JobCardProps) {
         jobTitle: job.title,
         jobDescription: job.description,
         jobRequirements: job.requirements,
-        userSkills: [...new Set(allSkills)],
+        userSkills: Array.from(new Set(allSkills)),
         userExperience: profile?.bio || "",
       });
       return response.json();

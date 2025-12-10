@@ -157,7 +157,6 @@ export function Navbar() {
                       onClick={() => setIsOpen(false)}
                       data-testid={`link-mobile-${item.label.toLowerCase().replace(/\s+/g, "-")}`}
                     >
-                      {item.icon && <item.icon className="h-5 w-5" aria-hidden="true" />}
                       {item.label}
                     </Button>
                   </Link>

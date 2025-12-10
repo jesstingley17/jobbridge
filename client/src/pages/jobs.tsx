@@ -58,7 +58,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
-import { JobCard } from "@/components/jobs/JobCard";
+import { JobCard, type ExtendedJob } from "@/components/jobs/JobCard";
 
 const accessibilityFilters = [
   { id: "remote", label: "Remote Work Available" },
@@ -437,7 +437,7 @@ export default function Jobs() {
   const [applyJob, setApplyJob] = useState<Job | null>(null);
   const [savedJobs, setSavedJobs] = useState<string[]>([]);
 
-  const handleApplyClick = (job: Job) => {
+  const handleApplyClick = (job: Job | ExtendedJob) => {
     if (!isAuthenticated) {
       toast({
         title: "Login Required",
@@ -606,15 +606,30 @@ export default function Jobs() {
                 <JobCardSkeleton />
               </>
             ) : filteredJobs && filteredJobs.length > 0 ? (
-              filteredJobs.map((job) => (
-                <JobCard
-                  key={job.id}
-                  job={job}
-                  isSaved={savedJobs.includes(String(job.id))}
-                  onToggleSave={toggleSave}
-                  onApply={handleApplyClick}
-                />
-              ))
+              filteredJobs.map((job) => {
+                const extendedJob: ExtendedJob = {
+                  id: job.id,
+                  title: job.title,
+                  company: job.company,
+                  location: job.location,
+                  type: job.type,
+                  description: job.description,
+                  salary: job.salary,
+                  postedDate: job.postedDate,
+                  requirements: job.requirements,
+                  externalSource: job.externalSource,
+                  accessibilityFeatures: job.accessibilityFeatures,
+                };
+                return (
+                  <JobCard
+                    key={job.id}
+                    job={extendedJob}
+                    isSaved={savedJobs.includes(String(job.id))}
+                    onToggleSave={toggleSave}
+                    onApply={handleApplyClick}
+                  />
+                );
+              })
             ) : (
               <Card className="overflow-visible">
                 <CardContent className="flex flex-col items-center justify-center py-16 text-center">
