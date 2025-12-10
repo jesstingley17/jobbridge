@@ -13,7 +13,8 @@ import {
   messages, type Message, type InsertMessage,
   supportTickets, type SupportTicket, type InsertSupportTicket,
   magicLinkTokens, type MagicLinkToken,
-  emailLogs, type EmailLog
+  emailLogs, type EmailLog,
+  notes, type Note, type InsertNote
 } from "@shared/schema";
 import bcrypt from "bcrypt";
 import { db } from "./db";
@@ -96,6 +97,11 @@ export interface IStorage {
   createUserWithPassword(userData: RegisterUser & { hashedPassword: string }): Promise<User>;
   updateUserPassword(userId: string, hashedPassword: string): Promise<void>;
   verifyUserEmail(email: string): Promise<void>;
+  
+  // Notes operations (Supabase integration)
+  getNotes(): Promise<Note[]>;
+  createNote(note: InsertNote): Promise<Note>;
+  deleteNote(id: number): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {

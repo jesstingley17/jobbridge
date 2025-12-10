@@ -1625,6 +1625,42 @@ Return JSON with:
     }
   });
 
+  // Supabase Notes API routes
+  app.get("/api/notes", async (req, res) => {
+    try {
+      const notes = await storage.getNotes();
+      res.json({ notes });
+    } catch (error) {
+      console.error("Error fetching notes:", error);
+      res.status(500).json({ error: "Failed to fetch notes" });
+    }
+  });
+
+  app.post("/api/notes", isAuthenticated, async (req: any, res) => {
+    try {
+      const { title } = req.body;
+      if (!title) {
+        return res.status(400).json({ error: "Title is required" });
+      }
+      const note = await storage.createNote({ title });
+      res.status(201).json({ note });
+    } catch (error) {
+      console.error("Error creating note:", error);
+      res.status(500).json({ error: "Failed to create note" });
+    }
+  });
+
+  app.delete("/api/notes/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      await storage.deleteNote(parseInt(id));
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting note:", error);
+      res.status(500).json({ error: "Failed to delete note" });
+    }
+  });
+
   // Admin route to list Stripe customers
   app.get("/api/stripe/customers", isAuthenticated, async (req: any, res) => {
     try {

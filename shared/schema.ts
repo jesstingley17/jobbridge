@@ -382,6 +382,18 @@ export type InsertMagicLinkToken = z.infer<typeof insertMagicLinkTokenSchema>;
 export type MagicLinkToken = typeof magicLinkTokens.$inferSelect;
 
 // Track if welcome email was sent
+// Notes table for Supabase integration
+export const notes = pgTable("notes", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  title: text("title").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export type Note = typeof notes.$inferSelect;
+export type InsertNote = typeof notes.$inferInsert;
+export const insertNoteSchema = createInsertSchema(notes);
+
 export const emailLogs = pgTable("email_logs", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id").references(() => users.id),
