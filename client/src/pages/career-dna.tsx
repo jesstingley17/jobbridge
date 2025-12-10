@@ -116,7 +116,7 @@ export default function CareerDNA() {
             <p className="text-muted-foreground mb-6">
               Please sign in to take the Career DNA assessment and discover your unique professional profile.
             </p>
-            <Button onClick={() => setLocation('/api/login')} data-testid="button-login">
+            <Button onClick={() => setLocation('/auth')} data-testid="button-login">
               Sign In to Continue
             </Button>
           </CardContent>

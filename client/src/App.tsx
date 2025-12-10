@@ -19,6 +19,8 @@ import Applications from "@/pages/applications";
 import SelectRole from "@/pages/select-role";
 import Community from "@/pages/community";
 import Pricing from "@/pages/pricing";
+import Auth from "@/pages/auth";
+import ResetPassword from "@/pages/reset-password";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -36,6 +38,8 @@ function Router() {
       <Route path="/select-role" component={SelectRole} />
       <Route path="/community" component={Community} />
       <Route path="/pricing" component={Pricing} />
+      <Route path="/auth" component={Auth} />
+      <Route path="/auth/verify" component={ResetPassword} />
       <Route component={NotFound} />
     </Switch>
   );
