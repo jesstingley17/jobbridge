@@ -29,14 +29,13 @@ export function Logo({
 
   const dimensions = iconSizes[size];
 
-  // If using image file, render simple image-based logo
-  // Note: The logo image already includes the text, so we don't show text separately
+  // If using image file, render image-based logo with optional text
   if (useImage) {
     // Use logo.png - if you've updated the logo, you may need to do a hard refresh (Ctrl+F5 / Cmd+Shift+R)
     // to see the changes due to browser caching
     return (
-      <div className={className}>
-        {/* Logo Image - includes both graphic and text, so no separate text needed */}
+      <div className={`flex items-center ${variant === "vertical" ? "flex-col gap-2" : "gap-3"} ${className}`}>
+        {/* Logo Image - graphic only (text is separate) */}
         <img
           src="/logo.png"
           alt="The JobBridge Logo"
@@ -74,6 +73,21 @@ export function Logo({
             }
           }}
         />
+        
+        {/* JOBBRIDGE Text - displayed separately when showText is true */}
+        {showText && (
+          <span 
+            className={`font-bold tracking-tight ${textSizes[size]} ${variant === "vertical" ? "mt-2" : ""}`}
+            style={{ 
+              color: '#F97316',
+              textShadow: '0 1px 2px rgba(0,0,0,0.1)',
+              fontWeight: 700,
+              letterSpacing: '-0.01em'
+            }}
+          >
+            JOBBRIDGE
+          </span>
+        )}
       </div>
     );
   }
