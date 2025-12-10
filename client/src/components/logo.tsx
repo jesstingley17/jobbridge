@@ -37,12 +37,13 @@ export function Logo({
         <img
           src="/logo.png"
           alt="The JobBridge Logo"
-          className="object-contain"
+          className="object-contain drop-shadow-sm"
           style={{ 
             width: dimensions.width, 
             height: 'auto',
             maxHeight: dimensions.height
           }}
+          loading="eager"
           onError={(e) => {
             // Fallback to SVG if image not found
             const target = e.target as HTMLImageElement;
