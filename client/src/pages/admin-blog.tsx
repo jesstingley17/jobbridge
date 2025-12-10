@@ -23,7 +23,7 @@ import {
   RefreshCw
 } from "lucide-react";
 import { Link } from "wouter";
-import { useAuth } from "@/hooks/use-auth";
+import { useLocation } from "wouter";
 
 interface BlogPost {
   id: string;
@@ -43,7 +43,7 @@ interface BlogPost {
 }
 
 export default function AdminBlog() {
-  const { isAuthenticated } = useAuth();
+  const [, setLocation] = useLocation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [editingPost, setEditingPost] = useState<BlogPost | null>(null);
@@ -57,6 +57,7 @@ export default function AdminBlog() {
       const response = await apiRequest("GET", "/api/admin/blog/posts");
       if (!response.ok) {
         if (response.status === 401 || response.status === 403) {
+          setLocation("/admin/login");
           throw new Error("Admin access required");
         }
         throw new Error("Failed to fetch posts");
@@ -194,19 +195,6 @@ export default function AdminBlog() {
     });
   };
 
-  if (!isAuthenticated) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <Card className="max-w-md">
-          <CardContent className="pt-6">
-            <p className="text-center text-muted-foreground">
-              Please log in to access the admin panel.
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
 
   if (isLoading) {
     return (

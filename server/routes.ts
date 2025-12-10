@@ -244,6 +244,145 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   });
 
+  // Admin login (separate from regular auth)
+  app.post('/api/admin/login', async (req, res) => {
+    try {
+      const { email, password } = loginUserSchema.parse(req.body);
+      
+      // Find user by email
+      const user = await storage.getUserByEmail(email);
+      if (!user || !user.password) {
+        return res.status(401).json({ message: "Invalid email or password" });
+      }
+      
+      // Verify password
+      const isValid = await verifyPassword(password, user.password);
+      if (!isValid) {
+        return res.status(401).json({ message: "Invalid email or password" });
+      }
+      
+      // Check if user is admin (via email check or role)
+      const adminEmails = process.env.ADMIN_EMAILS?.split(",").map(e => e.trim()) || [];
+      const adminPattern = process.env.ADMIN_EMAIL_PATTERN;
+      let isAdmin = false;
+      
+      if (user.role === "admin") {
+        isAdmin = true;
+      } else if (user.email && adminEmails.includes(user.email)) {
+        isAdmin = true;
+      } else if (adminPattern && user.email) {
+        const regex = new RegExp(adminPattern);
+        if (regex.test(user.email)) {
+          isAdmin = true;
+        }
+      }
+      
+      if (!isAdmin) {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+      
+      // Create session
+      (req.session as any).userId = user.id;
+      (req.session as any).user = {
+        claims: { sub: user.id }
+      };
+      (req.session as any).isAdmin = true;
+      
+      res.json({ 
+        message: "Login successful",
+        user: {
+          id: user.id,
+          email: user.email,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          role: user.role,
+        }
+      });
+    } catch (error: any) {
+      console.error("Admin login error:", error);
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ message: error.errors[0].message });
+      }
+      res.status(500).json({ message: "Login failed" });
+    }
+  });
+
+  // Admin logout
+  app.post('/api/admin/logout', (req, res) => {
+    req.session.destroy((err) => {
+      if (err) {
+        console.error("Admin logout error:", err);
+        return res.status(500).json({ message: "Logout failed" });
+      }
+      res.clearCookie('connect.sid');
+      res.json({ message: "Logged out successfully" });
+    });
+  });
+
+  // Admin forgot password
+  app.post('/api/admin/forgot-password', async (req, res) => {
+    try {
+      const { email } = z.object({ email: z.string().email() }).parse(req.body);
+      
+      // Check if user exists and is admin
+      const user = await storage.getUserByEmail(email);
+      if (!user) {
+        // Don't reveal if email exists or not
+        return res.json({ message: "If an admin account exists with this email, you will receive a reset link shortly." });
+      }
+      
+      // Check if user is admin
+      const adminEmails = process.env.ADMIN_EMAILS?.split(",").map(e => e.trim()) || [];
+      const adminPattern = process.env.ADMIN_EMAIL_PATTERN;
+      let isAdmin = false;
+      
+      if (user.role === "admin") {
+        isAdmin = true;
+      } else if (user.email && adminEmails.includes(user.email)) {
+        isAdmin = true;
+      } else if (adminPattern && user.email) {
+        const regex = new RegExp(adminPattern);
+        if (regex.test(user.email)) {
+          isAdmin = true;
+        }
+      }
+      
+      if (!isAdmin) {
+        // Don't reveal if email exists or not
+        return res.json({ message: "If an admin account exists with this email, you will receive a reset link shortly." });
+      }
+      
+      // Generate token
+      const token = crypto.randomBytes(32).toString('hex');
+      const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
+      
+      await storage.createMagicLinkToken(email, token, expiresAt);
+      
+      // Build reset link URL
+      const baseUrl = `${req.protocol}://${req.get('host')}`;
+      const resetLink = `${baseUrl}/auth/verify?token=${token}&type=reset`;
+      
+      // Send password reset email
+      const sent = await sendPasswordResetEmail({ 
+        email, 
+        firstName: user.firstName || undefined, 
+        magicLink: resetLink 
+      });
+      
+      if (sent) {
+        await storage.logEmail(user.id, email, 'password_reset');
+      }
+      
+      res.json({ message: "If an admin account exists with this email, you will receive a reset link shortly." });
+    } catch (error) {
+      console.error("Error sending admin password reset:", error);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Invalid email address" });
+      }
+      res.status(500).json({ error: "Failed to send reset email" });
+    }
+  });
+
   // Auth routes
   app.get('/api/auth/user', isAuthenticated, async (req: any, res) => {
     try {

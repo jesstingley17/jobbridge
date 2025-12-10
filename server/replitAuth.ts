@@ -179,10 +179,20 @@ export const isAuthenticated: RequestHandler = async (req, res, next) => {
 
 // Admin middleware - checks if user is admin
 // Admin is determined by:
-// 1. User role is "admin" (if we add that role)
+// 1. User role is "admin"
 // 2. User email is in ADMIN_EMAILS env var (comma-separated)
 // 3. User email matches ADMIN_EMAIL_PATTERN env var (regex pattern)
+// 4. Session has isAdmin flag (for admin login)
 export const isAdmin: RequestHandler = async (req: any, res, next) => {
+  // Check session-based auth first (for admin login)
+  const sessionUserId = (req.session as any)?.userId;
+  const sessionIsAdmin = (req.session as any)?.isAdmin;
+  
+  if (sessionUserId && sessionIsAdmin) {
+    return next();
+  }
+  
+  // Check passport-based auth (for Replit Auth)
   if (!req.isAuthenticated()) {
     return res.status(401).json({ message: "Unauthorized" });
   }

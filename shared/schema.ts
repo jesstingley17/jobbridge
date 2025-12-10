@@ -52,7 +52,7 @@ export const loginUserSchema = z.object({
 });
 export type LoginUser = z.infer<typeof loginUserSchema>;
 
-export const userRoles = ["developer", "participant", "employer"] as const;
+export const userRoles = ["developer", "participant", "employer", "admin"] as const;
 export type UserRole = typeof userRoles[number];
 
 // User profile with Career DNA assessment
