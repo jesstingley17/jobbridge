@@ -176,3 +176,51 @@ export const isAuthenticated: RequestHandler = async (req, res, next) => {
     return;
   }
 };
+
+// Admin middleware - checks if user is admin
+// Admin is determined by:
+// 1. User role is "admin" (if we add that role)
+// 2. User email is in ADMIN_EMAILS env var (comma-separated)
+// 3. User email matches ADMIN_EMAIL_PATTERN env var (regex pattern)
+export const isAdmin: RequestHandler = async (req: any, res, next) => {
+  if (!req.isAuthenticated()) {
+    return res.status(401).json({ message: "Unauthorized" });
+  }
+
+  try {
+    const userId = req.user?.claims?.sub;
+    if (!userId) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+
+    const user = await storage.getUser(userId);
+    if (!user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+
+    // Check if user has admin role
+    if (user.role === "admin") {
+      return next();
+    }
+
+    // Check admin emails from env
+    const adminEmails = process.env.ADMIN_EMAILS?.split(",").map(e => e.trim()) || [];
+    if (user.email && adminEmails.includes(user.email)) {
+      return next();
+    }
+
+    // Check admin email pattern
+    const adminPattern = process.env.ADMIN_EMAIL_PATTERN;
+    if (adminPattern && user.email) {
+      const regex = new RegExp(adminPattern);
+      if (regex.test(user.email)) {
+        return next();
+      }
+    }
+
+    return res.status(403).json({ message: "Admin access required" });
+  } catch (error) {
+    console.error("Error checking admin access:", error);
+    return res.status(500).json({ message: "Internal server error" });
+  }
+};

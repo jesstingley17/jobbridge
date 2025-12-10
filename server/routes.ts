@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { setupAuth, isAuthenticated } from "./replitAuth";
+import { setupAuth, isAuthenticated, isAdmin } from "./replitAuth";
 import OpenAI from "openai";
 import { z } from "zod";
 import { getExternalJobs } from "./externalJobs";
@@ -1807,6 +1807,108 @@ Return JSON with:
     } catch (error) {
       console.error("Error syncing Contentful posts:", error);
       res.status(500).json({ error: "Failed to sync posts" });
+    }
+  });
+
+  // Admin blog management routes
+  app.get("/api/admin/blog/posts", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const posts = await storage.getAllBlogPosts();
+      res.json({ posts });
+    } catch (error) {
+      console.error("Error fetching all blog posts:", error);
+      res.status(500).json({ error: "Failed to fetch blog posts" });
+    }
+  });
+
+  app.get("/api/admin/blog/posts/:id", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const post = await storage.getBlogPostById(id);
+      if (!post) {
+        return res.status(404).json({ error: "Post not found" });
+      }
+      res.json({ post });
+    } catch (error) {
+      console.error("Error fetching blog post:", error);
+      res.status(500).json({ error: "Failed to fetch blog post" });
+    }
+  });
+
+  app.post("/api/admin/blog/posts", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const { title, slug, excerpt, content, authorName, featuredImage, published, tags, publishedAt } = req.body;
+      
+      if (!title || !slug || !content) {
+        return res.status(400).json({ error: "Title, slug, and content are required" });
+      }
+
+      const post = await storage.upsertBlogPost({
+        title,
+        slug,
+        excerpt,
+        content,
+        authorName: authorName || "The JobBridge Team",
+        featuredImage,
+        published: published !== false,
+        tags: Array.isArray(tags) ? tags : tags ? [tags] : [],
+        publishedAt: publishedAt ? new Date(publishedAt) : new Date(),
+      });
+
+      res.status(201).json({ post });
+    } catch (error: any) {
+      console.error("Error creating blog post:", error);
+      if (error.code === '23505') { // Unique constraint violation
+        return res.status(400).json({ error: "A post with this slug already exists" });
+      }
+      res.status(500).json({ error: "Failed to create blog post" });
+    }
+  });
+
+  app.put("/api/admin/blog/posts/:id", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { title, slug, excerpt, content, authorName, featuredImage, published, tags, publishedAt } = req.body;
+
+      const existingPost = await storage.getBlogPostById(id);
+      if (!existingPost) {
+        return res.status(404).json({ error: "Post not found" });
+      }
+
+      const updates: any = {};
+      if (title !== undefined) updates.title = title;
+      if (slug !== undefined) updates.slug = slug;
+      if (excerpt !== undefined) updates.excerpt = excerpt;
+      if (content !== undefined) updates.content = content;
+      if (authorName !== undefined) updates.authorName = authorName;
+      if (featuredImage !== undefined) updates.featuredImage = featuredImage;
+      if (published !== undefined) updates.published = published;
+      if (tags !== undefined) updates.tags = Array.isArray(tags) ? tags : tags ? [tags] : [];
+      if (publishedAt !== undefined) updates.publishedAt = new Date(publishedAt);
+
+      const updated = await storage.updateBlogPost(id, updates);
+      if (!updated) {
+        return res.status(404).json({ error: "Post not found" });
+      }
+
+      res.json({ post: updated });
+    } catch (error: any) {
+      console.error("Error updating blog post:", error);
+      if (error.code === '23505') { // Unique constraint violation
+        return res.status(400).json({ error: "A post with this slug already exists" });
+      }
+      res.status(500).json({ error: "Failed to update blog post" });
+    }
+  });
+
+  app.delete("/api/admin/blog/posts/:id", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const { id } = req.params;
+      await storage.deleteBlogPost(id);
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting blog post:", error);
+      res.status(500).json({ error: "Failed to delete blog post" });
     }
   });
 

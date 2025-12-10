@@ -106,9 +106,13 @@ export interface IStorage {
   
   // Blog post operations
   getBlogPosts(search?: string, tag?: string): Promise<BlogPost[]>;
+  getAllBlogPosts(): Promise<BlogPost[]>; // Admin: get all posts including unpublished
   getBlogPostBySlug(slug: string): Promise<BlogPost | undefined>;
+  getBlogPostById(id: string): Promise<BlogPost | undefined>;
   getBlogPostByContentfulId(contentfulId: string): Promise<BlogPost | undefined>;
   upsertBlogPost(post: InsertBlogPost): Promise<BlogPost>;
+  updateBlogPost(id: string, updates: Partial<InsertBlogPost>): Promise<BlogPost | undefined>;
+  deleteBlogPost(id: string): Promise<void>;
   incrementBlogPostViews(slug: string): Promise<void>;
 }
 
@@ -681,6 +685,38 @@ export class DatabaseStorage implements IStorage {
       .update(blogPosts)
       .set({ views: sql`${blogPosts.views} + 1` })
       .where(eq(blogPosts.slug, slug));
+  }
+
+  // Admin blog post operations
+  async getAllBlogPosts(): Promise<BlogPost[]> {
+    return db
+      .select()
+      .from(blogPosts)
+      .orderBy(desc(blogPosts.createdAt));
+  }
+
+  async getBlogPostById(id: string): Promise<BlogPost | undefined> {
+    const [post] = await db
+      .select()
+      .from(blogPosts)
+      .where(eq(blogPosts.id, id));
+    return post;
+  }
+
+  async updateBlogPost(id: string, updates: Partial<InsertBlogPost>): Promise<BlogPost | undefined> {
+    const [updated] = await db
+      .update(blogPosts)
+      .set({
+        ...updates,
+        updatedAt: new Date(),
+      })
+      .where(eq(blogPosts.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteBlogPost(id: string): Promise<void> {
+    await db.delete(blogPosts).where(eq(blogPosts.id, id));
   }
 }
 
