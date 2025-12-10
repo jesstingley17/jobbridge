@@ -412,7 +412,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userId = req.user.claims.sub;
       const { role } = req.body;
-      if (!["developer", "participant", "employer"].includes(role)) {
+      if (!["developer", "participant", "employer", "admin"].includes(role)) {
         return res.status(400).json({ error: "Invalid role" });
       }
       const user = await storage.updateUserRole(userId, role);
