@@ -384,7 +384,8 @@ export class DatabaseStorage implements IStorage {
       normalizedResume.education = null;
     }
     
-    const [newResume] = await db.insert(resumes).values(normalizedResume as InsertResume).returning();
+    // Use explicit type assertion to satisfy Drizzle's type requirements
+    const [newResume] = await db.insert(resumes).values(normalizedResume as any).returning();
     return newResume;
   }
 
