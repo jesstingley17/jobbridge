@@ -123,7 +123,12 @@ const updateApplicationSchema = z.object({
   coverLetter: z.string().optional(),
 });
 
+import { registerSitemapRoute } from "./routes/sitemap";
+
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Register sitemap and robots.txt routes (before auth)
+  registerSitemapRoute(app);
+  
   // Setup authentication
   await setupAuth(app);
 

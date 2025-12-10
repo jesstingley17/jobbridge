@@ -92,6 +92,36 @@ app.use(compression({
   threshold: 1024, // Only compress responses larger than 1KB
 }));
 
+// Content Security Policy (CSP) headers
+app.use((req, res, next) => {
+  const baseUrl = process.env.CLIENT_URL || `https://thejobbridge-inc.com`;
+  
+  // CSP policy - allow necessary resources while preventing XSS
+  const cspDirectives = [
+    "default-src 'self'",
+    "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://dashboard.searchatlas.com https://fonts.googleapis.com",
+    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+    "font-src 'self' https://fonts.gstatic.com data:",
+    "img-src 'self' data: https: blob:",
+    "connect-src 'self' https://api.openai.com https://ai-gateway.vercel.sh https://*.supabase.co https://api.stripe.com https://api.mixedbread.ai https://serpapi.com https://jsearch.p.rapidapi.com",
+    "frame-src 'self' https://js.stripe.com https://hooks.stripe.com",
+    "object-src 'none'",
+    "base-uri 'self'",
+    "form-action 'self'",
+    "frame-ancestors 'none'",
+    "upgrade-insecure-requests",
+  ].join('; ');
+  
+  res.setHeader('Content-Security-Policy', cspDirectives);
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('X-XSS-Protection', '1; mode=block');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.setHeader('Permissions-Policy', 'geolocation=(), microphone=(), camera=()');
+  
+  next();
+});
+
 // Canonical domain redirects (must be before other middleware)
 // Redirect HTTP to HTTPS and www to non-www
 app.use((req, res, next) => {
