@@ -11,6 +11,7 @@ import { db } from "./db";
 import { requireFeature, requireApplicationQuota, incrementApplicationCount, getUserSubscriptionStatus } from "./subscriptionMiddleware";
 import { sendMagicLinkEmail, sendPasswordResetEmail } from "./email";
 import crypto from "crypto";
+import { generateAIText, getAIClient } from "./aiGateway";
 import { 
   generateResumeRequestSchema, 
   generateInterviewQuestionsRequestSchema,
@@ -63,12 +64,57 @@ const saveScoresSchema = z.object({
   })).min(1, "At least one score is required"),
 });
 
-const hasOpenAI = !!(process.env.AI_INTEGRATIONS_OPENAI_BASE_URL && process.env.AI_INTEGRATIONS_OPENAI_API_KEY);
+// Support both Vercel AI Gateway and direct OpenAI
+// Priority: AI Gateway > Direct OpenAI
+const aiClient = getAIClient();
+const hasOpenAI = !!aiClient;
 
-const openai = hasOpenAI ? new OpenAI({
-  baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
-  apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
-}) : null;
+// Legacy OpenAI client for backward compatibility
+const openai = aiClient && aiClient.type === 'openai' ? aiClient.client : null;
+
+// Helper to get model name (adds prefix for AI Gateway)
+function getModelName(baseModel: string = 'gpt-4o'): string {
+  if (aiClient?.type === 'gateway') {
+    // AI Gateway uses prefixed model names
+    return `openai/${baseModel}`;
+  }
+  return baseModel;
+}
+
+// Wrapper function to handle both AI Gateway and OpenAI
+async function createChatCompletion(
+  model: string,
+  messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }>,
+  options?: { max_tokens?: number; temperature?: number }
+) {
+  if (aiClient?.type === 'gateway') {
+    // Use AI Gateway via AI SDK
+    const result = await generateAIText(
+      getModelName(model),
+      messages,
+      {
+        maxTokens: options?.max_tokens,
+        temperature: options?.temperature,
+      }
+    );
+    return {
+      choices: [{
+        message: { content: result.text },
+        finish_reason: result.finishReason,
+      }],
+      usage: result.usage,
+    };
+  } else if (openai) {
+    // Use direct OpenAI SDK
+    return await openai.chat.completions.create({
+      model,
+      messages: messages as any,
+      max_tokens: options?.max_tokens,
+      temperature: options?.temperature,
+    });
+  }
+  throw new Error('No AI client available');
+}
 
 const validStatuses = ["applied", "interviewing", "offered", "rejected", "saved"] as const;
 const updateApplicationSchema = z.object({
@@ -730,15 +776,17 @@ Please generate a well-structured, professional resume that:
 
 Format the resume in a clean, professional markdown format.`;
 
-        const response = await openai.chat.completions.create({
-          model: "gpt-4o",
-          messages: [
+        const response = await createChatCompletion(
+          "gpt-4o",
+          [
             { role: "system", content: "You are an expert resume writer who creates accessible, ATS-friendly resumes." },
             { role: "user", content: prompt }
           ],
-          max_tokens: 2000,
-          temperature: 0.7,
-        });
+          {
+            max_tokens: 2000,
+            temperature: 0.7,
+          }
+        );
 
         resumeContent = response.choices[0]?.message?.content || generateMockResume(targetRole, experience, skills, education);
       } else {
@@ -789,15 +837,17 @@ ${resumeText}
 
 Return ONLY valid JSON, no markdown or explanation.`;
 
-        const response = await openai.chat.completions.create({
-          model: "gpt-4o",
-          messages: [
+        const response = await createChatCompletion(
+          "gpt-4o",
+          [
             { role: "system", content: "You are a resume parser. Extract structured data from resumes and return valid JSON only." },
             { role: "user", content: prompt }
           ],
-          max_tokens: 2000,
-          temperature: 0.3,
-        });
+          {
+            max_tokens: 2000,
+            temperature: 0.3,
+          }
+        );
 
         const content = response.choices[0]?.message?.content || "{}";
         const jsonMatch = content.match(/\{[\s\S]*\}/);
@@ -942,15 +992,17 @@ Create a compelling cover letter that:
 
 Keep it professional, concise (3-4 paragraphs), and personalized.`;
 
-        const response = await openai.chat.completions.create({
-          model: "gpt-4o",
-          messages: [
+        const response = await createChatCompletion(
+          "gpt-4o",
+          [
             { role: "system", content: "You are an expert cover letter writer who creates personalized, compelling letters." },
             { role: "user", content: prompt }
           ],
-          max_tokens: 1000,
-          temperature: 0.7,
-        });
+          {
+            max_tokens: 1000,
+            temperature: 0.7,
+          }
+        );
 
         coverLetter = response.choices[0]?.message?.content || generateMockCoverLetter(jobTitle, company);
       } else {
@@ -988,15 +1040,17 @@ For each question, provide:
 
 Format as a JSON array with objects containing: question, reason, tips`;
 
-          const response = await openai.chat.completions.create({
-            model: "gpt-4o",
-            messages: [
+          const response = await createChatCompletion(
+            "gpt-4o",
+            [
               { role: "system", content: "You are an expert career coach. Always return valid JSON." },
               { role: "user", content: prompt }
             ],
-            max_tokens: 2000,
-            temperature: 0.7,
-          });
+            {
+              max_tokens: 2000,
+              temperature: 0.7,
+            }
+          );
 
           const content = response.choices[0]?.message?.content || "[]";
           const jsonMatch = content.match(/\[[\s\S]*\]/);
@@ -1048,15 +1102,17 @@ Provide constructive feedback including:
 3. Areas for improvement
 4. Suggestions`;
 
-          const response = await openai.chat.completions.create({
-            model: "gpt-4o",
-            messages: [
+          const response = await createChatCompletion(
+            "gpt-4o",
+            [
               { role: "system", content: "You are a supportive interview coach." },
               { role: "user", content: prompt }
             ],
-            max_tokens: 1000,
-            temperature: 0.7,
-          });
+            {
+              max_tokens: 1000,
+              temperature: 0.7,
+            }
+          );
 
           feedback = response.choices[0]?.message?.content || getMockFeedback(answer);
         } catch {
@@ -1124,15 +1180,17 @@ Return a JSON array with objects containing:
 - reason: why this is a good match (consider their skills AND past experience)
 - searchTerms: array of 2-3 search terms to find these jobs`;
 
-          const response = await openai.chat.completions.create({
-            model: "gpt-4o",
-            messages: [
+          const response = await createChatCompletion(
+            "gpt-4o",
+            [
               { role: "system", content: "You are a career advisor helping people with disabilities find suitable employment. Return valid JSON only." },
               { role: "user", content: prompt }
             ],
-            max_tokens: 1000,
-            temperature: 0.7,
-          });
+            {
+              max_tokens: 1000,
+              temperature: 0.7,
+            }
+          );
 
           const content = response.choices[0]?.message?.content || "[]";
           const jsonMatch = content.match(/\[[\s\S]*\]/);
@@ -1183,15 +1241,17 @@ Please provide:
 
 Use simple words and short sentences.`;
 
-          const response = await openai.chat.completions.create({
-            model: "gpt-4o",
-            messages: [
+          const response = await createChatCompletion(
+            "gpt-4o",
+            [
               { role: "system", content: "You are a helpful assistant that explains job postings in simple, clear language." },
               { role: "user", content: prompt }
             ],
-            max_tokens: 1000,
-            temperature: 0.7,
-          });
+            {
+              max_tokens: 1000,
+              temperature: 0.7,
+            }
+          );
 
           simplified = response.choices[0]?.message?.content || getMockSimplifiedJob(jobTitle);
         } catch {
@@ -1235,15 +1295,17 @@ Provide:
 
 Return as JSON with: matchingSkills (array), skillGaps (array with name, priority, timeToLearn, resources)`;
 
-          const response = await openai.chat.completions.create({
-            model: "gpt-4o",
-            messages: [
+          const response = await createChatCompletion(
+            "gpt-4o",
+            [
               { role: "system", content: "You are a career development advisor. Return valid JSON only." },
               { role: "user", content: prompt }
             ],
-            max_tokens: 1500,
-            temperature: 0.7,
-          });
+            {
+              max_tokens: 1500,
+              temperature: 0.7,
+            }
+          );
 
           const content = response.choices[0]?.message?.content || "{}";
           const jsonMatch = content.match(/\{[\s\S]*\}/);
@@ -1294,12 +1356,14 @@ Be warm, supportive, and use clear, simple language. Keep responses concise but 
           }
           messages.push({ role: "user", content: message });
 
-          const response = await openai.chat.completions.create({
-            model: "gpt-4o",
+          const response = await createChatCompletion(
+            "gpt-4o",
             messages,
-            max_tokens: 500,
-            temperature: 0.8,
-          });
+            {
+              max_tokens: 500,
+              temperature: 0.8,
+            }
+          );
 
           reply = response.choices[0]?.message?.content || getMockChatReply(message);
         } catch {
@@ -1342,15 +1406,17 @@ For each tip, include:
 
 Return as JSON array with objects: { tip, importance, example }`;
 
-          const response = await openai.chat.completions.create({
-            model: "gpt-4o",
-            messages: [
+          const response = await createChatCompletion(
+            "gpt-4o",
+            [
               { role: "system", content: "You are a job application coach. Return valid JSON only." },
               { role: "user", content: prompt }
             ],
-            max_tokens: 1200,
-            temperature: 0.7,
-          });
+            {
+              max_tokens: 1200,
+              temperature: 0.7,
+            }
+          );
 
           const content = response.choices[0]?.message?.content || "[]";
           const jsonMatch = content.match(/\[[\s\S]*\]/);
@@ -1398,15 +1464,17 @@ Return JSON with:
 - strengths: brief summary of candidate strengths
 - recommendation: brief recommendation for the candidate`;
 
-          const response = await openai.chat.completions.create({
-            model: "gpt-4o",
-            messages: [
+          const response = await createChatCompletion(
+            "gpt-4o",
+            [
               { role: "system", content: "You are a job matching algorithm. Return valid JSON only." },
               { role: "user", content: prompt }
             ],
-            max_tokens: 800,
-            temperature: 0.5,
-          });
+            {
+              max_tokens: 800,
+              temperature: 0.5,
+            }
+          );
 
           const content = response.choices[0]?.message?.content || "{}";
           const jsonMatch = content.match(/\{[\s\S]*\}/);
@@ -1547,6 +1615,20 @@ Return JSON with:
     } catch (error) {
       console.error("Error creating portal session:", error);
       res.status(500).json({ error: "Failed to create portal session" });
+    }
+  });
+
+  // Admin route to list Stripe customers
+  app.get("/api/stripe/customers", isAuthenticated, async (req: any, res) => {
+    try {
+      const stripe = getUncachableStripeClient();
+      const customers = await stripe.customers.list({
+        limit: 100, // Adjust limit as needed
+      });
+      res.json({ customers: customers.data });
+    } catch (error: any) {
+      console.error("Error listing Stripe customers:", error);
+      res.status(500).json({ error: error.message || "Failed to list customers" });
     }
   });
 
