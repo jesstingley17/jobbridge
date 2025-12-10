@@ -45,7 +45,7 @@ export default function BlogPost() {
       const response = await apiRequest("GET", `/api/blog/posts?tag=${post.tags[0]}`);
       const data = await response.json();
       return (data.posts || [])
-        .filter((p: BlogPost) => p.id !== post.id && p.published)
+        .filter((p: BlogPost) => p.id !== post.id && p.publishedAt)
         .slice(0, 3);
     },
     enabled: !!post && post.tags && post.tags.length > 0,

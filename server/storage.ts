@@ -338,7 +338,53 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createResume(resume: InsertResume): Promise<Resume> {
-    const [newResume] = await db.insert(resumes).values(resume).returning();
+    // Normalize and type the resume data to ensure compatibility with Drizzle
+    const normalizedResume: any = {
+      userId: resume.userId,
+      title: resume.title,
+      content: resume.content,
+      skills: resume.skills || null,
+      isParsed: resume.isParsed || false,
+    };
+    
+    // Normalize contactInfo
+    if (resume.contactInfo) {
+      normalizedResume.contactInfo = {
+        name: String((resume.contactInfo as any).name || ''),
+        email: (resume.contactInfo as any).email ? String((resume.contactInfo as any).email) : undefined,
+        phone: (resume.contactInfo as any).phone ? String((resume.contactInfo as any).phone) : undefined,
+        linkedin: (resume.contactInfo as any).linkedin ? String((resume.contactInfo as any).linkedin) : undefined,
+        portfolio: (resume.contactInfo as any).portfolio ? String((resume.contactInfo as any).portfolio) : undefined,
+      };
+    } else {
+      normalizedResume.contactInfo = null;
+    }
+    
+    // Normalize experience array
+    if (resume.experience && Array.isArray(resume.experience)) {
+      normalizedResume.experience = resume.experience.map((exp: any) => ({
+        company: String(exp.company || ''),
+        title: String(exp.title || ''),
+        dates: exp.dates ? String(exp.dates) : undefined,
+        description: exp.description ? String(exp.description) : undefined,
+      }));
+    } else {
+      normalizedResume.experience = null;
+    }
+    
+    // Normalize education array
+    if (resume.education && Array.isArray(resume.education)) {
+      normalizedResume.education = resume.education.map((edu: any) => ({
+        school: String(edu.school || ''),
+        degree: edu.degree ? String(edu.degree) : undefined,
+        major: edu.major ? String(edu.major) : undefined,
+        gradYear: edu.gradYear ? String(edu.gradYear) : undefined,
+      }));
+    } else {
+      normalizedResume.education = null;
+    }
+    
+    const [newResume] = await db.insert(resumes).values(normalizedResume as InsertResume).returning();
     return newResume;
   }
 
@@ -539,6 +585,20 @@ export class DatabaseStorage implements IStorage {
       .update(users)
       .set({ emailVerified: true, updatedAt: new Date() })
       .where(eq(users.email, email));
+  }
+
+  // Notes operations
+  async getNotes(): Promise<Note[]> {
+    return db.select().from(notes).orderBy(desc(notes.createdAt));
+  }
+
+  async createNote(note: InsertNote): Promise<Note> {
+    const [newNote] = await db.insert(notes).values(note).returning();
+    return newNote;
+  }
+
+  async deleteNote(id: number): Promise<void> {
+    await db.delete(notes).where(eq(notes.id, id));
   }
 }
 

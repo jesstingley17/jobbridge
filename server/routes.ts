@@ -1153,11 +1153,11 @@ Provide constructive feedback including:
         .flatMap(r => r.skills || []);
       
       // Combine and deduplicate skills from profile and resumes
-      const allSkills = [...new Set([
+      const allSkills = Array.from(new Set([
         ...(skills || []),
         ...(profile?.skills || []),
         ...resumeSkills
-      ])];
+      ]));
       
       const userSkills = allSkills.length > 0 ? allSkills : [];
       const jobTypes = preferredJobTypes || profile?.preferredJobTypes || [];

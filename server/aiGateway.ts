@@ -56,11 +56,12 @@ export async function generateAIText(
     const result = await generateText({
       model: model as any,
       messages: messages as any,
+      provider: 'openai',
       apiKey: aiClient.apiKey,
       baseURL: aiClient.baseURL,
       temperature: options?.temperature ?? 0.7,
       maxTokens: options?.maxTokens ?? 1000,
-    });
+    } as any);
 
     return {
       text: result.text,
@@ -109,11 +110,12 @@ export async function streamAIText(
     return streamText({
       model: model as any,
       messages: messages as any,
+      provider: 'openai',
       apiKey: aiClient.apiKey,
       baseURL: aiClient.baseURL,
       temperature: options?.temperature ?? 0.7,
       maxTokens: options?.maxTokens ?? 1000,
-    });
+    } as any);
   } else {
     // For direct OpenAI, we'd need to use OpenAI's streaming
     // For now, fall back to non-streaming
