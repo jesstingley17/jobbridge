@@ -12,10 +12,10 @@ export function Logo({
   variant = "horizontal"
 }: LogoProps) {
   const iconSizes = {
-    sm: { width: 60, height: 50, fontSize: 16, bbSize: 20 },
-    md: { width: 90, height: 75, fontSize: 24, bbSize: 30 },
-    lg: { width: 120, height: 100, fontSize: 32, bbSize: 40 },
-    xl: { width: 180, height: 150, fontSize: 48, bbSize: 60 },
+    sm: { width: 60, height: 80, fontSize: 16, bbSize: 20 },
+    md: { width: 90, height: 120, fontSize: 24, bbSize: 30 },
+    lg: { width: 120, height: 160, fontSize: 32, bbSize: 40 },
+    xl: { width: 180, height: 240, fontSize: 48, bbSize: 60 },
   };
 
   const textSizes = {
@@ -34,12 +34,13 @@ export function Logo({
         <svg
           width={dimensions.width}
           height={dimensions.height}
-          viewBox="0 0 180 150"
+          viewBox="0 0 180 200"
           fill="none"
           xmlns="http://www.w3.org/2000/svg"
           className="drop-shadow-sm"
         >
           {/* Three-banded Rainbow Arch - Pink (outermost), Yellow/Orange (middle), Teal (innermost) */}
+          {/* Arch starts from behind wheelchair user and curves over BB letters */}
           <path
             d="M 35 55 Q 90 15 145 55"
             stroke="#EC4899"
@@ -83,28 +84,31 @@ export function Logo({
           <rect x="18" y="62" width="14" height="3" rx="1.5" fill="#9333EA" />
         </svg>
 
-        {/* BB Letters - positioned over the rainbow */}
+        {/* BB Letters - positioned over the rainbow, large and bold in teal */}
         <div 
           className="absolute top-0 right-0 flex items-center font-bold"
           style={{ 
             fontSize: dimensions.bbSize,
             color: '#14B8A6',
             lineHeight: 1,
+            fontWeight: 700,
             marginTop: size === 'sm' ? '8px' : size === 'md' ? '12px' : size === 'lg' ? '16px' : '24px',
             marginRight: size === 'sm' ? '4px' : size === 'md' ? '6px' : size === 'lg' ? '8px' : '12px',
           }}
         >
-          <span className="drop-shadow-sm">BB</span>
+          <span className="drop-shadow-sm" style={{ letterSpacing: '-0.02em' }}>BB</span>
         </div>
       </div>
 
-      {/* JOBBRIDGE Text */}
+      {/* JOBBRIDGE Text - Bold orange, positioned below when vertical */}
       {showText && (
         <span 
-          className={`font-bold tracking-tight ${textSizes[size]}`}
+          className={`font-bold tracking-tight ${textSizes[size]} ${variant === "vertical" ? "mt-2" : ""}`}
           style={{ 
             color: '#F97316',
-            textShadow: '0 1px 2px rgba(0,0,0,0.1)'
+            textShadow: '0 1px 2px rgba(0,0,0,0.1)',
+            fontWeight: 700,
+            letterSpacing: '-0.01em'
           }}
         >
           JOBBRIDGE

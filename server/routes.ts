@@ -135,8 +135,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Register sitemap and robots.txt routes (before auth)
   registerSitemapRoute(app);
   
-  // Setup authentication
-  await setupAuth(app);
+  // Note: setupAuth is called in api/index.ts for Vercel
+  // For local development, it's called in server/index.ts
+  // This prevents double initialization
+  if (!app.get('authInitialized')) {
+    await setupAuth(app);
+    app.set('authInitialized', true);
+  }
 
   // Seed initial data on startup
   // Seed data removed - using real job search API

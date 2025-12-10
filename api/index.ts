@@ -4,6 +4,7 @@ import express from 'express';
 import compression from 'compression';
 import { registerRoutes } from '../server/routes';
 import { serveStatic } from '../server/static';
+import { setupAuth } from '../server/replitAuth';
 
 // Create Express app instance
 const app = express();
@@ -87,6 +88,9 @@ async function initializeApp() {
 
   initPromise = (async () => {
     try {
+      // Setup authentication (includes session middleware)
+      await setupAuth(app);
+
       // Register all routes
       await registerRoutes(app);
 
