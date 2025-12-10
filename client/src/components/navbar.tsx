@@ -12,16 +12,15 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Menu, X, Briefcase, FileText, MessageSquare, LayoutDashboard, Sparkles, User, LogOut, Dna, ClipboardList, Users, CreditCard } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
+import { Logo } from "./logo";
 
 const navItems = [
-  { href: "/", label: "Home", icon: null },
-  { href: "/features", label: "Features", icon: Sparkles },
-  { href: "/jobs", label: "Find Jobs", icon: Briefcase },
-  { href: "/resume", label: "Resume Builder", icon: FileText },
-  { href: "/interview", label: "Interview Prep", icon: MessageSquare },
-  { href: "/community", label: "Community", icon: Users },
-  { href: "/pricing", label: "Pricing", icon: CreditCard },
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/", label: "Home" },
+  { href: "/about", label: "About" },
+  { href: "/features", label: "Features" },
+  { href: "/blog", label: "Blog" },
+  { href: "/community", label: "Community" },
+  { href: "/pricing", label: "Pricing" },
 ];
 
 export function Navbar() {
@@ -51,24 +50,21 @@ export function Navbar() {
       <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <nav className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8" aria-label="Main navigation">
           <div className="flex h-16 items-center justify-between gap-4">
-            <Link href="/" className="flex items-center gap-2" data-testid="link-logo">
-              <div className="flex h-9 w-9 items-center justify-center rounded-md bg-primary">
-                <Briefcase className="h-5 w-5 text-primary-foreground" aria-hidden="true" />
-              </div>
-              <span className="text-xl font-semibold tracking-tight">The Job Bridge</span>
+            <Link href="/" data-testid="link-logo">
+              <Logo size="sm" />
             </Link>
 
-            <div className="hidden md:flex md:items-center md:gap-1">
+            <div className="hidden md:flex md:items-center md:gap-6">
               {navItems.map((item) => (
-                <Link key={item.href} href={item.href}>
-                  <Button
-                    variant={location === item.href ? "secondary" : "ghost"}
-                    className="gap-2"
-                    data-testid={`link-nav-${item.label.toLowerCase().replace(/\s+/g, "-")}`}
-                  >
-                    {item.icon && <item.icon className="h-4 w-4" aria-hidden="true" />}
-                    {item.label}
-                  </Button>
+                <Link 
+                  key={item.href} 
+                  href={item.href}
+                  className={`text-sm font-medium transition-colors hover:text-primary ${
+                    location === item.href ? "text-primary" : "text-foreground"
+                  }`}
+                  data-testid={`link-nav-${item.label.toLowerCase().replace(/\s+/g, "-")}`}
+                >
+                  {item.label}
                 </Link>
               ))}
             </div>
@@ -115,9 +111,18 @@ export function Navbar() {
                     </DropdownMenuContent>
                   </DropdownMenu>
                 ) : (
-                  <Button asChild data-testid="button-login">
-                    <a href="/auth">Log in</a>
-                  </Button>
+                  <>
+                    <Link href="/auth">
+                      <Button variant="ghost" data-testid="button-login">
+                        Log In
+                      </Button>
+                    </Link>
+                    <Link href="/auth">
+                      <Button className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700" data-testid="button-get-started">
+                        Get Started
+                      </Button>
+                    </Link>
+                  </>
                 )
               )}
               

@@ -1,6 +1,7 @@
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import {
   Sparkles,
   FileText,
@@ -15,7 +16,13 @@ import {
   Zap,
   CheckCircle,
   ArrowRight,
+  Rocket,
 } from "lucide-react";
+import { Logo } from "@/components/logo";
+import { useState } from "react";
+import { useMutation } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 
 const features = [
   {
@@ -81,37 +88,105 @@ const howItWorks = [
 ];
 
 export default function Home() {
+  const { toast } = useToast();
+  const [email, setEmail] = useState("");
+
+  const waitlistMutation = useMutation({
+    mutationFn: async (email: string) => {
+      const response = await apiRequest("POST", "/api/waitlist", { email });
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Success!",
+        description: "You've been added to the waitlist. Check your email for confirmation.",
+      });
+      setEmail("");
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to join waitlist. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleWaitlistSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email) return;
+    waitlistMutation.mutate(email);
+  };
+
   return (
     <div className="flex flex-col">
       {/* Hero Section */}
-      <section className="relative overflow-hidden bg-gradient-to-b from-primary/5 via-accent/5 to-background py-20 md:py-32">
-        <div className="absolute inset-0 bg-grid-pattern opacity-5" aria-hidden="true" />
+      <section className="relative overflow-hidden bg-gradient-to-br from-purple-50 via-pink-50 to-white dark:from-purple-950/20 dark:via-pink-950/20 dark:to-background py-20 md:py-32">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="mx-auto max-w-4xl text-center">
-            <div className="mb-6 inline-flex items-center gap-2 rounded-full bg-primary/10 px-4 py-2 text-sm font-medium text-primary">
-              <Sparkles className="h-4 w-4" aria-hidden="true" />
-              AI-Powered Employment Platform
+            {/* Large Logo */}
+            <div className="mb-8 flex justify-center">
+              <Logo size="lg" />
             </div>
-            <h1 className="text-4xl font-bold tracking-tight sm:text-5xl md:text-6xl lg:text-7xl leading-tight">
+
+            {/* CTA Button */}
+            <div className="mb-8 flex justify-center">
+              <Button
+                size="lg"
+                className="bg-gradient-to-r from-purple-400 to-pink-400 hover:from-purple-500 hover:to-pink-500 text-white border-0 gap-2 px-8 py-6 text-lg"
+                data-testid="button-join-revolution"
+              >
+                <Rocket className="h-5 w-5" aria-hidden="true" />
+                Join the JobBridge Revolution
+              </Button>
+            </div>
+
+            {/* Main Heading */}
+            <h1 className="text-4xl font-bold tracking-tight sm:text-5xl md:text-6xl lg:text-7xl leading-tight mb-6">
               Breaking Employment{" "}
-              <span className="text-primary">Barriers</span> for Everyone
+              <span className="bg-gradient-to-r from-purple-600 via-pink-600 to-orange-600 bg-clip-text text-transparent">
+                Barriers
+              </span>{" "}
+              for Everyone
             </h1>
+
+            {/* Subheading */}
             <p className="mx-auto mt-6 max-w-2xl text-lg text-muted-foreground md:text-xl leading-relaxed">
               The most comprehensive, accessible, and user-friendly job search platform designed with the success and wellbeing of people with disabilities in mind.
             </p>
-            <div className="mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row">
-              <Link href="/jobs">
-                <Button size="lg" className="gap-2 px-8 py-6 text-lg" data-testid="button-hero-get-started">
-                  Get Started Free
-                  <ArrowRight className="h-5 w-5" aria-hidden="true" />
+
+            {/* Waitlist Form */}
+            <form onSubmit={handleWaitlistSubmit} className="mt-10 mx-auto max-w-md">
+              <div className="flex flex-col sm:flex-row gap-3">
+                <Input
+                  type="email"
+                  placeholder="Enter your email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="flex-1 rounded-md"
+                  required
+                  data-testid="input-waitlist-email"
+                />
+                <Button
+                  type="submit"
+                  className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white border-0 gap-2 px-8"
+                  disabled={waitlistMutation.isPending}
+                  data-testid="button-join-waitlist"
+                >
+                  {waitlistMutation.isPending ? (
+                    "Joining..."
+                  ) : (
+                    <>
+                      Join Waitlist
+                      <ArrowRight className="h-4 w-4" aria-hidden="true" />
+                    </>
+                  )}
                 </Button>
-              </Link>
-              <Link href="/features">
-                <Button variant="outline" size="lg" className="gap-2 px-8 py-6 text-lg" data-testid="button-hero-learn-more">
-                  Learn More
-                </Button>
-              </Link>
-            </div>
+              </div>
+              <p className="mt-3 text-sm text-muted-foreground">
+                Get 30-day free premium trial + priority access
+              </p>
+            </form>
           </div>
         </div>
       </section>
