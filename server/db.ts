@@ -8,10 +8,14 @@ const { Pool } = pg;
 const databaseUrl = process.env.DATABASE_URL || process.env.POSTGRES_PRISMA_URL;
 
 if (!databaseUrl) {
-  throw new Error(
-    "DATABASE_URL or POSTGRES_PRISMA_URL must be set. Did you forget to provision a database?",
-  );
+  const errorMsg = "DATABASE_URL or POSTGRES_PRISMA_URL must be set. Did you forget to provision a database?";
+  console.error(`[DB Init Error] ${errorMsg}`);
+  console.error(`[DB Init] DATABASE_URL: ${process.env.DATABASE_URL || 'NOT SET'}`);
+  console.error(`[DB Init] POSTGRES_PRISMA_URL: ${process.env.POSTGRES_PRISMA_URL || 'NOT SET'}`);
+  throw new Error(errorMsg);
 }
+
+console.log(`[DB Init] Using database URL: ${databaseUrl.substring(0, 50)}...`);
 
 // Parse connection string and add SSL config if needed
 const connectionConfig: any = { connectionString: databaseUrl };
@@ -31,5 +35,18 @@ if (process.env.DATABASE_SSL_REJECT_UNAUTHORIZED === 'false') {
   connectionConfig.ssl = true;
 }
 
-export const pool = new Pool(connectionConfig);
-export const db = drizzle(pool, { schema });
+console.log(`[DB Init] Connection config: ${JSON.stringify({ ...connectionConfig, connectionString: connectionConfig.connectionString?.substring(0, 50) })}`);
+
+let pool: pg.Pool;
+let db: any;
+
+try {
+  pool = new Pool(connectionConfig);
+  db = drizzle(pool, { schema });
+  console.log('[DB Init] Pool and Drizzle initialized successfully');
+} catch (poolErr: any) {
+  console.error('[DB Init] Failed to initialize pool:', poolErr.message);
+  throw poolErr;
+}
+
+export { pool, db };
