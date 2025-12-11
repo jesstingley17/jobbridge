@@ -30,6 +30,7 @@ const allowlist = [
   "xlsx",
   "zod",
   "zod-validation-error",
+  "@shared",  // Include shared schema in bundle
 ];
 
 async function buildAll() {
