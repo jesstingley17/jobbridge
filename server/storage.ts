@@ -30,7 +30,7 @@ import {
   notifications, type Notification, type InsertNotification
 } from "@shared/schema";
 import bcrypt from "bcrypt";
-import { db } from "./db";
+import { db } from "./db.js";
 import { eq, ilike, or, and, desc, sql } from "drizzle-orm";
 
 export interface IStorage {

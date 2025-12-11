@@ -1,6 +1,6 @@
-import { getStripeSync, getUncachableStripeClient } from './stripeClient';
-import { storage } from './storage';
-import { db } from './db';
+import { getStripeSync, getUncachableStripeClient } from './stripeClient.js';
+import { storage } from './storage.js';
+import { db } from './db.js';
 import { sql } from 'drizzle-orm';
 import { users } from '@shared/schema';
 import { eq } from 'drizzle-orm';

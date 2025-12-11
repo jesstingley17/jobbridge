@@ -1,7 +1,7 @@
 import { Response, NextFunction } from 'express';
-import { storage } from './storage';
-import { getTierLimits, hasFeatureAccess, FEATURE_DESCRIPTIONS, TierLimits } from './subscriptionLimits';
-import { db } from './db';
+import { storage } from './storage.js';
+import { getTierLimits, hasFeatureAccess, FEATURE_DESCRIPTIONS, TierLimits } from './subscriptionLimits.js';
+import { db } from './db.js';
 import { users } from '@shared/schema';
 import { eq } from 'drizzle-orm';
 

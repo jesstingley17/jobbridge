@@ -6,8 +6,8 @@ import session from "express-session";
 import type { Express, RequestHandler } from "express";
 import memoize from "memoizee";
 import connectPg from "connect-pg-simple";
-import { storage } from "./storage";
-import { sendWelcomeEmail } from "./email";
+import { storage } from "./storage.js";
+import { sendWelcomeEmail } from "./email.js";
 
 const getOidcConfig = memoize(
   async () => {
