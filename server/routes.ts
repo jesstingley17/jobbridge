@@ -173,10 +173,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Create session - store user data in session for traditional auth
-      (req.session as any).userId = user.id;
-      (req.session as any).user = {
-        claims: { sub: user.id }
-      };
+      try {
+        if (req.session) {
+          (req.session as any).userId = user.id;
+          (req.session as any).user = {
+            claims: { sub: user.id }
+          };
+        }
+      } catch (sessionError) {
+        console.warn("Failed to set session, continuing without session:", sessionError);
+        // Continue even if session setup fails
+      }
       
       res.status(201).json({ 
         message: "Registration successful",
