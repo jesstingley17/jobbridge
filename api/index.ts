@@ -5,6 +5,7 @@ import compression from 'compression';
 import { registerRoutes } from '../server/routes.js';
 import { serveStatic } from '../server/static.js';
 import { setupAuth } from '../server/replitAuth.js';
+import { ensureEnvWarn, ensureEnvOrThrow } from '../server/env.js';
 
 // Create Express app instance
 const app = express();
@@ -88,6 +89,27 @@ async function initializeApp() {
 
   initPromise = (async () => {
     try {
+      // Warn/validate environment variables early to provide clearer errors
+      try {
+        // Required: Supabase URL and Service Role Key for auth
+        // DATABASE_URL defaults to Supabase pooler connection if not set
+        // SESSION_SECRET required for session store
+        const requiredEnvs = ['SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY', 'SESSION_SECRET'];
+        
+        if (process.env.NODE_ENV === 'production') {
+          ensureEnvOrThrow(requiredEnvs);
+        } else {
+          ensureEnvWarn(requiredEnvs);
+        }
+        
+        // Warn if DATABASE_URL is missing (but don't fail - it can use Supabase pooler)
+        if (!process.env.DATABASE_URL) {
+          console.warn('DATABASE_URL not set; ensure your db.ts uses a Supabase pooler connection or set DATABASE_URL explicitly.');
+        }
+      } catch (envErr: any) {
+        console.error('Env validation error:', envErr.message);
+        throw envErr;
+      }
       // Setup authentication (includes session middleware)
       await setupAuth(app);
 
@@ -113,7 +135,18 @@ async function initializeApp() {
 // Vercel serverless function handler
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   // Initialize app on first request
-  await initializeApp();
+  try {
+    await initializeApp();
+  } catch (initError: any) {
+    // Log and return a clearer 500 error so Vercel doesn't surface a vague FUNCTION_INVOCATION_FAILED
+    console.error('Failed to initialize Express app in Vercel handler:', initError);
+    const message = initError?.message || 'Failed to initialize application';
+    // Include stack/message in development for easier debugging
+    if (!res.headersSent) {
+      return res.status(500).json({ error: 'App initialization failed', message: process.env.NODE_ENV === 'development' ? message : undefined });
+    }
+    return;
+  }
 
   // Convert Vercel request/response to Express-compatible format
   // Vercel's req/res are already compatible with Express, but we need to ensure proper handling
