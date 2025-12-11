@@ -189,10 +189,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } catch (error: any) {
       console.error("Registration error:", error);
+      console.error("Error details:", {
+        message: error.message,
+        stack: error.stack,
+        name: error.name,
+        code: error.code
+      });
       if (error.name === 'ZodError') {
         return res.status(400).json({ message: error.errors[0].message });
       }
-      res.status(500).json({ message: "Registration failed" });
+      // Provide more detailed error message for debugging
+      const errorMessage = error.message || "Registration failed";
+      res.status(500).json({ 
+        message: "Registration failed",
+        error: process.env.NODE_ENV === 'development' ? errorMessage : undefined
+      });
     }
   });
 

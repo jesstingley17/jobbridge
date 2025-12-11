@@ -594,9 +594,9 @@ export class DatabaseStorage implements IStorage {
         firstName: userData.firstName,
         lastName: userData.lastName || null,
         emailVerified: false,
-        termsAccepted: userData.termsAccepted || false,
+        termsAccepted: userData.termsAccepted ?? false,
         termsAcceptedAt: userData.termsAccepted ? now : null,
-        marketingConsent: userData.marketingConsent || false,
+        marketingConsent: userData.marketingConsent ?? false,
         marketingConsentAt: userData.marketingConsent ? now : null,
       })
       .returning();
