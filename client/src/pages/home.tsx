@@ -131,14 +131,16 @@ export default function Home() {
 
             {/* CTA Button */}
             <div className="mb-8 flex justify-center">
-              <Button
-                size="lg"
-                className="bg-gradient-to-r from-purple-400 to-pink-400 hover:from-purple-500 hover:to-pink-500 text-white border-0 gap-2 px-8 py-6 text-lg"
-                data-testid="button-join-revolution"
-              >
-                <Rocket className="h-5 w-5" aria-hidden="true" />
-                Join the JobBridge Revolution
-              </Button>
+              <Link href="/auth">
+                <Button
+                  size="lg"
+                  className="bg-gradient-to-r from-purple-400 to-pink-400 hover:from-purple-500 hover:to-pink-500 text-white border-0 gap-2 px-8 py-6 text-lg"
+                  data-testid="button-join-revolution"
+                >
+                  <Rocket className="h-5 w-5" aria-hidden="true" />
+                  Join the JobBridge Revolution
+                </Button>
+              </Link>
             </div>
 
             {/* Main Heading */}
