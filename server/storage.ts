@@ -586,21 +586,58 @@ export class DatabaseStorage implements IStorage {
   // Password auth operations
   async createUserWithPassword(userData: RegisterUser & { hashedPassword: string }): Promise<User> {
     const now = new Date();
-    const [user] = await db
-      .insert(users)
-      .values({
-        email: userData.email,
-        password: userData.hashedPassword,
-        firstName: userData.firstName,
-        lastName: userData.lastName || null,
-        emailVerified: false,
-        termsAccepted: userData.termsAccepted ?? false,
-        termsAcceptedAt: userData.termsAccepted ? now : null,
-        marketingConsent: userData.marketingConsent ?? false,
-        marketingConsentAt: userData.marketingConsent ? now : null,
-      })
-      .returning();
-    return user;
+    
+    // Try with all fields first
+    try {
+      const [user] = await db
+        .insert(users)
+        .values({
+          email: userData.email,
+          password: userData.hashedPassword,
+          firstName: userData.firstName,
+          lastName: userData.lastName || null,
+          emailVerified: false,
+          termsAccepted: userData.termsAccepted ?? false,
+          termsAcceptedAt: userData.termsAccepted ? now : null,
+          marketingConsent: userData.marketingConsent ?? false,
+          marketingConsentAt: userData.marketingConsent ? now : null,
+        })
+        .returning();
+      return user;
+    } catch (error: any) {
+      // If columns don't exist (PostgreSQL error code 42703 = undefined_column),
+      // retry without the timestamp fields
+      if (error.code === '42703' || 
+          error.message?.includes('column') || 
+          error.message?.includes('does not exist') ||
+          error.message?.includes('terms_accepted_at') ||
+          error.message?.includes('marketing_consent_at')) {
+        console.warn("Consent timestamp columns don't exist, creating user without them. Run migration: migrations/add_user_consent_fields.sql");
+        const [user] = await db
+          .insert(users)
+          .values({
+            email: userData.email,
+            password: userData.hashedPassword,
+            firstName: userData.firstName,
+            lastName: userData.lastName || null,
+            emailVerified: false,
+            termsAccepted: userData.termsAccepted ?? false,
+            marketingConsent: userData.marketingConsent ?? false,
+          })
+          .returning();
+        return user;
+      }
+      // Re-throw other errors
+      console.error("Error creating user with password:", error);
+      console.error("Error details:", {
+        message: error.message,
+        code: error.code,
+        detail: error.detail,
+        constraint: error.constraint,
+        table: error.table
+      });
+      throw error;
+    }
   }
 
   async updateUserPassword(userId: string, hashedPassword: string): Promise<void> {
