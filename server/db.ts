@@ -24,22 +24,12 @@ const connectionConfig: any = {
   max: 2,  // Reduced from default 10 for serverless
   idleTimeoutMillis: 30000,
   connectionTimeoutMillis: 5000,
+  // Always allow self-signed certs for now (pooler connections use them)
+  ssl: { rejectUnauthorized: false },
 };
 
-// Handle SSL for databases that require it
-// If DATABASE_SSL_REJECT_UNAUTHORIZED is set to 'false', allow self-signed certs
-if (process.env.DATABASE_SSL_REJECT_UNAUTHORIZED === 'false') {
-  connectionConfig.ssl = { rejectUnauthorized: false };
-} else if (databaseUrl?.includes('sslmode=require') || 
-           databaseUrl?.includes('sslmode=prefer')) {
-  connectionConfig.ssl = { rejectUnauthorized: false };
-} else if (process.env.NODE_ENV === 'production' && 
-           (databaseUrl?.includes('supabase') || 
-            databaseUrl?.includes('railway') ||
-            databaseUrl?.includes('vercel'))) {
-  // For production databases, use SSL
-  connectionConfig.ssl = true;
-}
+// Handle SSL for databases that require it (keep ssl: false from above since we set it directly)
+// Additional configuration can be added here if needed
 
 console.log(`[DB Init] Connection config: ${JSON.stringify({ ...connectionConfig, connectionString: connectionConfig.connectionString?.substring(0, 50) })}`);
 
