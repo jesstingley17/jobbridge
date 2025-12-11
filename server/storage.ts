@@ -457,7 +457,7 @@ export class DatabaseStorage implements IStorage {
       .innerJoin(users, eq(mentors.userId, users.id))
       .where(eq(mentors.isActive, true));
     
-    return result.map(r => ({
+    return result.map((r: any) => ({
       ...r.mentors,
       user: r.users,
     }));
@@ -689,7 +689,7 @@ export class DatabaseStorage implements IStorage {
       .orderBy(desc(blogPosts.publishedAt));
     
     if (tag) {
-      return posts.filter(post => post.tags?.includes(tag));
+      return posts.filter((post: any) => post.tags?.includes(tag));
     }
     
     return posts;
