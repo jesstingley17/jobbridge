@@ -1,9 +1,9 @@
 import { Response, NextFunction } from 'express';
 import { storage } from './storage.js';
 import { getTierLimits, hasFeatureAccess, FEATURE_DESCRIPTIONS, TierLimits } from './subscriptionLimits.js';
-import { db } from './db.js';
-import { users } from '@shared/schema';
-import { eq } from 'drizzle-orm';
+import { db } from "./db";
+import { users } from '../shared/schema';
+import { eq } from "drizzle-orm";
 
 export function requireFeature(feature: keyof TierLimits) {
   return async (req: any, res: Response, next: NextFunction) => {

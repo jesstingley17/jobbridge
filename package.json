@@ -3,6 +3,11 @@
   "version": "1.0.0",
   "type": "module",
   "license": "MIT",
+  "imports": {
+    "@shared/*": {
+      "default": "./shared/*"
+    }
+  },
   "engines": {
     "node": ">=18.x"
   },

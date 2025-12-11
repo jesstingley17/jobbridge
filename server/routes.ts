@@ -8,7 +8,7 @@ import { getExternalJobs } from "./externalJobs.js";
 import { getUncachableStripeClient, getStripePublishableKey } from "./stripeClient.js";
 import { sql, eq } from "drizzle-orm";
 import { db } from "./db.js";
-import { postComments } from "@shared/schema";
+import { postComments } from "../shared/schema";
 import { requireFeature, requireApplicationQuota, incrementApplicationCount, getUserSubscriptionStatus } from "./subscriptionMiddleware.js";
 import { sendMagicLinkEmail, sendPasswordResetEmail } from "./email.js";
 import crypto from "crypto";
@@ -36,7 +36,7 @@ import {
   bulkApplyRequestSchema,
   registerUserSchema,
   loginUserSchema
-} from "@shared/schema";
+} from "../shared/schema";
 import { hashPassword, verifyPassword } from "./storage.js";
 import { sendWelcomeEmail } from "./email.js";
 
