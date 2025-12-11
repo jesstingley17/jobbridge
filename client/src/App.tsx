@@ -30,6 +30,7 @@ import Notes from "@/pages/notes";
 import Privacy from "@/pages/privacy";
 import Cookies from "@/pages/cookies";
 import Terms from "@/pages/terms";
+import EarlyAccess from "@/pages/early-access";
 import AdminBlog from "@/pages/admin-blog";
 import AdminLogin from "@/pages/admin-login";
 import NotFound from "@/pages/not-found";
@@ -59,6 +60,7 @@ function Router() {
           <Route path="/privacy" component={Privacy} />
           <Route path="/cookies" component={Cookies} />
           <Route path="/terms" component={Terms} />
+          <Route path="/early-access" component={EarlyAccess} />
           <Route path="/auth" component={Auth} />
       <Route path="/auth/verify" component={ResetPassword} />
       <Route component={NotFound} />

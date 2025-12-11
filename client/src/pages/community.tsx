@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -8,9 +8,15 @@ import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { Users, UserPlus, MessageCircle, Star, Loader2, Briefcase, Code } from "lucide-react";
+import { 
+  Users, UserPlus, MessageCircle, Star, Loader2, Briefcase, Code,
+  Home, Users2, Calendar, MessageSquare, Bell
+} from "lucide-react";
 import { useState } from "react";
 import type { User } from "@shared/schema";
+import { CommunityFeed } from "@/components/community/CommunityFeed";
+import { GroupsList } from "@/components/community/GroupsList";
+import { EventsList } from "@/components/community/EventsList";
 
 type MentorWithUser = {
   id: string;
@@ -24,7 +30,6 @@ type MentorWithUser = {
 
 export default function Community() {
   const { toast } = useToast();
-  const queryClient = useQueryClient();
   const [connectMessage, setConnectMessage] = useState("");
   const [selectedMentor, setSelectedMentor] = useState<MentorWithUser | null>(null);
 
@@ -45,7 +50,6 @@ export default function Community() {
       toast({ title: "Connection request sent!", description: "The mentor will review your request." });
       setSelectedMentor(null);
       setConnectMessage("");
-      queryClient.invalidateQueries({ queryKey: ["/api/mentors"] });
     },
     onError: () => {
       toast({ title: "Error", description: "Failed to send connection request", variant: "destructive" });
@@ -57,14 +61,6 @@ export default function Community() {
       case "employer": return <Briefcase className="w-4 h-4" />;
       case "developer": return <Code className="w-4 h-4" />;
       default: return <Users className="w-4 h-4" />;
-    }
-  };
-
-  const getRoleBadgeVariant = (role: string | null) => {
-    switch (role) {
-      case "employer": return "secondary";
-      case "developer": return "outline";
-      default: return "default";
     }
   };
 
@@ -88,21 +84,49 @@ export default function Community() {
         </p>
       </div>
 
-      <Tabs defaultValue="mentors" className="space-y-6">
-        <TabsList>
+      <Tabs defaultValue="feed" className="space-y-6">
+        <TabsList className="grid w-full grid-cols-5">
+          <TabsTrigger value="feed" data-testid="tab-feed">
+            <Home className="w-4 h-4 mr-2" />
+            Feed
+          </TabsTrigger>
+          <TabsTrigger value="groups" data-testid="tab-groups">
+            <Users2 className="w-4 h-4 mr-2" />
+            Groups
+          </TabsTrigger>
+          <TabsTrigger value="events" data-testid="tab-events">
+            <Calendar className="w-4 h-4 mr-2" />
+            Events
+          </TabsTrigger>
           <TabsTrigger value="mentors" data-testid="tab-mentors">
             <Star className="w-4 h-4 mr-2" />
             Mentors
           </TabsTrigger>
-          <TabsTrigger value="connect" data-testid="tab-connect">
-            <UserPlus className="w-4 h-4 mr-2" />
-            Find Connections
-          </TabsTrigger>
           <TabsTrigger value="messages" data-testid="tab-messages">
-            <MessageCircle className="w-4 h-4 mr-2" />
+            <MessageSquare className="w-4 h-4 mr-2" />
             Messages
           </TabsTrigger>
         </TabsList>
+
+        <TabsContent value="feed" className="space-y-6">
+          <CommunityFeed />
+        </TabsContent>
+
+        <TabsContent value="groups" className="space-y-6">
+          <div className="flex items-center justify-between">
+            <h2 className="text-xl font-semibold">Community Groups</h2>
+            <Button>Create Group</Button>
+          </div>
+          <GroupsList />
+        </TabsContent>
+
+        <TabsContent value="events" className="space-y-6">
+          <div className="flex items-center justify-between">
+            <h2 className="text-xl font-semibold">Upcoming Events</h2>
+            <Button>Create Event</Button>
+          </div>
+          <EventsList />
+        </TabsContent>
 
         <TabsContent value="mentors" className="space-y-6">
           <div className="flex items-center justify-between gap-4 flex-wrap">
@@ -216,24 +240,6 @@ export default function Community() {
               </CardContent>
             </Card>
           )}
-        </TabsContent>
-
-        <TabsContent value="connect" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Find Connections</CardTitle>
-              <CardDescription>
-                Connect with other job seekers, employers, and partners in the community
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="text-center py-8">
-              <Users className="w-16 h-16 mx-auto text-muted-foreground mb-4" />
-              <p className="text-muted-foreground mb-4">
-                Peer networking features coming soon
-              </p>
-              <Badge variant="outline">Feature in development</Badge>
-            </CardContent>
-          </Card>
         </TabsContent>
 
         <TabsContent value="messages" className="space-y-6">

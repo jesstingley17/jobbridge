@@ -6,8 +6,9 @@ import OpenAI from "openai";
 import { z } from "zod";
 import { getExternalJobs } from "./externalJobs";
 import { getUncachableStripeClient, getStripePublishableKey } from "./stripeClient";
-import { sql } from "drizzle-orm";
+import { sql, eq } from "drizzle-orm";
 import { db } from "./db";
+import { postComments } from "@shared/schema";
 import { requireFeature, requireApplicationQuota, incrementApplicationCount, getUserSubscriptionStatus } from "./subscriptionMiddleware";
 import { sendMagicLinkEmail, sendPasswordResetEmail } from "./email";
 import crypto from "crypto";
@@ -2053,6 +2054,516 @@ Return JSON with:
     } catch (error) {
       console.error("Error deleting blog post:", error);
       res.status(500).json({ error: "Failed to delete blog post" });
+    }
+  });
+
+  // ==================== COMMUNITY ROUTES ====================
+  
+  // Community Posts
+  app.get("/api/community/posts", isAuthenticated, async (req: any, res) => {
+    try {
+      const { userId, groupId, limit, offset } = req.query;
+      const posts = await storage.getCommunityPosts(
+        userId as string | undefined,
+        groupId as string | undefined,
+        limit ? parseInt(limit as string) : 20,
+        offset ? parseInt(offset as string) : 0
+      );
+      res.json({ posts });
+    } catch (error) {
+      console.error("Error fetching community posts:", error);
+      res.status(500).json({ error: "Failed to fetch posts" });
+    }
+  });
+
+  app.get("/api/community/posts/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const post = await storage.getCommunityPost(id);
+      if (!post) {
+        return res.status(404).json({ error: "Post not found" });
+      }
+      res.json({ post });
+    } catch (error) {
+      console.error("Error fetching community post:", error);
+      res.status(500).json({ error: "Failed to fetch post" });
+    }
+  });
+
+  app.post("/api/community/posts", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      if (!userId) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+
+      const { content, mediaUrls, postType, groupId, forumId, isPublic, tags } = req.body;
+      if (!content) {
+        return res.status(400).json({ error: "Content is required" });
+      }
+
+      const post = await storage.createCommunityPost({
+        authorId: userId,
+        content,
+        mediaUrls: mediaUrls || [],
+        postType: postType || "post",
+        groupId: groupId || null,
+        forumId: forumId || null,
+        isPublic: isPublic !== false,
+        tags: tags || [],
+      });
+
+      res.status(201).json({ post });
+    } catch (error) {
+      console.error("Error creating community post:", error);
+      res.status(500).json({ error: "Failed to create post" });
+    }
+  });
+
+  app.put("/api/community/posts/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const { id } = req.params;
+      const post = await storage.getCommunityPost(id);
+      
+      if (!post) {
+        return res.status(404).json({ error: "Post not found" });
+      }
+      
+      if (post.authorId !== userId) {
+        return res.status(403).json({ error: "You can only edit your own posts" });
+      }
+
+      const { content, mediaUrls, tags } = req.body;
+      const updated = await storage.updateCommunityPost(id, {
+        content,
+        mediaUrls,
+        tags,
+      });
+
+      res.json({ post: updated });
+    } catch (error) {
+      console.error("Error updating community post:", error);
+      res.status(500).json({ error: "Failed to update post" });
+    }
+  });
+
+  app.delete("/api/community/posts/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const { id } = req.params;
+      const post = await storage.getCommunityPost(id);
+      
+      if (!post) {
+        return res.status(404).json({ error: "Post not found" });
+      }
+      
+      if (post.authorId !== userId) {
+        return res.status(403).json({ error: "You can only delete your own posts" });
+      }
+
+      await storage.deleteCommunityPost(id);
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting community post:", error);
+      res.status(500).json({ error: "Failed to delete post" });
+    }
+  });
+
+  // Post Comments
+  app.get("/api/community/posts/:postId/comments", isAuthenticated, async (req: any, res) => {
+    try {
+      const { postId } = req.params;
+      const comments = await storage.getPostComments(postId);
+      res.json({ comments });
+    } catch (error) {
+      console.error("Error fetching post comments:", error);
+      res.status(500).json({ error: "Failed to fetch comments" });
+    }
+  });
+
+  app.post("/api/community/posts/:postId/comments", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const { postId } = req.params;
+      const { content, parentCommentId } = req.body;
+
+      if (!content) {
+        return res.status(400).json({ error: "Content is required" });
+      }
+
+      const comment = await storage.createPostComment({
+        postId,
+        authorId: userId,
+        content,
+        parentCommentId: parentCommentId || null,
+      });
+
+      res.status(201).json({ comment });
+    } catch (error) {
+      console.error("Error creating post comment:", error);
+      res.status(500).json({ error: "Failed to create comment" });
+    }
+  });
+
+  app.delete("/api/community/comments/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const { id } = req.params;
+      const [comment] = await db.select().from(postComments).where(eq(postComments.id, id));
+      
+      if (!comment) {
+        return res.status(404).json({ error: "Comment not found" });
+      }
+      
+      if (comment.authorId !== userId) {
+        return res.status(403).json({ error: "You can only delete your own comments" });
+      }
+
+      await storage.deletePostComment(id);
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting comment:", error);
+      res.status(500).json({ error: "Failed to delete comment" });
+    }
+  });
+
+  // Post Reactions
+  app.post("/api/community/posts/:postId/reactions", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const { postId } = req.params;
+      const { reactionType } = req.body;
+
+      const reaction = await storage.togglePostReaction(postId, userId, reactionType || "like");
+      res.json({ reaction });
+    } catch (error) {
+      console.error("Error toggling post reaction:", error);
+      res.status(500).json({ error: "Failed to toggle reaction" });
+    }
+  });
+
+  // Community Groups
+  app.get("/api/community/groups", isAuthenticated, async (req: any, res) => {
+    try {
+      const { category, limit } = req.query;
+      const groups = await storage.getCommunityGroups(
+        category as string | undefined,
+        limit ? parseInt(limit as string) : 50
+      );
+      res.json({ groups });
+    } catch (error) {
+      console.error("Error fetching community groups:", error);
+      res.status(500).json({ error: "Failed to fetch groups" });
+    }
+  });
+
+  app.get("/api/community/groups/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const group = await storage.getCommunityGroup(id);
+      if (!group) {
+        return res.status(404).json({ error: "Group not found" });
+      }
+      res.json({ group });
+    } catch (error) {
+      console.error("Error fetching community group:", error);
+      res.status(500).json({ error: "Failed to fetch group" });
+    }
+  });
+
+  app.post("/api/community/groups", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const { name, description, slug, category, isPublic, isPrivate, rules, tags } = req.body;
+
+      if (!name || !slug) {
+        return res.status(400).json({ error: "Name and slug are required" });
+      }
+
+      const group = await storage.createCommunityGroup({
+        name,
+        description,
+        slug,
+        ownerId: userId,
+        category,
+        isPublic: isPublic !== false,
+        isPrivate: isPrivate || false,
+        rules,
+        tags: tags || [],
+      });
+
+      res.status(201).json({ group });
+    } catch (error) {
+      console.error("Error creating community group:", error);
+      res.status(500).json({ error: "Failed to create group" });
+    }
+  });
+
+  app.post("/api/community/groups/:id/join", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const { id } = req.params;
+      const member = await storage.joinGroup(id, userId);
+      res.json({ member });
+    } catch (error) {
+      console.error("Error joining group:", error);
+      res.status(500).json({ error: "Failed to join group" });
+    }
+  });
+
+  app.post("/api/community/groups/:id/leave", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const { id } = req.params;
+      await storage.leaveGroup(id, userId);
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error leaving group:", error);
+      res.status(500).json({ error: "Failed to leave group" });
+    }
+  });
+
+  // Forums
+  app.get("/api/community/forums", isAuthenticated, async (req: any, res) => {
+    try {
+      const forums = await storage.getForums();
+      res.json({ forums });
+    } catch (error) {
+      console.error("Error fetching forums:", error);
+      res.status(500).json({ error: "Failed to fetch forums" });
+    }
+  });
+
+  app.get("/api/community/forums/:id/topics", isAuthenticated, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const { limit, offset } = req.query;
+      const topics = await storage.getForumTopics(
+        id,
+        limit ? parseInt(limit as string) : 20,
+        offset ? parseInt(offset as string) : 0
+      );
+      res.json({ topics });
+    } catch (error) {
+      console.error("Error fetching forum topics:", error);
+      res.status(500).json({ error: "Failed to fetch topics" });
+    }
+  });
+
+  app.get("/api/community/topics/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const topic = await storage.getForumTopic(id);
+      if (!topic) {
+        return res.status(404).json({ error: "Topic not found" });
+      }
+      
+      // Increment views
+      await storage.incrementTopicViews(id);
+      
+      res.json({ topic });
+    } catch (error) {
+      console.error("Error fetching forum topic:", error);
+      res.status(500).json({ error: "Failed to fetch topic" });
+    }
+  });
+
+  app.post("/api/community/forums/:forumId/topics", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const { forumId } = req.params;
+      const { title, content, slug, tags } = req.body;
+
+      if (!title || !content || !slug) {
+        return res.status(400).json({ error: "Title, content, and slug are required" });
+      }
+
+      const topic = await storage.createForumTopic({
+        forumId,
+        authorId: userId,
+        title,
+        content,
+        slug,
+        tags: tags || [],
+      });
+
+      res.status(201).json({ topic });
+    } catch (error) {
+      console.error("Error creating forum topic:", error);
+      res.status(500).json({ error: "Failed to create topic" });
+    }
+  });
+
+  app.get("/api/community/topics/:topicId/replies", isAuthenticated, async (req: any, res) => {
+    try {
+      const { topicId } = req.params;
+      const replies = await storage.getForumReplies(topicId);
+      res.json({ replies });
+    } catch (error) {
+      console.error("Error fetching forum replies:", error);
+      res.status(500).json({ error: "Failed to fetch replies" });
+    }
+  });
+
+  app.post("/api/community/topics/:topicId/replies", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const { topicId } = req.params;
+      const { content, parentReplyId } = req.body;
+
+      if (!content) {
+        return res.status(400).json({ error: "Content is required" });
+      }
+
+      const reply = await storage.createForumReply({
+        topicId,
+        authorId: userId,
+        content,
+        parentReplyId: parentReplyId || null,
+      });
+
+      res.status(201).json({ reply });
+    } catch (error) {
+      console.error("Error creating forum reply:", error);
+      res.status(500).json({ error: "Failed to create reply" });
+    }
+  });
+
+  // Community Events
+  app.get("/api/community/events", isAuthenticated, async (req: any, res) => {
+    try {
+      const { limit, upcoming } = req.query;
+      const events = await storage.getCommunityEvents(
+        limit ? parseInt(limit as string) : 20,
+        upcoming !== "false"
+      );
+      res.json({ events });
+    } catch (error) {
+      console.error("Error fetching community events:", error);
+      res.status(500).json({ error: "Failed to fetch events" });
+    }
+  });
+
+  app.get("/api/community/events/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const event = await storage.getCommunityEvent(id);
+      if (!event) {
+        return res.status(404).json({ error: "Event not found" });
+      }
+      res.json({ event });
+    } catch (error) {
+      console.error("Error fetching community event:", error);
+      res.status(500).json({ error: "Failed to fetch event" });
+    }
+  });
+
+  app.post("/api/community/events", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const { title, description, slug, eventType, startDate, endDate, location, locationUrl, isOnline, isPublic, maxAttendees, registrationRequired, registrationUrl, tags } = req.body;
+
+      if (!title || !slug || !startDate) {
+        return res.status(400).json({ error: "Title, slug, and start date are required" });
+      }
+
+      const event = await storage.createCommunityEvent({
+        organizerId: userId,
+        title,
+        description,
+        slug,
+        eventType,
+        startDate: new Date(startDate),
+        endDate: endDate ? new Date(endDate) : null,
+        location,
+        locationUrl,
+        isOnline: isOnline || false,
+        isPublic: isPublic !== false,
+        maxAttendees,
+        registrationRequired: registrationRequired || false,
+        registrationUrl,
+        tags: tags || [],
+      });
+
+      res.status(201).json({ event });
+    } catch (error) {
+      console.error("Error creating community event:", error);
+      res.status(500).json({ error: "Failed to create event" });
+    }
+  });
+
+  app.post("/api/community/events/:id/register", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const { id } = req.params;
+      const attendee = await storage.registerForEvent(id, userId);
+      res.json({ attendee });
+    } catch (error) {
+      console.error("Error registering for event:", error);
+      res.status(500).json({ error: "Failed to register for event" });
+    }
+  });
+
+  app.post("/api/community/events/:id/unregister", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const { id } = req.params;
+      await storage.unregisterFromEvent(id, userId);
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error unregistering from event:", error);
+      res.status(500).json({ error: "Failed to unregister from event" });
+    }
+  });
+
+  // Activity Feed
+  app.get("/api/community/activity", isAuthenticated, async (req: any, res) => {
+    try {
+      const { userId, limit } = req.query;
+      const activities = await storage.getActivityFeed(
+        userId as string | undefined,
+        limit ? parseInt(limit as string) : 50
+      );
+      res.json({ activities });
+    } catch (error) {
+      console.error("Error fetching activity feed:", error);
+      res.status(500).json({ error: "Failed to fetch activity feed" });
+    }
+  });
+
+  // Notifications
+  app.get("/api/notifications", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const { unreadOnly } = req.query;
+      const notifications = await storage.getNotifications(userId, unreadOnly === "true");
+      res.json({ notifications });
+    } catch (error) {
+      console.error("Error fetching notifications:", error);
+      res.status(500).json({ error: "Failed to fetch notifications" });
+    }
+  });
+
+  app.post("/api/notifications/:id/read", isAuthenticated, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      await storage.markNotificationAsRead(id);
+      res.json({ message: "Notification marked as read" });
+    } catch (error) {
+      console.error("Error marking notification as read:", error);
+      res.status(500).json({ error: "Failed to mark notification as read" });
+    }
+  });
+
+  app.post("/api/notifications/read-all", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      await storage.markAllNotificationsAsRead(userId);
+      res.json({ message: "All notifications marked as read" });
+    } catch (error) {
+      console.error("Error marking all notifications as read:", error);
+      res.status(500).json({ error: "Failed to mark all notifications as read" });
     }
   });
 

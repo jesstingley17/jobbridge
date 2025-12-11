@@ -15,7 +15,19 @@ import {
   magicLinkTokens, type MagicLinkToken,
   emailLogs, type EmailLog,
   notes, type Note, type InsertNote,
-  blogPosts, type BlogPost, type InsertBlogPost
+  blogPosts, type BlogPost, type InsertBlogPost,
+  communityPosts, type CommunityPost, type InsertCommunityPost,
+  postComments, type PostComment, type InsertPostComment,
+  postReactions, type PostReaction,
+  communityGroups, type CommunityGroup, type InsertCommunityGroup,
+  groupMembers, type GroupMember,
+  forums, type Forum, type InsertForum,
+  forumTopics, type ForumTopic, type InsertForumTopic,
+  forumReplies, type ForumReply, type InsertForumReply,
+  communityEvents, type CommunityEvent, type InsertCommunityEvent,
+  eventAttendees, type EventAttendee,
+  activityFeed, type ActivityFeed,
+  notifications, type Notification, type InsertNotification
 } from "@shared/schema";
 import bcrypt from "bcrypt";
 import { db } from "./db";
@@ -722,6 +734,793 @@ export class DatabaseStorage implements IStorage {
 
   async deleteBlogPost(id: string): Promise<void> {
     await db.delete(blogPosts).where(eq(blogPosts.id, id));
+  }
+
+  // Community Posts operations
+  async getCommunityPosts(userId?: string, groupId?: string, limit: number = 20, offset: number = 0): Promise<(CommunityPost & { author: User })[]> {
+    let query = db
+      .select({
+        id: communityPosts.id,
+        authorId: communityPosts.authorId,
+        content: communityPosts.content,
+        mediaUrls: communityPosts.mediaUrls,
+        postType: communityPosts.postType,
+        groupId: communityPosts.groupId,
+        forumId: communityPosts.forumId,
+        isPinned: communityPosts.isPinned,
+        isPublic: communityPosts.isPublic,
+        tags: communityPosts.tags,
+        likesCount: communityPosts.likesCount,
+        commentsCount: communityPosts.commentsCount,
+        sharesCount: communityPosts.sharesCount,
+        createdAt: communityPosts.createdAt,
+        updatedAt: communityPosts.updatedAt,
+        author: users,
+      })
+      .from(communityPosts)
+      .leftJoin(users, eq(communityPosts.authorId, users.id))
+      .$dynamic();
+
+    const conditions = [];
+    if (userId) conditions.push(eq(communityPosts.authorId, userId));
+    if (groupId) conditions.push(eq(communityPosts.groupId, groupId));
+    if (conditions.length > 0) {
+      query = query.where(and(...conditions));
+    }
+
+    const results = await query
+      .orderBy(desc(communityPosts.isPinned), desc(communityPosts.createdAt))
+      .limit(limit)
+      .offset(offset);
+
+    return results.map((r: any) => ({
+      ...r,
+      author: r.author,
+    })) as (CommunityPost & { author: User })[];
+  }
+
+  async getCommunityPost(id: string): Promise<(CommunityPost & { author: User }) | undefined> {
+    const [result] = await db
+      .select({
+        id: communityPosts.id,
+        authorId: communityPosts.authorId,
+        content: communityPosts.content,
+        mediaUrls: communityPosts.mediaUrls,
+        postType: communityPosts.postType,
+        groupId: communityPosts.groupId,
+        forumId: communityPosts.forumId,
+        isPinned: communityPosts.isPinned,
+        isPublic: communityPosts.isPublic,
+        tags: communityPosts.tags,
+        likesCount: communityPosts.likesCount,
+        commentsCount: communityPosts.commentsCount,
+        sharesCount: communityPosts.sharesCount,
+        createdAt: communityPosts.createdAt,
+        updatedAt: communityPosts.updatedAt,
+        author: users,
+      })
+      .from(communityPosts)
+      .leftJoin(users, eq(communityPosts.authorId, users.id))
+      .where(eq(communityPosts.id, id));
+
+    if (!result) return undefined;
+    return { ...result, author: result.author } as CommunityPost & { author: User };
+  }
+
+  async createCommunityPost(post: InsertCommunityPost): Promise<CommunityPost> {
+    const [newPost] = await db.insert(communityPosts).values(post).returning();
+    
+    if (post.groupId) {
+      await db
+        .update(communityGroups)
+        .set({ postsCount: sql`${communityGroups.postsCount} + 1` })
+        .where(eq(communityGroups.id, post.groupId));
+    }
+    
+    await this.createActivity({
+      userId: post.authorId,
+      activityType: "post_created",
+      targetType: "post",
+      targetId: newPost.id,
+      metadata: {},
+      isPublic: post.isPublic ?? true,
+    });
+    
+    return newPost;
+  }
+
+  async updateCommunityPost(id: string, updates: Partial<InsertCommunityPost>): Promise<CommunityPost | undefined> {
+    const [updated] = await db
+      .update(communityPosts)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(communityPosts.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteCommunityPost(id: string): Promise<void> {
+    const [post] = await db.select().from(communityPosts).where(eq(communityPosts.id, id));
+    
+    if (post?.groupId) {
+      await db
+        .update(communityGroups)
+        .set({ postsCount: sql`${communityGroups.postsCount} - 1` })
+        .where(eq(communityGroups.id, post.groupId));
+    }
+    
+    await db.delete(communityPosts).where(eq(communityPosts.id, id));
+  }
+
+  // Post Comments operations
+  async getPostComments(postId: string): Promise<(PostComment & { author: User })[]> {
+    const results = await db
+      .select({
+        id: postComments.id,
+        postId: postComments.postId,
+        authorId: postComments.authorId,
+        content: postComments.content,
+        parentCommentId: postComments.parentCommentId,
+        likesCount: postComments.likesCount,
+        createdAt: postComments.createdAt,
+        updatedAt: postComments.updatedAt,
+        author: users,
+      })
+      .from(postComments)
+      .leftJoin(users, eq(postComments.authorId, users.id))
+      .where(eq(postComments.postId, postId))
+      .orderBy(postComments.createdAt);
+
+    return results.map((r: any) => ({ ...r, author: r.author })) as (PostComment & { author: User })[];
+  }
+
+  async createPostComment(comment: InsertPostComment): Promise<PostComment> {
+    const [newComment] = await db.insert(postComments).values(comment).returning();
+    
+    await db
+      .update(communityPosts)
+      .set({ commentsCount: sql`${communityPosts.commentsCount} + 1` })
+      .where(eq(communityPosts.id, comment.postId));
+    
+    await this.createActivity({
+      userId: comment.authorId,
+      activityType: "comment_added",
+      targetType: "post",
+      targetId: comment.postId,
+      metadata: {},
+      isPublic: true,
+    });
+    
+    return newComment;
+  }
+
+  async deletePostComment(id: string): Promise<void> {
+    const [comment] = await db.select().from(postComments).where(eq(postComments.id, id));
+    
+    if (comment) {
+      await db
+        .update(communityPosts)
+        .set({ commentsCount: sql`${communityPosts.commentsCount} - 1` })
+        .where(eq(communityPosts.id, comment.postId));
+    }
+    
+    await db.delete(postComments).where(eq(postComments.id, id));
+  }
+
+  // Post Reactions operations
+  async getPostReactions(postId: string): Promise<PostReaction[]> {
+    return db.select().from(postReactions).where(eq(postReactions.postId, postId));
+  }
+
+  async togglePostReaction(postId: string, userId: string, reactionType: string = "like"): Promise<PostReaction | null> {
+    const [existing] = await db
+      .select()
+      .from(postReactions)
+      .where(and(eq(postReactions.postId, postId), eq(postReactions.userId, userId)));
+
+    if (existing) {
+      await db
+        .delete(postReactions)
+        .where(and(eq(postReactions.postId, postId), eq(postReactions.userId, userId)));
+      
+      await db
+        .update(communityPosts)
+        .set({ likesCount: sql`${communityPosts.likesCount} - 1` })
+        .where(eq(communityPosts.id, postId));
+      
+      return null;
+    } else {
+      const [newReaction] = await db
+        .insert(postReactions)
+        .values({ postId, userId, reactionType })
+        .returning();
+      
+      await db
+        .update(communityPosts)
+        .set({ likesCount: sql`${communityPosts.likesCount} + 1` })
+        .where(eq(communityPosts.id, postId));
+      
+      return newReaction;
+    }
+  }
+
+  // Community Groups operations
+  async getCommunityGroups(category?: string, limit: number = 50): Promise<(CommunityGroup & { owner: User; memberCount: number })[]> {
+    let query = db
+      .select({
+        id: communityGroups.id,
+        name: communityGroups.name,
+        description: communityGroups.description,
+        slug: communityGroups.slug,
+        coverImageUrl: communityGroups.coverImageUrl,
+        avatarUrl: communityGroups.avatarUrl,
+        ownerId: communityGroups.ownerId,
+        category: communityGroups.category,
+        isPublic: communityGroups.isPublic,
+        isPrivate: communityGroups.isPrivate,
+        membersCount: communityGroups.membersCount,
+        postsCount: communityGroups.postsCount,
+        rules: communityGroups.rules,
+        tags: communityGroups.tags,
+        createdAt: communityGroups.createdAt,
+        updatedAt: communityGroups.updatedAt,
+        owner: users,
+      })
+      .from(communityGroups)
+      .leftJoin(users, eq(communityGroups.ownerId, users.id))
+      .$dynamic();
+
+    if (category) {
+      query = query.where(eq(communityGroups.category, category));
+    }
+
+    const results = await query
+      .orderBy(desc(communityGroups.membersCount), desc(communityGroups.createdAt))
+      .limit(limit);
+
+    // Get member counts separately
+    const groupsWithCounts = await Promise.all(
+      results.map(async (group: any) => {
+        const memberCountResult = await db
+          .select({ count: sql<number>`COUNT(*)::int` })
+          .from(groupMembers)
+          .where(eq(groupMembers.groupId, group.id));
+        
+        return {
+          ...group,
+          owner: group.owner,
+          memberCount: Number(memberCountResult[0]?.count) || 0,
+        };
+      })
+    );
+
+    return groupsWithCounts as (CommunityGroup & { owner: User; memberCount: number })[];
+  }
+
+  async getCommunityGroup(id: string): Promise<(CommunityGroup & { owner: User; memberCount: number }) | undefined> {
+    const [result] = await db
+      .select({
+        id: communityGroups.id,
+        name: communityGroups.name,
+        description: communityGroups.description,
+        slug: communityGroups.slug,
+        coverImageUrl: communityGroups.coverImageUrl,
+        avatarUrl: communityGroups.avatarUrl,
+        ownerId: communityGroups.ownerId,
+        category: communityGroups.category,
+        isPublic: communityGroups.isPublic,
+        isPrivate: communityGroups.isPrivate,
+        membersCount: communityGroups.membersCount,
+        postsCount: communityGroups.postsCount,
+        rules: communityGroups.rules,
+        tags: communityGroups.tags,
+        createdAt: communityGroups.createdAt,
+        updatedAt: communityGroups.updatedAt,
+        owner: users,
+      })
+      .from(communityGroups)
+      .leftJoin(users, eq(communityGroups.ownerId, users.id))
+      .where(eq(communityGroups.id, id));
+
+    if (!result || !result.owner) return undefined;
+
+    const memberCountResult = await db
+      .select({ count: sql<number>`COUNT(*)::int` })
+      .from(groupMembers)
+      .where(eq(groupMembers.groupId, id));
+
+    return {
+      ...result,
+      owner: result.owner,
+      memberCount: Number(memberCountResult[0]?.count) || 0,
+    };
+  }
+
+  async createCommunityGroup(group: InsertCommunityGroup): Promise<CommunityGroup> {
+    const [newGroup] = await db.insert(communityGroups).values(group).returning();
+    
+    await db.insert(groupMembers).values({
+      groupId: newGroup.id,
+      userId: group.ownerId,
+      role: "admin",
+      status: "active",
+    });
+    
+    return newGroup;
+  }
+
+  async updateCommunityGroup(id: string, updates: Partial<InsertCommunityGroup>): Promise<CommunityGroup | undefined> {
+    const [updated] = await db
+      .update(communityGroups)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(communityGroups.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteCommunityGroup(id: string): Promise<void> {
+    await db.delete(communityGroups).where(eq(communityGroups.id, id));
+  }
+
+  // Group Members operations
+  async getGroupMembers(groupId: string): Promise<(GroupMember & { user: User })[]> {
+    const results = await db
+      .select({
+        id: groupMembers.id,
+        groupId: groupMembers.groupId,
+        userId: groupMembers.userId,
+        role: groupMembers.role,
+        status: groupMembers.status,
+        joinedAt: groupMembers.joinedAt,
+        user: users,
+      })
+      .from(groupMembers)
+      .leftJoin(users, eq(groupMembers.userId, users.id))
+      .where(eq(groupMembers.groupId, groupId))
+      .orderBy(groupMembers.joinedAt);
+
+    return results.map((r: any) => ({ ...r, user: r.user })) as (GroupMember & { user: User })[];
+  }
+
+  async joinGroup(groupId: string, userId: string): Promise<GroupMember> {
+    const [member] = await db
+      .insert(groupMembers)
+      .values({ groupId, userId, role: "member", status: "active" })
+      .returning();
+    
+    await db
+      .update(communityGroups)
+      .set({ membersCount: sql`${communityGroups.membersCount} + 1` })
+      .where(eq(communityGroups.id, groupId));
+    
+    await this.createActivity({
+      userId,
+      activityType: "group_joined",
+      targetType: "group",
+      targetId: groupId,
+      metadata: {},
+      isPublic: true,
+    });
+    
+    return member;
+  }
+
+  async leaveGroup(groupId: string, userId: string): Promise<void> {
+    await db
+      .delete(groupMembers)
+      .where(and(eq(groupMembers.groupId, groupId), eq(groupMembers.userId, userId)));
+    
+    await db
+      .update(communityGroups)
+      .set({ membersCount: sql`${communityGroups.membersCount} - 1` })
+      .where(eq(communityGroups.id, groupId));
+  }
+
+  async updateGroupMemberRole(groupId: string, userId: string, role: string): Promise<GroupMember | undefined> {
+    const [updated] = await db
+      .update(groupMembers)
+      .set({ role })
+      .where(and(eq(groupMembers.groupId, groupId), eq(groupMembers.userId, userId)))
+      .returning();
+    return updated;
+  }
+
+  // Forums operations
+  async getForums(): Promise<Forum[]> {
+    return db.select().from(forums).orderBy(forums.order, forums.name);
+  }
+
+  async getForum(id: string): Promise<Forum | undefined> {
+    const [forum] = await db.select().from(forums).where(eq(forums.id, id));
+    return forum;
+  }
+
+  async createForum(forum: InsertForum): Promise<Forum> {
+    const [newForum] = await db.insert(forums).values(forum).returning();
+    return newForum;
+  }
+
+  // Forum Topics operations
+  async getForumTopics(forumId: string, limit: number = 20, offset: number = 0): Promise<(ForumTopic & { author: User })[]> {
+    const results = await db
+      .select({
+        id: forumTopics.id,
+        forumId: forumTopics.forumId,
+        authorId: forumTopics.authorId,
+        title: forumTopics.title,
+        content: forumTopics.content,
+        slug: forumTopics.slug,
+        isPinned: forumTopics.isPinned,
+        isLocked: forumTopics.isLocked,
+        viewsCount: forumTopics.viewsCount,
+        repliesCount: forumTopics.repliesCount,
+        lastReplyAt: forumTopics.lastReplyAt,
+        lastReplyBy: forumTopics.lastReplyBy,
+        tags: forumTopics.tags,
+        createdAt: forumTopics.createdAt,
+        updatedAt: forumTopics.updatedAt,
+        author: users,
+      })
+      .from(forumTopics)
+      .leftJoin(users, eq(forumTopics.authorId, users.id))
+      .where(eq(forumTopics.forumId, forumId))
+      .orderBy(desc(forumTopics.isPinned), desc(forumTopics.lastReplyAt), desc(forumTopics.createdAt))
+      .limit(limit)
+      .offset(offset);
+
+    return results.map((r: any) => ({ ...r, author: r.author })) as (ForumTopic & { author: User })[];
+  }
+
+  async getForumTopic(id: string): Promise<(ForumTopic & { author: User }) | undefined> {
+    const [result] = await db
+      .select({
+        id: forumTopics.id,
+        forumId: forumTopics.forumId,
+        authorId: forumTopics.authorId,
+        title: forumTopics.title,
+        content: forumTopics.content,
+        slug: forumTopics.slug,
+        isPinned: forumTopics.isPinned,
+        isLocked: forumTopics.isLocked,
+        viewsCount: forumTopics.viewsCount,
+        repliesCount: forumTopics.repliesCount,
+        lastReplyAt: forumTopics.lastReplyAt,
+        lastReplyBy: forumTopics.lastReplyBy,
+        tags: forumTopics.tags,
+        createdAt: forumTopics.createdAt,
+        updatedAt: forumTopics.updatedAt,
+        author: users,
+      })
+      .from(forumTopics)
+      .leftJoin(users, eq(forumTopics.authorId, users.id))
+      .where(eq(forumTopics.id, id));
+
+    if (!result || !result.author) return undefined;
+    return { ...result, author: result.author };
+  }
+
+  async createForumTopic(topic: InsertForumTopic): Promise<ForumTopic> {
+    const [newTopic] = await db.insert(forumTopics).values(topic).returning();
+    
+    await db
+      .update(forums)
+      .set({ 
+        topicsCount: sql`${forums.topicsCount} + 1`,
+        lastPostAt: new Date(),
+        lastPostBy: topic.authorId,
+      })
+      .where(eq(forums.id, topic.forumId));
+    
+    return newTopic;
+  }
+
+  async incrementTopicViews(id: string): Promise<void> {
+    await db
+      .update(forumTopics)
+      .set({ viewsCount: sql`${forumTopics.viewsCount} + 1` })
+      .where(eq(forumTopics.id, id));
+  }
+
+  // Forum Replies operations
+  async getForumReplies(topicId: string): Promise<(ForumReply & { author: User })[]> {
+    const results = await db
+      .select({
+        id: forumReplies.id,
+        topicId: forumReplies.topicId,
+        authorId: forumReplies.authorId,
+        content: forumReplies.content,
+        parentReplyId: forumReplies.parentReplyId,
+        likesCount: forumReplies.likesCount,
+        isSolution: forumReplies.isSolution,
+        createdAt: forumReplies.createdAt,
+        updatedAt: forumReplies.updatedAt,
+        author: users,
+      })
+      .from(forumReplies)
+      .leftJoin(users, eq(forumReplies.authorId, users.id))
+      .where(eq(forumReplies.topicId, topicId))
+      .orderBy(forumReplies.createdAt);
+
+    return results.map((r: any) => ({ ...r, author: r.author })) as (ForumReply & { author: User })[];
+  }
+
+  async createForumReply(reply: InsertForumReply): Promise<ForumReply> {
+    const [newReply] = await db.insert(forumReplies).values(reply).returning();
+    
+    await db
+      .update(forumTopics)
+      .set({ 
+        repliesCount: sql`${forumTopics.repliesCount} + 1`,
+        lastReplyAt: new Date(),
+        lastReplyBy: reply.authorId,
+      })
+      .where(eq(forumTopics.id, reply.topicId));
+    
+    const [topic] = await db.select().from(forumTopics).where(eq(forumTopics.id, reply.topicId));
+    if (topic) {
+      await db
+        .update(forums)
+        .set({
+          postsCount: sql`${forums.postsCount} + 1`,
+          lastPostAt: new Date(),
+          lastPostBy: reply.authorId,
+        })
+        .where(eq(forums.id, topic.forumId));
+    }
+    
+    return newReply;
+  }
+
+  async markReplyAsSolution(replyId: string): Promise<void> {
+    await db
+      .update(forumReplies)
+      .set({ isSolution: true })
+      .where(eq(forumReplies.id, replyId));
+  }
+
+  // Community Events operations
+  async getCommunityEvents(limit: number = 20, upcoming: boolean = true): Promise<(CommunityEvent & { organizer: User; attendeeCount: number })[]> {
+    let query = db
+      .select({
+        id: communityEvents.id,
+        organizerId: communityEvents.organizerId,
+        title: communityEvents.title,
+        description: communityEvents.description,
+        slug: communityEvents.slug,
+        eventType: communityEvents.eventType,
+        startDate: communityEvents.startDate,
+        endDate: communityEvents.endDate,
+        location: communityEvents.location,
+        locationUrl: communityEvents.locationUrl,
+        coverImageUrl: communityEvents.coverImageUrl,
+        isOnline: communityEvents.isOnline,
+        isPublic: communityEvents.isPublic,
+        maxAttendees: communityEvents.maxAttendees,
+        attendeesCount: communityEvents.attendeesCount,
+        registrationRequired: communityEvents.registrationRequired,
+        registrationUrl: communityEvents.registrationUrl,
+        tags: communityEvents.tags,
+        createdAt: communityEvents.createdAt,
+        updatedAt: communityEvents.updatedAt,
+        organizer: users,
+      })
+      .from(communityEvents)
+      .leftJoin(users, eq(communityEvents.organizerId, users.id))
+      .$dynamic();
+
+    if (upcoming) {
+      query = query.where(sql`${communityEvents.startDate} >= NOW()`);
+    }
+
+    const results = await query
+      .orderBy(communityEvents.startDate)
+      .limit(limit);
+
+    // Get attendee counts separately
+    const eventsWithCounts = await Promise.all(
+      results.map(async (event: any) => {
+        const attendeeCountResult = await db
+          .select({ count: sql<number>`COUNT(*)::int` })
+          .from(eventAttendees)
+          .where(eq(eventAttendees.eventId, event.id));
+        
+        return {
+          ...event,
+          organizer: event.organizer,
+          attendeeCount: Number(attendeeCountResult[0]?.count) || 0,
+        };
+      })
+    );
+
+    return eventsWithCounts as (CommunityEvent & { organizer: User; attendeeCount: number })[];
+  }
+
+  async getCommunityEvent(id: string): Promise<(CommunityEvent & { organizer: User; attendeeCount: number }) | undefined> {
+    const [result] = await db
+      .select({
+        id: communityEvents.id,
+        organizerId: communityEvents.organizerId,
+        title: communityEvents.title,
+        description: communityEvents.description,
+        slug: communityEvents.slug,
+        eventType: communityEvents.eventType,
+        startDate: communityEvents.startDate,
+        endDate: communityEvents.endDate,
+        location: communityEvents.location,
+        locationUrl: communityEvents.locationUrl,
+        coverImageUrl: communityEvents.coverImageUrl,
+        isOnline: communityEvents.isOnline,
+        isPublic: communityEvents.isPublic,
+        maxAttendees: communityEvents.maxAttendees,
+        attendeesCount: communityEvents.attendeesCount,
+        registrationRequired: communityEvents.registrationRequired,
+        registrationUrl: communityEvents.registrationUrl,
+        tags: communityEvents.tags,
+        createdAt: communityEvents.createdAt,
+        updatedAt: communityEvents.updatedAt,
+        organizer: users,
+      })
+      .from(communityEvents)
+      .leftJoin(users, eq(communityEvents.organizerId, users.id))
+      .where(eq(communityEvents.id, id));
+
+    if (!result || !result.organizer) return undefined;
+
+    const attendeeCountResult = await db
+      .select({ count: sql<number>`COUNT(*)::int` })
+      .from(eventAttendees)
+      .where(eq(eventAttendees.eventId, id));
+
+    return {
+      ...result,
+      organizer: result.organizer,
+      attendeeCount: Number(attendeeCountResult[0]?.count) || 0,
+    };
+  }
+
+  async createCommunityEvent(event: InsertCommunityEvent): Promise<CommunityEvent> {
+    const [newEvent] = await db.insert(communityEvents).values(event).returning();
+    
+    await this.createActivity({
+      userId: event.organizerId,
+      activityType: "event_created",
+      targetType: "event",
+      targetId: newEvent.id,
+      metadata: {},
+      isPublic: event.isPublic ?? true,
+    });
+    
+    return newEvent;
+  }
+
+  async updateCommunityEvent(id: string, updates: Partial<InsertCommunityEvent>): Promise<CommunityEvent | undefined> {
+    const [updated] = await db
+      .update(communityEvents)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(communityEvents.id, id))
+      .returning();
+    return updated;
+  }
+
+  // Event Attendees operations
+  async registerForEvent(eventId: string, userId: string): Promise<EventAttendee> {
+    const [attendee] = await db
+      .insert(eventAttendees)
+      .values({ eventId, userId, status: "registered" })
+      .returning();
+    
+    await db
+      .update(communityEvents)
+      .set({ attendeesCount: sql`${communityEvents.attendeesCount} + 1` })
+      .where(eq(communityEvents.id, eventId));
+    
+    await this.createActivity({
+      userId,
+      activityType: "event_registered",
+      targetType: "event",
+      targetId: eventId,
+      metadata: {},
+      isPublic: true,
+    });
+    
+    return attendee;
+  }
+
+  async unregisterFromEvent(eventId: string, userId: string): Promise<void> {
+    await db
+      .delete(eventAttendees)
+      .where(and(eq(eventAttendees.eventId, eventId), eq(eventAttendees.userId, userId)));
+    
+    await db
+      .update(communityEvents)
+      .set({ attendeesCount: sql`${communityEvents.attendeesCount} - 1` })
+      .where(eq(communityEvents.id, eventId));
+  }
+
+  async getEventAttendees(eventId: string): Promise<(EventAttendee & { user: User })[]> {
+    const results = await db
+      .select({
+        id: eventAttendees.id,
+        eventId: eventAttendees.eventId,
+        userId: eventAttendees.userId,
+        status: eventAttendees.status,
+        registeredAt: eventAttendees.registeredAt,
+        user: users,
+      })
+      .from(eventAttendees)
+      .leftJoin(users, eq(eventAttendees.userId, users.id))
+      .where(eq(eventAttendees.eventId, eventId))
+      .orderBy(eventAttendees.registeredAt);
+
+    return results.map((r: any) => ({ ...r, user: r.user })) as (EventAttendee & { user: User })[];
+  }
+
+  // Activity Feed operations
+  async getActivityFeed(userId?: string, limit: number = 50): Promise<(ActivityFeed & { user: User })[]> {
+    let query = db
+      .select({
+        id: activityFeed.id,
+        userId: activityFeed.userId,
+        activityType: activityFeed.activityType,
+        targetType: activityFeed.targetType,
+        targetId: activityFeed.targetId,
+        metadata: activityFeed.metadata,
+        isPublic: activityFeed.isPublic,
+        createdAt: activityFeed.createdAt,
+        user: users,
+      })
+      .from(activityFeed)
+      .leftJoin(users, eq(activityFeed.userId, users.id))
+      .where(eq(activityFeed.isPublic, true))
+      .$dynamic();
+
+    if (userId) {
+      query = query.where(eq(activityFeed.userId, userId));
+    }
+
+    const results = await query
+      .orderBy(desc(activityFeed.createdAt))
+      .limit(limit);
+
+    return results.map((r: any) => ({ ...r, user: r.user })) as (ActivityFeed & { user: User })[];
+  }
+
+  async createActivity(activity: Omit<ActivityFeed, "id" | "createdAt">): Promise<ActivityFeed> {
+    const [newActivity] = await db.insert(activityFeed).values(activity).returning();
+    return newActivity;
+  }
+
+  // Notifications operations
+  async getNotifications(userId: string, unreadOnly: boolean = false): Promise<Notification[]> {
+    let query = db
+      .select()
+      .from(notifications)
+      .where(eq(notifications.userId, userId))
+      .$dynamic();
+
+    if (unreadOnly) {
+      query = query.where(eq(notifications.isRead, false));
+    }
+
+    return query.orderBy(desc(notifications.createdAt));
+  }
+
+  async createNotification(notification: InsertNotification): Promise<Notification> {
+    const [newNotification] = await db.insert(notifications).values(notification).returning();
+    return newNotification;
+  }
+
+  async markNotificationAsRead(id: string): Promise<void> {
+    await db
+      .update(notifications)
+      .set({ isRead: true })
+      .where(eq(notifications.id, id));
+  }
+
+  async markAllNotificationsAsRead(userId: string): Promise<void> {
+    await db
+      .update(notifications)
+      .set({ isRead: true })
+      .where(eq(notifications.userId, userId));
   }
 }
 

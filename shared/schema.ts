@@ -40,16 +40,18 @@ export const users = pgTable("users", {
 export type UpsertUser = typeof users.$inferInsert;
 export type User = typeof users.$inferSelect;
 
-// Registration schema for email/password signup
+// Registration schema for email/password signup (Early Access/Beta)
 export const registerUserSchema = z.object({
   email: z.string().email(),
   password: z.string().min(8, "Password must be at least 8 characters"),
   firstName: z.string().min(1, "First name is required"),
   lastName: z.string().optional(),
   termsAccepted: z.boolean().refine((val) => val === true, {
-    message: "You must accept the Terms and Conditions to create an account",
+    message: "You must accept the Terms and Conditions to join early access",
   }),
-  marketingConsent: z.boolean().optional().default(false),
+  marketingConsent: z.boolean().refine((val) => val === true, {
+    message: "You must consent to marketing communications to join early access and receive updates",
+  }),
 });
 export type RegisterUser = z.infer<typeof registerUserSchema>;
 
@@ -296,6 +298,224 @@ export const supportTickets = pgTable("support_tickets", {
 export const insertSupportTicketSchema = createInsertSchema(supportTickets).omit({ id: true, createdAt: true, updatedAt: true });
 export type InsertSupportTicket = z.infer<typeof insertSupportTicketSchema>;
 export type SupportTicket = typeof supportTickets.$inferSelect;
+
+// Community Posts (social feed)
+export const communityPosts = pgTable("community_posts", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  authorId: varchar("author_id").notNull().references(() => users.id),
+  content: text("content").notNull(),
+  mediaUrls: text("media_urls").array(), // Array of image/video URLs
+  postType: varchar("post_type").default("post"), // post, question, announcement, job_share
+  groupId: varchar("group_id"), // Optional: if post belongs to a group
+  forumId: varchar("forum_id"), // Optional: if post belongs to a forum
+  isPinned: boolean("is_pinned").default(false),
+  isPublic: boolean("is_public").default(true),
+  tags: text("tags").array(),
+  likesCount: integer("likes_count").default(0),
+  commentsCount: integer("comments_count").default(0),
+  sharesCount: integer("shares_count").default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertCommunityPostSchema = createInsertSchema(communityPosts).omit({ id: true, createdAt: true, updatedAt: true, likesCount: true, commentsCount: true, sharesCount: true });
+export type InsertCommunityPost = z.infer<typeof insertCommunityPostSchema>;
+export type CommunityPost = typeof communityPosts.$inferSelect;
+
+// Post Comments
+export const postComments = pgTable("post_comments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  postId: varchar("post_id").notNull().references(() => communityPosts.id, { onDelete: "cascade" }),
+  authorId: varchar("author_id").notNull().references(() => users.id),
+  content: text("content").notNull(),
+  parentCommentId: varchar("parent_comment_id"), // For nested replies
+  likesCount: integer("likes_count").default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertPostCommentSchema = createInsertSchema(postComments).omit({ id: true, createdAt: true, updatedAt: true, likesCount: true });
+export type InsertPostComment = z.infer<typeof insertPostCommentSchema>;
+export type PostComment = typeof postComments.$inferSelect;
+
+// Post Reactions (likes, etc.)
+export const postReactions = pgTable("post_reactions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  postId: varchar("post_id").notNull().references(() => communityPosts.id, { onDelete: "cascade" }),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  reactionType: varchar("reaction_type").default("like"), // like, love, support, celebrate
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export type PostReaction = typeof postReactions.$inferSelect;
+
+// Community Groups
+export const communityGroups = pgTable("community_groups", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: varchar("name").notNull(),
+  description: text("description"),
+  slug: varchar("slug").notNull().unique(),
+  coverImageUrl: text("cover_image_url"),
+  avatarUrl: text("avatar_url"),
+  ownerId: varchar("owner_id").notNull().references(() => users.id),
+  category: varchar("category"), // industry, disability_type, location, interest
+  isPublic: boolean("is_public").default(true),
+  isPrivate: boolean("is_private").default(false),
+  membersCount: integer("members_count").default(0),
+  postsCount: integer("posts_count").default(0),
+  rules: text("rules"), // Group rules/guidelines
+  tags: text("tags").array(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertCommunityGroupSchema = createInsertSchema(communityGroups).omit({ id: true, createdAt: true, updatedAt: true, membersCount: true, postsCount: true });
+export type InsertCommunityGroup = z.infer<typeof insertCommunityGroupSchema>;
+export type CommunityGroup = typeof communityGroups.$inferSelect;
+
+// Group Members
+export const groupMembers = pgTable("group_members", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  groupId: varchar("group_id").notNull().references(() => communityGroups.id, { onDelete: "cascade" }),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  role: varchar("role").default("member"), // member, moderator, admin
+  status: varchar("status").default("active"), // active, pending, banned
+  joinedAt: timestamp("joined_at").defaultNow(),
+});
+
+export type GroupMember = typeof groupMembers.$inferSelect;
+
+// Forums (Discussion Boards)
+export const forums = pgTable("forums", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: varchar("name").notNull(),
+  description: text("description"),
+  slug: varchar("slug").notNull().unique(),
+  category: varchar("category"), // general, career_advice, job_seeking, accessibility, success_stories
+  icon: varchar("icon"), // Icon name or emoji
+  isPublic: boolean("is_public").default(true),
+  topicsCount: integer("topics_count").default(0),
+  postsCount: integer("posts_count").default(0),
+  lastPostAt: timestamp("last_post_at"),
+  lastPostBy: varchar("last_post_by").references(() => users.id),
+  order: integer("order").default(0), // Display order
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertForumSchema = createInsertSchema(forums).omit({ id: true, createdAt: true, updatedAt: true, topicsCount: true, postsCount: true });
+export type InsertForum = z.infer<typeof insertForumSchema>;
+export type Forum = typeof forums.$inferSelect;
+
+// Forum Topics (Discussion Threads)
+export const forumTopics = pgTable("forum_topics", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  forumId: varchar("forum_id").notNull().references(() => forums.id, { onDelete: "cascade" }),
+  authorId: varchar("author_id").notNull().references(() => users.id),
+  title: varchar("title").notNull(),
+  content: text("content").notNull(),
+  slug: varchar("slug").notNull(),
+  isPinned: boolean("is_pinned").default(false),
+  isLocked: boolean("is_locked").default(false),
+  viewsCount: integer("views_count").default(0),
+  repliesCount: integer("replies_count").default(0),
+  lastReplyAt: timestamp("last_reply_at"),
+  lastReplyBy: varchar("last_reply_by").references(() => users.id),
+  tags: text("tags").array(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertForumTopicSchema = createInsertSchema(forumTopics).omit({ id: true, createdAt: true, updatedAt: true, viewsCount: true, repliesCount: true });
+export type InsertForumTopic = z.infer<typeof insertForumTopicSchema>;
+export type ForumTopic = typeof forumTopics.$inferSelect;
+
+// Forum Replies
+export const forumReplies = pgTable("forum_replies", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  topicId: varchar("topic_id").notNull().references(() => forumTopics.id, { onDelete: "cascade" }),
+  authorId: varchar("author_id").notNull().references(() => users.id),
+  content: text("content").notNull(),
+  parentReplyId: varchar("parent_reply_id"), // For nested replies
+  likesCount: integer("likes_count").default(0),
+  isSolution: boolean("is_solution").default(false), // Mark as solution/answer
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertForumReplySchema = createInsertSchema(forumReplies).omit({ id: true, createdAt: true, updatedAt: true, likesCount: true });
+export type InsertForumReply = z.infer<typeof insertForumReplySchema>;
+export type ForumReply = typeof forumReplies.$inferSelect;
+
+// Community Events
+export const communityEvents = pgTable("community_events", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  organizerId: varchar("organizer_id").notNull().references(() => users.id),
+  title: varchar("title").notNull(),
+  description: text("description"),
+  slug: varchar("slug").notNull().unique(),
+  eventType: varchar("event_type"), // networking, workshop, webinar, meetup, conference
+  startDate: timestamp("start_date").notNull(),
+  endDate: timestamp("end_date"),
+  location: text("location"), // Physical location or "Online"
+  locationUrl: text("location_url"), // Zoom, Google Meet, etc.
+  coverImageUrl: text("cover_image_url"),
+  isOnline: boolean("is_online").default(false),
+  isPublic: boolean("is_public").default(true),
+  maxAttendees: integer("max_attendees"),
+  attendeesCount: integer("attendees_count").default(0),
+  registrationRequired: boolean("registration_required").default(false),
+  registrationUrl: text("registration_url"),
+  tags: text("tags").array(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertCommunityEventSchema = createInsertSchema(communityEvents).omit({ id: true, createdAt: true, updatedAt: true, attendeesCount: true });
+export type InsertCommunityEvent = z.infer<typeof insertCommunityEventSchema>;
+export type CommunityEvent = typeof communityEvents.$inferSelect;
+
+// Event Attendees
+export const eventAttendees = pgTable("event_attendees", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  eventId: varchar("event_id").notNull().references(() => communityEvents.id, { onDelete: "cascade" }),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  status: varchar("status").default("registered"), // registered, attending, attended, cancelled
+  registeredAt: timestamp("registered_at").defaultNow(),
+});
+
+export type EventAttendee = typeof eventAttendees.$inferSelect;
+
+// Activity Feed (user activity stream)
+export const activityFeed = pgTable("activity_feed", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  activityType: varchar("activity_type").notNull(), // post_created, comment_added, group_joined, event_registered, connection_made
+  targetType: varchar("target_type"), // post, comment, group, event, user
+  targetId: varchar("target_id"), // ID of the target entity
+  metadata: jsonb("metadata"), // Additional activity data
+  isPublic: boolean("is_public").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export type ActivityFeed = typeof activityFeed.$inferSelect;
+
+// Notifications
+export const notifications = pgTable("notifications", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  type: varchar("type").notNull(), // post_like, comment_reply, connection_request, event_reminder, group_invite
+  title: varchar("title").notNull(),
+  message: text("message").notNull(),
+  link: text("link"), // URL to navigate to
+  isRead: boolean("is_read").default(false),
+  metadata: jsonb("metadata"), // Additional notification data
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertNotificationSchema = createInsertSchema(notifications).omit({ id: true, createdAt: true, isRead: true });
+export type InsertNotification = z.infer<typeof insertNotificationSchema>;
+export type Notification = typeof notifications.$inferSelect;
 
 // Request/response types for API
 export const generateResumeRequestSchema = z.object({

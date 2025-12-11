@@ -46,7 +46,7 @@ export default function Auth() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
-      setLocation("/dashboard");
+      setLocation("/early-access");
     },
     onError: (error: any) => {
       setLoginError(error.message || "Login failed. Please check your credentials.");
@@ -60,7 +60,7 @@ export default function Auth() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
-      setLocation("/select-role");
+      setLocation("/early-access");
     },
     onError: (error: any) => {
       setRegisterError(error.message || "Registration failed. Please try again.");
@@ -98,7 +98,12 @@ export default function Auth() {
     }
 
     if (!termsAccepted) {
-      setRegisterError("You must accept the Terms and Conditions to create an account");
+      setRegisterError("You must accept the Terms and Conditions to join early access");
+      return;
+    }
+
+    if (!marketingConsent) {
+      setRegisterError("You must consent to marketing communications to receive early access updates");
       return;
     }
 
@@ -108,7 +113,7 @@ export default function Auth() {
       firstName,
       lastName: lastName || undefined,
       termsAccepted: true,
-      marketingConsent: marketingConsent || false,
+      marketingConsent: true, // Required for early access
     });
   };
 
@@ -222,7 +227,15 @@ export default function Auth() {
                 </TabsList>
 
                 <TabsContent value="login" className="space-y-6 mt-0">
-                  <p className="text-sm text-muted-foreground mb-6">your account.</p>
+                  <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-lg p-4 mb-6">
+                    <p className="text-sm text-blue-900 dark:text-blue-100 font-medium mb-1">
+                      Early Access Login
+                    </p>
+                    <p className="text-xs text-blue-800 dark:text-blue-200">
+                      You're logging in to receive updates about our platform launch, community events, and blog posts. 
+                      Full platform features are coming soon - you'll be among the first beta testers!
+                    </p>
+                  </div>
                   <form onSubmit={handleLogin} className="space-y-4">
                     {loginError && (
                       <Alert variant="destructive">
@@ -304,7 +317,23 @@ export default function Auth() {
                 </TabsContent>
 
                 <TabsContent value="register" className="space-y-6 mt-0">
-                  <p className="text-sm text-muted-foreground mb-6">create your account.</p>
+                  <div className="bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-950/30 dark:to-pink-950/30 border border-purple-200 dark:border-purple-800 rounded-lg p-4 mb-6">
+                    <p className="text-sm font-semibold text-purple-900 dark:text-purple-100 mb-2">
+                      🎉 Join Early Access - Become a Beta Tester!
+                    </p>
+                    <p className="text-xs text-purple-800 dark:text-purple-200 mb-2">
+                      Sign up to be among the <strong>first beta testers</strong> when we launch! Right now, you'll get:
+                    </p>
+                    <ul className="text-xs text-purple-800 dark:text-purple-200 space-y-1 list-disc list-inside">
+                      <li>Email updates about platform launches and new features</li>
+                      <li>Community updates and networking opportunities</li>
+                      <li>Blog post notifications and career insights</li>
+                    </ul>
+                    <p className="text-xs text-purple-800 dark:text-purple-200 mt-2 font-medium">
+                      ⚠️ Full platform features (job matching, resume builder, etc.) are not yet available. 
+                      You'll be notified when they launch!
+                    </p>
+                  </div>
                   <form onSubmit={handleRegister} className="space-y-4">
                     {registerError && (
                       <Alert variant="destructive">
@@ -432,6 +461,7 @@ export default function Auth() {
                           id="marketing-consent"
                           checked={marketingConsent}
                           onCheckedChange={(checked) => setMarketingConsent(checked === true)}
+                          required
                           className="mt-1"
                           data-testid="checkbox-marketing-consent"
                         />
@@ -439,7 +469,12 @@ export default function Auth() {
                           htmlFor="marketing-consent"
                           className="text-sm font-normal leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
                         >
-                          I agree to receive marketing communications, newsletters, and promotional emails from The JobBridge, Inc. (Optional)
+                          I agree to receive marketing communications, newsletters, and updates about platform launches, 
+                          community events, and blog posts from The JobBridge, Inc. 
+                          <span className="text-destructive"> *</span>
+                          <span className="block text-xs text-muted-foreground mt-1">
+                            Required to receive early access updates and become a beta tester
+                          </span>
                         </Label>
                       </div>
                     </div>
@@ -447,16 +482,16 @@ export default function Auth() {
                     <Button
                       type="submit"
                       className="w-full bg-black text-white hover:bg-black/90 rounded-md h-12 text-base font-medium"
-                      disabled={registerMutation.isPending || !termsAccepted}
+                      disabled={registerMutation.isPending || !termsAccepted || !marketingConsent}
                       data-testid="button-register-submit"
                     >
                       {registerMutation.isPending ? (
                         <>
                           <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          Creating account...
+                          Joining Early Access...
                         </>
                       ) : (
-                        "Create Account"
+                        "Join Early Access"
                       )}
                     </Button>
                   </form>
