@@ -8,11 +8,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Separator } from "@/components/ui/separator";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Eye, EyeOff, Mail, Lock, User, Loader2, AlertCircle, CheckCircle } from "lucide-react";
+import { Eye, EyeOff, Mail, Lock, User, Loader2, AlertCircle, CheckCircle, Chrome } from "lucide-react";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Logo } from "@/components/logo";
 import { Link } from "wouter";
+import { supabase } from "@/utils/supabase/client";
 
 export default function Auth() {
   const [, setLocation] = useLocation();
@@ -38,6 +39,22 @@ export default function Auth() {
   const [forgotEmail, setForgotEmail] = useState("");
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [forgotPasswordSent, setForgotPasswordSent] = useState(false);
+
+  const googleLoginMutation = useMutation({
+    mutationFn: async () => {
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: \`${window.location.origin}/early-access\`,
+        },
+      });
+      if (error) throw error;
+      return data;
+    },
+    onError: (error: any) => {
+      setLoginError(error.message || "Google login failed. Please try again.");
+    },
+  });
 
   const loginMutation = useMutation({
     mutationFn: async (data: { email: string; password: string }) => {
@@ -303,6 +320,35 @@ export default function Auth() {
                         "Login"
                       )}
                     </Button>
+
+                    <div className="relative">
+                      <div className="absolute inset-0 flex items-center">
+                        <Separator className="w-full" />
+                      </div>
+                      <div className="relative flex justify-center text-xs uppercase">
+                        <span className="bg-white dark:bg-slate-950 px-2 text-muted-foreground">Or continue with</span>
+                      </div>
+                    </div>
+
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="w-full rounded-md h-12 text-base font-medium"
+                      onClick={() => googleLoginMutation.mutate()}
+                      disabled={googleLoginMutation.isPending}
+                    >
+                      {googleLoginMutation.isPending ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Signing in with Google...
+                        </>
+                      ) : (
+                        <>
+                          <Chrome className="mr-2 h-4 w-4" />
+                          Google
+                        </>
+                      )}
+                    </Button>
                   </form>
 
                   <Button
@@ -492,6 +538,35 @@ export default function Auth() {
                         </>
                       ) : (
                         "Join Early Access"
+                      )}
+                    </Button>
+
+                    <div className="relative">
+                      <div className="absolute inset-0 flex items-center">
+                        <Separator className="w-full" />
+                      </div>
+                      <div className="relative flex justify-center text-xs uppercase">
+                        <span className="bg-white dark:bg-slate-950 px-2 text-muted-foreground">Or sign up with</span>
+                      </div>
+                    </div>
+
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="w-full rounded-md h-12 text-base font-medium"
+                      onClick={() => googleLoginMutation.mutate()}
+                      disabled={googleLoginMutation.isPending}
+                    >
+                      {googleLoginMutation.isPending ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Signing up with Google...
+                        </>
+                      ) : (
+                        <>
+                          <Chrome className="mr-2 h-4 w-4" />
+                          Google
+                        </>
                       )}
                     </Button>
                   </form>
