@@ -18,7 +18,13 @@ if (!databaseUrl) {
 console.log(`[DB Init] Using database URL: ${databaseUrl.substring(0, 50)}...`);
 
 // Parse connection string and add SSL config if needed
-const connectionConfig: any = { connectionString: databaseUrl };
+const connectionConfig: any = { 
+  connectionString: databaseUrl,
+  // Optimize for serverless: keep connections alive but don't keep too many
+  max: 2,  // Reduced from default 10 for serverless
+  idleTimeoutMillis: 30000,
+  connectionTimeoutMillis: 5000,
+};
 
 // Handle SSL for databases that require it
 // If DATABASE_SSL_REJECT_UNAUTHORIZED is set to 'false', allow self-signed certs
