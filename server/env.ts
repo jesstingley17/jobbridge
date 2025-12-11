@@ -1,27 +1,37 @@
-export function listMissingEnv(required: string[]) {
-  const missing: string[] = [];
-  for (const key of required) {
-    const val = process.env[key];
-    if (!val || val === '' || val?.startsWith('replace_with') || val?.includes('your_')) {
-      missing.push(key);
-    }
-  }
-  return missing;
+/**
+ * Environment variable validation utilities
+ */
+
+/**
+ * Check if an environment variable is set
+ */
+export function hasEnv(key: string): boolean {
+  return process.env[key] !== undefined && process.env[key] !== '';
 }
 
-export function ensureEnvOrThrow(required: string[]) {
-  const missing = listMissingEnv(required);
+/**
+ * Ensure all required environment variables are set, throw if missing
+ */
+export function ensureEnvOrThrow(keys: string[]): void {
+  const missing = keys.filter(key => !hasEnv(key));
   if (missing.length > 0) {
-    const msg = `Missing required environment variables: ${missing.join(', ')}`;
-    throw new Error(msg);
+    throw new Error(`Missing required environment variables: ${missing.join(', ')}`);
   }
 }
 
-export function ensureEnvWarn(required: string[]) {
-  const missing = listMissingEnv(required);
+/**
+ * Warn if environment variables are missing (but don't throw)
+ */
+export function ensureEnvWarn(keys: string[]): void {
+  const missing = keys.filter(key => !hasEnv(key));
   if (missing.length > 0) {
-    console.warn(`Warning: missing environment variables: ${missing.join(', ')}`);
+    console.warn(`Missing environment variables (will use defaults if available): ${missing.join(', ')}`);
   }
 }
 
-export default { listMissingEnv, ensureEnvOrThrow, ensureEnvWarn };
+/**
+ * Get an environment variable with optional default
+ */
+export function getEnv(key: string, defaultValue?: string): string | undefined {
+  return process.env[key] || defaultValue;
+}
