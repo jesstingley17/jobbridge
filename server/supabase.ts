@@ -1,8 +1,15 @@
 import { createClient } from '@supabase/supabase-js';
 
 // Server-side Supabase client with service role key
-const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || 'https://mkkmfocbujeeayenvxtl.supabase.co';
-const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1ra21mb2NidWplZWF5ZW52eHRsIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2NTM5MjIzNiwiZXhwIjoyMDgwOTY4MjM2fQ.RM0PEUe8h6yGqoL3CDiMRFiBeIBOlLlGBCEPq0FNMbc';
+const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+if (!supabaseUrl || !supabaseServiceRoleKey) {
+  throw new Error(
+    'Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY environment variables. ' +
+    'Set them in your .env file or deployment environment (Vercel).'
+  );
+}
 
 // Server-side Supabase client (bypasses RLS)
 export const supabaseAdmin = createClient(supabaseUrl, supabaseServiceRoleKey, {
@@ -11,4 +18,3 @@ export const supabaseAdmin = createClient(supabaseUrl, supabaseServiceRoleKey, {
     persistSession: false,
   },
 });
-
