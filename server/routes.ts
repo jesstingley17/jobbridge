@@ -147,6 +147,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Seed initial data on startup
   // Seed data removed - using real job search API
 
+  // Google OAuth callback handler
+  app.post('/api/auth/google', async (req, res) => {
+    try {
+      const { idToken } = req.body;
+      
+      if (!idToken) {
+        return res.status(400).json({ message: 'ID token is required' });
+      }
+
+      // Supabase handles OAuth validation client-side
+      // This endpoint is optional for any additional server-side processing
+      res.json({ message: 'Google OAuth token received' });
+    } catch (error: any) {
+      console.error('Google OAuth error:', error);
+      res.status(500).json({ message: 'Google authentication failed' });
+    }
+  });
+
+  // Google OAuth callback handler
+  app.post('/api/auth/google', async (req, res) => {
+    try {
+      const { idToken } = req.body;
+      
+      if (!idToken) {
+        return res.status(400).json({ message: 'ID token is required' });
+      }
+
+      // Supabase handles OAuth validation client-side
+      // This endpoint is optional for any additional server-side processing
+      res.json({ message: 'Google OAuth token received' });
+    } catch (error: any) {
+      console.error('Google OAuth error:', error);
+      res.status(500).json({ message: 'Google authentication failed' });
+    }
+  });
+
   // Email/password registration
   app.post('/api/auth/register', async (req, res) => {
     try {
