@@ -1,24 +1,24 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
-import { storage } from "./storage";
-import { setupAuth, isAuthenticated, isAdmin } from "./replitAuth";
+import { storage } from "./storage.js";
+import { setupAuth, isAuthenticated, isAdmin } from "./replitAuth.js";
 import OpenAI from "openai";
 import { z } from "zod";
-import { getExternalJobs } from "./externalJobs";
-import { getUncachableStripeClient, getStripePublishableKey } from "./stripeClient";
+import { getExternalJobs } from "./externalJobs.js";
+import { getUncachableStripeClient, getStripePublishableKey } from "./stripeClient.js";
 import { sql, eq } from "drizzle-orm";
-import { db } from "./db";
+import { db } from "./db.js";
 import { postComments } from "@shared/schema";
-import { requireFeature, requireApplicationQuota, incrementApplicationCount, getUserSubscriptionStatus } from "./subscriptionMiddleware";
-import { sendMagicLinkEmail, sendPasswordResetEmail } from "./email";
+import { requireFeature, requireApplicationQuota, incrementApplicationCount, getUserSubscriptionStatus } from "./subscriptionMiddleware.js";
+import { sendMagicLinkEmail, sendPasswordResetEmail } from "./email.js";
 import crypto from "crypto";
-import { generateAIText, getAIClient } from "./aiGateway";
+import { generateAIText, getAIClient } from "./aiGateway.js";
 import { 
   fetchContentfulPosts, 
   fetchContentfulPostBySlug, 
   convertContentfulPostToDbFormat,
   syncContentfulPosts 
-} from "./contentful";
+} from "./contentful.js";
 import { 
   generateResumeRequestSchema, 
   generateInterviewQuestionsRequestSchema,
@@ -37,8 +37,8 @@ import {
   registerUserSchema,
   loginUserSchema
 } from "@shared/schema";
-import { hashPassword, verifyPassword } from "./storage";
-import { sendWelcomeEmail } from "./email";
+import { hashPassword, verifyPassword } from "./storage.js";
+import { sendWelcomeEmail } from "./email.js";
 
 const normalizeStringArray = z.preprocess((val) => {
   if (typeof val === 'string') {
@@ -130,7 +130,7 @@ const updateApplicationSchema = z.object({
   coverLetter: z.string().optional(),
 });
 
-import { registerSitemapRoute } from "./routes/sitemap";
+import { registerSitemapRoute } from "./routes/sitemap.js";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Register sitemap and robots.txt routes (before auth)
