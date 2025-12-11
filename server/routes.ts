@@ -153,17 +153,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const validatedData = registerUserSchema.parse(req.body);
       
       // Check if user already exists
-      const existingUser = await storage.getUserByEmail(validatedData.email);
+      let existingUser;
+      try {
+        existingUser = await storage.getUserByEmail(validatedData.email);
+      } catch (dbError: any) {
+        // If it's a "relation does not exist" error, the database tables haven't been created
+        if (dbError.code === '42P01' || dbError.message?.includes('does not exist') || dbError.message?.includes('relation')) {
+          console.error("Database tables not found. Please run migrations:", dbError.message);
+          return res.status(500).json({ 
+            message: "Database not initialized. Please run database migrations.",
+            error: "Database tables do not exist. Run: npm run db:push or execute migrations/create_community_tables.sql"
+          });
+        }
+        throw dbError; // Re-throw other database errors
+      }
+      
       if (existingUser) {
         return res.status(400).json({ message: "An account with this email already exists" });
       }
       
       // Hash password and create user
       const hashedPassword = await hashPassword(validatedData.password);
-      const user = await storage.createUserWithPassword({
-        ...validatedData,
-        hashedPassword
-      });
+      let user;
+      try {
+        user = await storage.createUserWithPassword({
+          ...validatedData,
+          hashedPassword
+        });
+      } catch (createError: any) {
+        // Check if it's a database table error
+        if (createError.code === '42P01' || createError.message?.includes('does not exist') || createError.message?.includes('relation')) {
+          console.error("Database tables not found during user creation:", createError.message);
+          return res.status(500).json({ 
+            message: "Database not initialized. Please run database migrations.",
+            error: "Database tables do not exist. Run: npm run db:push or execute migrations/create_community_tables.sql"
+          });
+        }
+        throw createError; // Re-throw other errors
+      }
       
       // Send welcome email
       try {
