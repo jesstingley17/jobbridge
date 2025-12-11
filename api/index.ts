@@ -2,9 +2,9 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import express from 'express';
 import compression from 'compression';
-import { registerRoutes } from '../server/routes';
-import { serveStatic } from '../server/static';
-import { setupAuth } from '../server/replitAuth';
+import { registerRoutes } from '../server/routes.js';
+import { serveStatic } from '../server/static.js';
+import { setupAuth } from '../server/replitAuth.js';
 
 // Create Express app instance
 const app = express();
