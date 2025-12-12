@@ -24,7 +24,8 @@ async function checkSupabaseAuth(req: any): Promise<string | null> {
   try {
     const authHeader = req.headers.authorization;
     if (authHeader?.startsWith('Bearer ')) {
-      const { supabaseAdmin } = await import('./supabase.js');
+      const { getSupabaseAdmin } = await import('./supabase.js');
+      const supabaseAdmin = getSupabaseAdmin();
       const token = authHeader.replace('Bearer ', '');
       const { data: { user }, error } = await supabaseAdmin.auth.getUser(token);
       if (!error && user) {
