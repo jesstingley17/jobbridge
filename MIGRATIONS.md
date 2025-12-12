@@ -2,6 +2,12 @@
 
 Your app uses Drizzle ORM for database schema management. Here's how to run migrations.
 
+## ⚡ Quick Start (Easiest Method)
+
+**Copy and paste the entire contents of `migrations/run-all-migrations.sql` into the Supabase SQL Editor and click Run.**
+
+This single file contains all migrations in the correct order.
+
 ## Option 1: Using Drizzle Kit Push (Recommended)
 
 This syncs your schema directly to the database:
