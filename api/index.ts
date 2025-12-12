@@ -110,8 +110,16 @@ async function initializeApp() {
         console.error('Env validation error:', envErr.message);
         throw envErr;
       }
-      // Setup authentication (includes session middleware)
-      await setupAuth(app);
+      // Setup authentication (skip Replit Auth if using Supabase)
+      // Only setup Replit Auth if REPL_ID is set (for Replit deployments)
+      if (process.env.REPL_ID) {
+        await setupAuth(app);
+      } else {
+        // For Vercel/Supabase: Just setup session middleware without OIDC
+        const { getSession } = await import('../server/replitAuth.js');
+        app.set("trust proxy", 1);
+        app.use(getSession());
+      }
 
       // Register all routes
       await registerRoutes(app);

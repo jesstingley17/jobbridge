@@ -22,9 +22,10 @@ const getOidcConfig = memoize(
 export function getSession() {
   const sessionTtl = 7 * 24 * 60 * 60 * 1000; // 1 week
   
-  // Check if DATABASE_URL is available
-  if (!process.env.DATABASE_URL) {
-    console.warn("DATABASE_URL not set, using memory store for sessions");
+  // For Vercel/Supabase: Use lightweight memory store (sessions handled by Supabase)
+  // Only use PostgreSQL store if explicitly configured for Replit
+  if (!process.env.DATABASE_URL || process.env.VERCEL) {
+    // Use memory store for Vercel (Supabase handles auth, sessions are minimal)
     return session({
       secret: process.env.SESSION_SECRET || "default-secret-change-in-production",
       resave: false,

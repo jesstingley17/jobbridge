@@ -36,7 +36,7 @@ import {
   bulkApplyRequestSchema,
   registerUserSchema,
   loginUserSchema
-} from "../shared/schema";
+} from "@shared/schema";
 import { hashPassword, verifyPassword } from "./storage.js";
 import { sendWelcomeEmail } from "./email.js";
 
