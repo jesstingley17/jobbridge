@@ -42,10 +42,6 @@ export default function Community() {
   const { data: mentors, isLoading: mentorsLoading } = useQuery<MentorWithUser[]>({
     queryKey: ["/api/mentors"],
     retry: false,
-    // Don't fail the whole page if mentors endpoint fails
-    onError: (error) => {
-      console.error("Failed to load mentors:", error);
-    },
   });
 
   const connectMutation = useMutation({

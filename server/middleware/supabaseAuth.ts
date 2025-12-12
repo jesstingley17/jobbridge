@@ -43,7 +43,7 @@ async function verifyJwtWithJwks(token: string, projectUrl: string) {
   }
 
   const keys = await getSupabaseJwks(projectUrl);
-  const jwk = keys.find((k) => k.kid === header.kid && k.alg === header.alg);
+  const jwk = keys.find((k: any) => k.kid === header.kid && k.alg === header.alg);
   
   if (!jwk) {
     throw new Error("No matching JWK");
