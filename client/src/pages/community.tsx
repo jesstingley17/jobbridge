@@ -159,9 +159,9 @@ export default function Community() {
             <div className="flex justify-center py-12">
               <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
             </div>
-          ) : mentors && mentors.length > 0 ? (
+          ) : mentors && Array.isArray(mentors) && mentors.length > 0 ? (
             <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-              {mentors.map((mentor) => (
+              {mentors.map((mentor: MentorWithUser) => (
                 <Card key={mentor.id} data-testid={`card-mentor-${mentor.id}`}>
                   <CardHeader>
                     <div className="flex items-start gap-4">
