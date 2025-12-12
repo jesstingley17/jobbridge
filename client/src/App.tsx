@@ -25,6 +25,7 @@ import Community from "@/pages/community";
 import Pricing from "@/pages/pricing";
 import Auth from "@/pages/auth";
 import AuthWrapper from "@/pages/auth-wrapper";
+import AuthCallback from "@/pages/auth-callback";
 import ResetPassword from "@/pages/reset-password";
 import About from "@/pages/about";
 import Blog from "@/pages/blog";
@@ -82,6 +83,7 @@ function Router() {
           <Route path="/auth" component={AuthWrapper} />
       <Route path="/auth/sign-in" component={AuthWrapper} />
       <Route path="/auth/sign-up" component={AuthWrapper} />
+      <Route path="/auth/callback" component={AuthCallback} />
       <Route path="/auth/verify" component={ResetPassword} />
       <Route path="/cms" component={BuilderPage} />
       <Route component={CatchAllRoute} />
