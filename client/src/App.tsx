@@ -39,6 +39,7 @@ import AdminBlog from "@/pages/admin-blog";
 import AdminLogin from "@/pages/admin-login";
 import NotFound from "@/pages/not-found";
 import BuilderPage from "@/pages/builder";
+import ClerkTest from "@/pages/clerk-test";
 
 // Initialize Builder.io if API key is available
 const BUILDER_API_KEY = import.meta.env.VITE_BUILDER_API_KEY || "";
@@ -88,6 +89,7 @@ function Router() {
       <Route path="/auth/sign-up" component={AuthWrapper} />
       <Route path="/auth/verify" component={ResetPassword} />
       <Route path="/cms" component={BuilderPage} />
+      <Route path="/clerk-test" component={ClerkTest} />
       <Route component={CatchAllRoute} />
     </Switch>
   );

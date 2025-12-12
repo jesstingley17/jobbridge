@@ -11,7 +11,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Menu, X, Briefcase, FileText, MessageSquare, LayoutDashboard, Sparkles, User, LogOut, Dna, ClipboardList, Users, CreditCard } from "lucide-react";
-import { useAuth } from "@/hooks/useAuth";
+import { useAuth as useCustomAuth } from "@/hooks/useAuth";
+import { useUser, useClerk, useAuth as useClerkAuth, SignedIn, SignedOut, UserButton } from "@clerk/clerk-react";
 import { Logo } from "./logo";
 
 const navItems = [
@@ -26,10 +27,29 @@ const navItems = [
 export function Navbar() {
   const [isOpen, setIsOpen] = useState(false);
   const [location] = useLocation();
-  const { user, isLoading, isAuthenticated } = useAuth();
+  
+  // Try Clerk first, fallback to custom auth
+  const clerkUser = useUser();
+  const clerkAuth = useClerkAuth();
+  const customAuth = useCustomAuth();
+  const clerk = useClerk();
+  
+  // Determine which auth system to use
+  const CLERK_PUBLISHABLE_KEY = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY || 
+    import.meta.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY || "";
+  
+  const isUsingClerk = !!CLERK_PUBLISHABLE_KEY && clerkAuth.isLoaded;
+  const user = isUsingClerk ? clerkUser.user : customAuth.user;
+  const isLoading = isUsingClerk ? !clerkAuth.isLoaded : customAuth.isLoading;
+  const isAuthenticated = isUsingClerk ? clerkAuth.isSignedIn : customAuth.isAuthenticated;
 
-  const handleLogout = () => {
-    window.location.href = "/api/logout";
+  const handleLogout = async () => {
+    if (isUsingClerk && clerk) {
+      await clerk.signOut();
+      window.location.href = "/";
+    } else {
+      window.location.href = "/api/logout";
+    }
   };
 
   const getInitials = (firstName?: string | null, lastName?: string | null) => {
@@ -37,6 +57,29 @@ export function Navbar() {
     const last = lastName?.charAt(0) || "";
     return (first + last).toUpperCase() || "U";
   };
+
+  // Helper to get user display info (works for both Clerk and custom auth)
+  const getUserDisplayInfo = () => {
+    if (isUsingClerk && clerkUser.user) {
+      return {
+        firstName: clerkUser.user.firstName || "",
+        lastName: clerkUser.user.lastName || "",
+        imageUrl: clerkUser.user.imageUrl || undefined,
+        initials: getInitials(clerkUser.user.firstName, clerkUser.user.lastName),
+      };
+    } else if (user && !isUsingClerk) {
+      const customUser = user as any;
+      return {
+        firstName: customUser.firstName || "",
+        lastName: customUser.lastName || "",
+        imageUrl: customUser.profileImageUrl || undefined,
+        initials: getInitials(customUser.firstName, customUser.lastName),
+      };
+    }
+    return null;
+  };
+
+  const userDisplay = getUserDisplayInfo();
 
   return (
     <>
@@ -72,16 +115,45 @@ export function Navbar() {
             <div className="flex items-center gap-2">
               <ThemeToggle />
               
-              {!isLoading && (
-                isAuthenticated && user ? (
+              {/* Clerk User Button (if using Clerk) */}
+              {isUsingClerk && (
+                <>
+                  <SignedOut>
+                    <Link href="/auth/sign-in">
+                      <Button variant="ghost" data-testid="button-login">
+                        Log In
+                      </Button>
+                    </Link>
+                    <Link href="/auth/sign-up">
+                      <Button className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700" data-testid="button-get-started">
+                        Get Started
+                      </Button>
+                    </Link>
+                  </SignedOut>
+                  <SignedIn>
+                    <UserButton 
+                      afterSignOutUrl="/"
+                      appearance={{
+                        elements: {
+                          avatarBox: "w-8 h-8"
+                        }
+                      }}
+                    />
+                  </SignedIn>
+                </>
+              )}
+              
+              {/* Custom Auth (if not using Clerk) */}
+              {!isUsingClerk && !isLoading && (
+                isAuthenticated && userDisplay ? (
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <Button variant="ghost" className="gap-2" data-testid="button-user-menu">
                         <Avatar className="h-7 w-7">
-                          <AvatarImage src={user.profileImageUrl || undefined} alt={`${user.firstName} ${user.lastName}`} />
-                          <AvatarFallback className="text-xs">{getInitials(user.firstName, user.lastName)}</AvatarFallback>
+                          <AvatarImage src={userDisplay.imageUrl} alt={`${userDisplay.firstName} ${userDisplay.lastName}`} />
+                          <AvatarFallback className="text-xs">{userDisplay.initials}</AvatarFallback>
                         </Avatar>
-                        <span className="hidden sm:inline">{user.firstName}</span>
+                        <span className="hidden sm:inline">{userDisplay.firstName}</span>
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">

@@ -49,10 +49,19 @@ export default function AuthWrapper() {
       });
   }, []);
 
-  // Priority: Builder.io > Clerk > Default Auth
+  // Priority: Builder.io (only if content exists) > Clerk > Default Auth
   // If Builder.io content exists, use it
-  if (BUILDER_API_KEY && (content || isPreviewing)) {
-    if (loading && !isPreviewing) {
+  if (BUILDER_API_KEY && content && !isPreviewing) {
+    return (
+      <div className="builder-auth-page">
+        <BuilderComponent model="page" content={content} />
+      </div>
+    );
+  }
+
+  // If Builder.io is loading and we're previewing, show Builder.io
+  if (BUILDER_API_KEY && isPreviewing) {
+    if (loading) {
       return (
         <div className="flex items-center justify-center min-h-screen">
           <div className="text-center">
@@ -69,7 +78,7 @@ export default function AuthWrapper() {
     );
   }
 
-  // If Clerk is configured, use Clerk auth
+  // If Clerk is configured, use Clerk auth (skip Builder.io if no content)
   if (CLERK_PUBLISHABLE_KEY) {
     return <AuthClerk />;
   }
