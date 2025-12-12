@@ -134,11 +134,17 @@ export function Navbar() {
             <div className="flex items-center gap-2">
               <ThemeToggle />
               
+              {/* Debug: Check if this div renders */}
+              <div style={{ backgroundColor: 'red', padding: '4px', color: 'white', fontSize: '10px' }}>
+                DEBUG: Buttons should be here
+              </div>
+              
               {/* Always show buttons for now (debugging) */}
               <Button 
                 variant="ghost" 
                 data-testid="button-login" 
                 onClick={handleSignInClick}
+                style={{ backgroundColor: 'yellow', color: 'black' }}
               >
                 Log In
               </Button>
@@ -146,6 +152,7 @@ export function Navbar() {
                 className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700" 
                 data-testid="button-get-started" 
                 onClick={handleSignUpClick}
+                style={{ backgroundColor: 'lime', color: 'black' }}
               >
                 Get Started
               </Button>
