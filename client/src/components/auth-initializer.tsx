@@ -43,8 +43,13 @@ export function AuthInitializer() {
       
       if (event === "SIGNED_IN" || event === "TOKEN_REFRESHED") {
         // Sync user data with backend when signed in or token refreshed
-        // Just invalidate - React Query will refetch automatically
-        queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+        // Wait a moment for session to be fully established, then invalidate
+        setTimeout(() => {
+          if (mounted) {
+            console.log("Invalidating user query after", event);
+            queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+          }
+        }, 100);
       } else if (event === "SIGNED_OUT") {
         // Clear user data when signed out
         queryClient.setQueryData(["/api/auth/user"], null);

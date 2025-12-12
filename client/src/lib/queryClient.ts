@@ -20,9 +20,19 @@ async function getAuthToken(): Promise<string | null> {
       return null;
     }
 
-    // If session exists but token is expired, Supabase will auto-refresh
-    // We just need to return the current access token
-    return session?.access_token || null;
+    if (session?.access_token) {
+      // Log token availability for debugging (only in dev)
+      if (import.meta.env.DEV) {
+        console.log("Auth token available:", session.user?.email);
+      }
+      return session.access_token;
+    }
+
+    // No token available
+    if (import.meta.env.DEV) {
+      console.log("No auth token available");
+    }
+    return null;
   } catch (error) {
     console.error("Error in getAuthToken:", error);
     return null;

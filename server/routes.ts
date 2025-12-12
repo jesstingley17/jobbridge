@@ -531,8 +531,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const { supabaseAdmin } = await import('./supabase.js');
           const token = authHeader.replace('Bearer ', '');
           
+          // Log token verification attempt (only in dev)
+          if (process.env.NODE_ENV === 'development') {
+            console.log('Verifying Supabase token, length:', token.length);
+          }
+          
           // Verify token with Supabase
           const { data: { user: supabaseUser }, error } = await supabaseAdmin.auth.getUser(token);
+          
+          if (process.env.NODE_ENV === 'development') {
+            if (error) {
+              console.error('Token verification error:', error.message);
+            } else if (supabaseUser) {
+              console.log('Token verified for user:', supabaseUser.email);
+            }
+          }
           
           if (!error && supabaseUser) {
             // Get user from database using Supabase user ID
