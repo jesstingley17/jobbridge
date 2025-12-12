@@ -2,7 +2,7 @@ import { getStripeSync, getUncachableStripeClient } from './stripeClient.js';
 import { storage } from './storage.js';
 import { db } from './db.js';
 import { sql } from 'drizzle-orm';
-import { users } from '@shared/schema';
+import { users } from '../shared/schema.js';
 import { eq } from 'drizzle-orm';
 
 const PRODUCT_TIER_MAP: Record<string, string> = {

@@ -1,4 +1,4 @@
-import type { Job } from "@shared/schema";
+import type { Job } from "../shared/schema.js";
 
 interface ExternalJobsCache {
   data: Job[];

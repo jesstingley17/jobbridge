@@ -28,7 +28,7 @@ import {
   eventAttendees, type EventAttendee,
   activityFeed, type ActivityFeed,
   notifications, type Notification, type InsertNotification
-} from "@shared/schema";
+} from "../shared/schema.js";
 import bcrypt from "bcrypt";
 import { db } from "./db.js";
 import { eq, ilike, or, and, desc, sql } from "drizzle-orm";
