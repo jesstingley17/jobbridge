@@ -17,20 +17,24 @@ async function getAuthToken(): Promise<string | null> {
     
     if (error) {
       console.error("Error getting session:", error);
+      console.error("Session error details:", error.message);
       return null;
     }
 
     if (session?.access_token) {
-      // Log token availability for debugging (only in dev)
-      if (import.meta.env.DEV) {
-        console.log("Auth token available:", session.user?.email);
-      }
+      // Always log for debugging auth issues
+      console.log("Auth token available:", session.user?.email || session.user?.id);
+      console.log("Token length:", session.access_token.length);
       return session.access_token;
     }
 
     // No token available
-    if (import.meta.env.DEV) {
-      console.log("No auth token available");
+    console.log("No auth token available - user not signed in");
+    if (session) {
+      console.log("Session exists but no access_token:", {
+        hasRefreshToken: !!session.refresh_token,
+        expiresAt: session.expires_at
+      });
     }
     return null;
   } catch (error) {

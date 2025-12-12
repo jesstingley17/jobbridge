@@ -526,23 +526,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       // Try Supabase auth first
       const authHeader = req.headers.authorization;
+      console.log('Auth header present:', !!authHeader);
+      console.log('Auth header starts with Bearer:', authHeader?.startsWith('Bearer '));
+      
       if (authHeader?.startsWith('Bearer ')) {
         try {
+          // Check if Supabase is configured before trying to import
+          const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+          const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+          
+          if (!supabaseUrl || !supabaseServiceRoleKey) {
+            console.error('Supabase not configured:', {
+              hasUrl: !!supabaseUrl,
+              hasServiceKey: !!supabaseServiceRoleKey
+            });
+            return res.status(500).json({ 
+              error: 'Authentication service not configured',
+              message: 'Supabase environment variables are missing'
+            });
+          }
+          
           const { supabaseAdmin } = await import('./supabase.js');
           const token = authHeader.replace('Bearer ', '');
           
-          // Log token verification attempt (only in dev)
-          if (process.env.NODE_ENV === 'development') {
-            console.log('Verifying Supabase token, length:', token.length);
-          }
+          console.log('Verifying Supabase token, length:', token.length);
           
           // Verify token with Supabase
           const { data: { user: supabaseUser }, error } = await supabaseAdmin.auth.getUser(token);
           
-          // Always log in production for debugging (but not sensitive data)
+          // Always log for debugging
           if (error) {
             console.error('Token verification error:', error.message);
             console.error('Error code:', error.status);
+            console.error('Error name:', error.name);
           } else if (supabaseUser) {
             console.log('Token verified for user:', supabaseUser.email || supabaseUser.id);
           }
