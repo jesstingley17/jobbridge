@@ -39,12 +39,20 @@ async function checkSupabaseAuth(req: any): Promise<string | null> {
 }
 
 export const isAuthenticated: RequestHandler = async (req, res, next) => {
-  // Check Supabase auth
+  // Check Supabase auth first
   const supabaseUserId = await checkSupabaseAuth(req);
   if (supabaseUserId) {
     // Set req.user for compatibility with existing code
     req.user = {
       claims: { sub: supabaseUserId }
+    };
+    return next();
+  }
+  
+  // Fallback to session-based auth (for admin login)
+  if (req.session && (req.session as any).userId) {
+    req.user = {
+      claims: { sub: (req.session as any).userId }
     };
     return next();
   }
@@ -55,50 +63,60 @@ export const isAuthenticated: RequestHandler = async (req, res, next) => {
 
 // Admin middleware - checks if user is admin
 export const isAdmin: RequestHandler = async (req: any, res, next) => {
-  // Check Supabase auth
+  let userId: string | null = null;
+  
+  // Check Supabase auth first
   const supabaseUserId = await checkSupabaseAuth(req);
   if (supabaseUserId) {
-    try {
-      const user = await storage.getUser(supabaseUserId);
-      if (!user) {
-        return res.status(401).json({ message: "Unauthorized" });
-      }
-
-      // Check if user has admin role
-      if (user.role === "admin") {
-        req.user = {
-          claims: { sub: supabaseUserId }
-        };
-        return next();
-      }
-
-      // Check admin emails from env
-      const adminEmails = process.env.ADMIN_EMAILS?.split(",").map(e => e.trim()) || [];
-      if (user.email && adminEmails.includes(user.email)) {
-        req.user = {
-          claims: { sub: supabaseUserId }
-        };
-        return next();
-      }
-
-      // Check admin email pattern
-      const adminPattern = process.env.ADMIN_EMAIL_PATTERN;
-      if (adminPattern && user.email) {
-        const regex = new RegExp(adminPattern);
-        if (regex.test(user.email)) {
-          req.user = {
-            claims: { sub: supabaseUserId }
-          };
-          return next();
-        }
-      }
-
-      return res.status(403).json({ message: "Admin access required" });
-    } catch (error) {
-      console.error("Error checking admin access:", error);
-      return res.status(500).json({ message: "Internal server error" });
-    }
+    userId = supabaseUserId;
+  }
+  // Fallback to session-based auth (for admin login)
+  else if (req.session && (req.session as any).userId) {
+    userId = (req.session as any).userId;
   }
   
-  return res.status(401).json({ message: "Unauthorized" });
+  if (!userId) {
+    return res.status(401).json({ message: "Unauthorized" });
+  }
+  
+  try {
+    const user = await storage.getUser(userId);
+    if (!user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+
+    // Check if user has admin role
+    if (user.role === "admin") {
+      req.user = {
+        claims: { sub: userId }
+      };
+      return next();
+    }
+
+    // Check admin emails from env
+    const adminEmails = process.env.ADMIN_EMAILS?.split(",").map(e => e.trim()) || [];
+    if (user.email && adminEmails.includes(user.email)) {
+      req.user = {
+        claims: { sub: userId }
+      };
+      return next();
+    }
+
+    // Check admin email pattern
+    const adminPattern = process.env.ADMIN_EMAIL_PATTERN;
+    if (adminPattern && user.email) {
+      const regex = new RegExp(adminPattern);
+      if (regex.test(user.email)) {
+        req.user = {
+          claims: { sub: userId }
+        };
+        return next();
+      }
+    }
+
+    return res.status(403).json({ message: "Admin access required" });
+  } catch (error) {
+    console.error("Error checking admin access:", error);
+    return res.status(500).json({ message: "Internal server error" });
+  }
 };
