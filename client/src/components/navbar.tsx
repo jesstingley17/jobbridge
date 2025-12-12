@@ -52,14 +52,16 @@ export function Navbar() {
 
   const handleSignInClick = (e: React.MouseEvent) => {
     e.preventDefault();
-    console.log("Sign In button clicked, navigating to /auth/sign-in");
-    setLocation("/auth/sign-in");
+    console.log("Sign In button clicked, redirecting to Clerk hosted page");
+    // Redirect to Clerk's hosted sign-in page
+    window.location.href = "https://accounts.thejobbridge-inc.com/sign-in";
   };
 
   const handleSignUpClick = (e: React.MouseEvent) => {
     e.preventDefault();
-    console.log("Sign Up button clicked, navigating to /auth/sign-up");
-    setLocation("/auth/sign-up");
+    console.log("Sign Up button clicked, redirecting to Clerk hosted page");
+    // Redirect to Clerk's hosted sign-up page
+    window.location.href = "https://accounts.thejobbridge-inc.com/sign-up";
   };
 
   const handleLogout = async () => {
