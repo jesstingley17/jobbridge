@@ -99,7 +99,10 @@ function App() {
   // If Clerk is configured, wrap with ClerkProvider
   if (CLERK_PUBLISHABLE_KEY) {
     return (
-      <ClerkProvider publishableKey={CLERK_PUBLISHABLE_KEY}>
+      <ClerkProvider 
+        publishableKey={CLERK_PUBLISHABLE_KEY}
+        domain="thejobbridge-inc.com"
+      >
         <QueryClientProvider client={queryClient}>
           <TooltipProvider>
             <SubscriptionProvider>

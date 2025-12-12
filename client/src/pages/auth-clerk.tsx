@@ -45,7 +45,7 @@ export default function AuthClerk() {
             <div className="w-full" style={{ minWidth: '100%' }}>
               {CLERK_PUBLISHABLE_KEY ? (
                 <SignUp
-                  routing="path"
+                  routing="hash"
                   path="/auth/sign-up"
                   signInUrl="/auth/sign-in"
                   afterSignUpUrl="/early-access"
@@ -67,7 +67,7 @@ export default function AuthClerk() {
             <div className="w-full" style={{ minWidth: '100%' }}>
               {CLERK_PUBLISHABLE_KEY ? (
                 <SignIn
-                  routing="path"
+                  routing="hash"
                   path="/auth/sign-in"
                   signUpUrl="/auth/sign-up"
                   afterSignInUrl="/early-access"
