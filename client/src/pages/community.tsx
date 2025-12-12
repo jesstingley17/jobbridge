@@ -33,9 +33,14 @@ export default function Community() {
   const [connectMessage, setConnectMessage] = useState("");
   const [selectedMentor, setSelectedMentor] = useState<MentorWithUser | null>(null);
 
+  // All hooks must be called before any conditional returns
   const { data: currentUser, isLoading: userLoading } = useQuery<User>({
     queryKey: ["/api/auth/user"],
     retry: false,
+  });
+
+  const { data: mentors, isLoading: mentorsLoading } = useQuery<MentorWithUser[]>({
+    queryKey: ["/api/mentors"],
   });
   
   // Show loading state while checking auth
@@ -46,10 +51,6 @@ export default function Community() {
       </div>
     );
   }
-
-  const { data: mentors, isLoading: mentorsLoading } = useQuery<MentorWithUser[]>({
-    queryKey: ["/api/mentors"],
-  });
 
   const connectMutation = useMutation({
     mutationFn: async ({ mentorId, message }: { mentorId: string; message: string }) => {

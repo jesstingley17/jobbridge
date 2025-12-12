@@ -55,7 +55,15 @@ export const getQueryFn: <T>(options: {
       headers,
     });
 
+    // Handle 401 Unauthorized - return null if configured to do so
     if (unauthorizedBehavior === "returnNull" && res.status === 401) {
+      return null;
+    }
+
+    // For auth/user endpoint, also handle 500 errors gracefully (return null)
+    // This prevents the app from breaking if the auth endpoint has temporary issues
+    if (queryKey[0] === "/api/auth/user" && res.status === 500) {
+      console.warn("Auth endpoint returned 500, treating as unauthenticated");
       return null;
     }
 

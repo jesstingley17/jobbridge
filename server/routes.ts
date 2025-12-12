@@ -530,11 +530,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
         try {
           const { supabaseAdmin } = await import('./supabase.js');
           const token = authHeader.replace('Bearer ', '');
+          
+          // Verify token with Supabase
           const { data: { user: supabaseUser }, error } = await supabaseAdmin.auth.getUser(token);
           
           if (!error && supabaseUser) {
             // Get user from database using Supabase user ID
-            let user = await storage.getUser(supabaseUser.id);
+            let user;
+            try {
+              user = await storage.getUser(supabaseUser.id);
+            } catch (getUserError: any) {
+              console.error('Error getting user from database:', getUserError);
+              // If it's a database connection error, return 500
+              if (getUserError.code === '42P01' || getUserError.message?.includes('does not exist')) {
+                console.error('Database tables not found');
+                return res.status(500).json({ 
+                  error: 'Database not initialized',
+                  message: 'Database tables do not exist. Please run migrations.'
+                });
+              }
+              // For other errors, try to continue
+            }
             
             // If user doesn't exist in our database yet, create it from Supabase data
             if (!user && supabaseUser.email) {
@@ -552,8 +568,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 });
               } catch (upsertError: any) {
                 console.error('Error upserting user:', upsertError);
-                // Continue - try to get user again
-                user = await storage.getUser(supabaseUser.id);
+                console.error('Upsert error stack:', upsertError.stack);
+                // If it's a database error, return 500
+                if (upsertError.code === '42P01' || upsertError.message?.includes('does not exist')) {
+                  return res.status(500).json({ 
+                    error: 'Database not initialized',
+                    message: 'Database tables do not exist. Please run migrations.'
+                  });
+                }
+                // Try to get user again as fallback
+                try {
+                  user = await storage.getUser(supabaseUser.id);
+                } catch (retryError) {
+                  console.error('Error retrying getUser:', retryError);
+                }
               }
             }
             
@@ -562,21 +590,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
             }
           } else if (error) {
             console.error('Supabase token verification error:', error);
-            // Continue to fallback auth instead of failing immediately
+            // Invalid token - return 401 instead of 500
+            return res.status(401).json({ error: 'Not authenticated', message: 'Invalid token' });
           }
         } catch (supabaseError: any) {
           console.error('Error verifying Supabase token:', supabaseError);
           console.error('Supabase error stack:', supabaseError.stack);
-          // Continue to fallback auth
+          // If Supabase client failed to initialize, return 500
+          if (supabaseError.message?.includes('SUPABASE') || supabaseError.message?.includes('environment')) {
+            return res.status(500).json({ 
+              error: 'Authentication service unavailable',
+              message: 'Supabase configuration error'
+            });
+          }
+          // For other errors, continue to fallback auth
         }
       }
       
       // Fallback to legacy session-based auth
       if (req.user?.claims?.sub) {
-        const userId = req.user.claims.sub;
-        const user = await storage.getUser(userId);
-        if (user) {
-          return res.json(user);
+        try {
+          const userId = req.user.claims.sub;
+          const user = await storage.getUser(userId);
+          if (user) {
+            return res.json(user);
+          }
+        } catch (getUserError: any) {
+          console.error('Error getting user from session:', getUserError);
+          // If it's a database error, return 500
+          if (getUserError.code === '42P01' || getUserError.message?.includes('does not exist')) {
+            return res.status(500).json({ 
+              error: 'Database not initialized',
+              message: 'Database tables do not exist. Please run migrations.'
+            });
+          }
         }
       }
       
@@ -585,6 +632,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       console.error("Error fetching user:", error);
       console.error("Error stack:", error.stack);
+      // Only return 500 for unexpected errors, not for missing auth
       res.status(500).json({ 
         message: "Failed to fetch user", 
         error: process.env.NODE_ENV === 'development' ? error.message : undefined,
