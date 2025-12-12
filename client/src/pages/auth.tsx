@@ -74,12 +74,20 @@ export default function Auth() {
       setLocation("/early-access");
     },
     onError: (error: any) => {
-      setLoginError(error.message || "Login failed. Please check your credentials.");
+      console.error("Login error:", error);
+      const errorMessage = error.message || error.toString() || "Login failed. Please check your credentials.";
+      setLoginError(errorMessage);
     },
   });
 
   const registerMutation = useMutation({
     mutationFn: async (data: { email: string; password: string; firstName: string; lastName?: string; termsAccepted: boolean; marketingConsent?: boolean }) => {
+      // Check if Supabase is configured
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+      if (!supabaseUrl || supabaseUrl.includes('placeholder')) {
+        throw new Error("Supabase is not configured. Please contact support.");
+      }
+
       // Sign up with Supabase
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email: data.email,
@@ -91,35 +99,55 @@ export default function Auth() {
             terms_accepted: data.termsAccepted,
             marketing_consent: data.marketingConsent,
           },
+          emailRedirectTo: `${window.location.origin}/early-access`,
         },
       });
-      if (authError) throw authError;
+      
+      if (authError) {
+        console.error("Supabase signup error:", authError);
+        throw new Error(authError.message || "Registration failed. Please try again.");
+      }
+
+      if (!authData.user) {
+        throw new Error("Registration failed. No user data returned.");
+      }
       
       // Sync user to your database via API
-      if (authData.user) {
-        try {
-          await apiRequest("POST", "/api/auth/sync-supabase-user", {
-            supabaseUserId: authData.user.id,
-            email: data.email,
-            firstName: data.firstName,
-            lastName: data.lastName,
-            termsAccepted: data.termsAccepted,
-            marketingConsent: data.marketingConsent,
-          });
-        } catch (syncError) {
-          console.error("Failed to sync user to database:", syncError);
-          // Don't fail registration if sync fails
-        }
+      try {
+        await apiRequest("POST", "/api/auth/sync-supabase-user", {
+          supabaseUserId: authData.user.id,
+          email: data.email,
+          firstName: data.firstName,
+          lastName: data.lastName,
+          termsAccepted: data.termsAccepted,
+          marketingConsent: data.marketingConsent,
+        });
+      } catch (syncError: any) {
+        console.error("Failed to sync user to database:", syncError);
+        // If sync fails, still allow registration but log the error
+        // The user can still use the app, we'll sync later if needed
       }
       
       return authData;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
-      setLocation("/early-access");
+    onSuccess: (data) => {
+      // Check if email confirmation is required
+      if (data.user && !data.session) {
+        // Email confirmation required
+        setRegisterError("");
+        queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+        // Show success message instead of redirecting
+        setLocation("/early-access?confirm=email");
+      } else {
+        // User is signed in immediately
+        queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+        setLocation("/early-access");
+      }
     },
     onError: (error: any) => {
-      setRegisterError(error.message || "Registration failed. Please try again.");
+      console.error("Registration error:", error);
+      const errorMessage = error.message || error.toString() || "Registration failed. Please try again.";
+      setRegisterError(errorMessage);
     },
   });
 
