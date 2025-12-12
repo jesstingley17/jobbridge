@@ -1,6 +1,8 @@
 import { build as esbuild } from "esbuild";
 import { build as viteBuild } from "vite";
-import { rm, readFile } from "fs/promises";
+import { rm, readFile, cp } from "fs/promises";
+import { existsSync } from "fs";
+import { join } from "path";
 
 // server deps to bundle to reduce openat(2) syscalls
 // which helps cold start times
@@ -62,7 +64,35 @@ async function buildAll() {
     alias: {
       "@shared": "./shared",
     },
+    plugins: [
+      {
+        name: "resolve-shared",
+        setup(build) {
+          // Resolve @shared/schema imports
+          build.onResolve({ filter: /^@shared\/schema$/ }, (args) => {
+            return { path: join(process.cwd(), "shared/schema.ts") };
+          });
+          // Resolve ../shared/schema imports
+          build.onResolve({ filter: /^\.\.\/shared\/schema$/ }, (args) => {
+            return { path: join(process.cwd(), "shared/schema.ts") };
+          });
+          // Resolve @shared/* imports
+          build.onResolve({ filter: /^@shared\// }, (args) => {
+            const path = args.path.replace("@shared/", "");
+            return { path: join(process.cwd(), "shared", path) };
+          });
+        },
+      },
+    ],
   });
+
+  // Copy shared directory to dist and api for Vercel serverless functions
+  if (existsSync("shared")) {
+    console.log("copying shared directory...");
+    await cp("shared", "dist/shared", { recursive: true });
+    // Also copy to api directory for Vercel serverless functions
+    await cp("shared", "api/shared", { recursive: true });
+  }
 }
 
 buildAll().catch((err) => {
