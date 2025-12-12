@@ -116,9 +116,8 @@ async function initializeApp() {
         console.error('Env validation error:', envErr.message);
         throw envErr;
       }
-      // For Vercel: Just setup session middleware without Replit Auth
-      // We use Supabase for authentication, not Replit OIDC
-      const { getSession } = await import('../server/replitAuth.js');
+      // Setup session middleware (Supabase handles authentication)
+      const { getSession } = await import('../server/auth.js');
       app.set("trust proxy", 1);
       app.use(getSession());
 

@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage.js";
-import { setupAuth, isAuthenticated, isAdmin } from "./replitAuth.js";
+import { isAuthenticated, isAdmin } from "./auth.js";
 import OpenAI from "openai";
 import { z } from "zod";
 import { getExternalJobs } from "./externalJobs.js";
@@ -185,16 +185,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  // Note: setupAuth is called in api/index.ts for Vercel
-  // For local development, it's called in server/index.ts
-  // SKIP Replit Auth setup on Vercel - we use Supabase instead
-  if (!process.env.VERCEL && !app.get('authInitialized')) {
-    // Only setup Replit Auth if we're on Replit (has REPL_ID)
-    if (process.env.REPL_ID) {
-      await setupAuth(app);
-      app.set('authInitialized', true);
-    }
-  }
+  // Auth is handled by Supabase - no setup needed
 
   // Seed initial data on startup
   // Seed data removed - using real job search API
