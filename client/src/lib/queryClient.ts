@@ -88,6 +88,20 @@ export const getQueryFn: <T>(options: {
     // For auth/user endpoint, also handle 500 errors gracefully (return null)
     // This prevents the app from breaking if the auth endpoint has temporary issues
     if (queryKey[0] === "/api/auth/user" && res.status === 500) {
+      // Try to get error details from response
+      try {
+        const errorText = await res.text();
+        console.error("Auth endpoint returned 500:", errorText);
+        // Try to parse as JSON
+        try {
+          const errorJson = JSON.parse(errorText);
+          console.error("Error details:", errorJson);
+        } catch {
+          // Not JSON, just log the text
+        }
+      } catch (e) {
+        console.error("Could not read error response:", e);
+      }
       console.warn("Auth endpoint returned 500, treating as unauthenticated");
       return null;
     }

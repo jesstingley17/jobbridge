@@ -660,20 +660,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.error("Error name:", error.name);
       console.error("Error message:", error.message);
       console.error("Error stack:", error.stack);
+      console.error("Error code:", error.code);
       
       // Check if it's a known error type
       if (error.code === '42P01' || error.message?.includes('does not exist')) {
         return res.status(500).json({ 
           error: 'Database not initialized',
-          message: 'Database tables do not exist. Please run migrations.'
+          message: 'Database tables do not exist. Please run migrations.',
+          code: error.code
         });
       }
       
-      // For other unexpected errors, return 500 with details in dev
+      // Check for Supabase initialization errors
+      if (error.message?.includes('SUPABASE') || error.message?.includes('Missing')) {
+        return res.status(500).json({ 
+          error: 'Authentication service unavailable',
+          message: 'Supabase configuration error',
+          details: error.message
+        });
+      }
+      
+      // For other unexpected errors, return 500 with details
       res.status(500).json({ 
         message: "Failed to fetch user", 
-        error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error',
-        stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+        error: error.message || 'Internal server error',
+        code: error.code,
+        // Include stack in production for debugging (but not sensitive data)
+        stack: error.stack ? error.stack.split('\n').slice(0, 5).join('\n') : undefined
       });
     }
   });
