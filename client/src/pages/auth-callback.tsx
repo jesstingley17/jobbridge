@@ -46,7 +46,10 @@ export default function AuthCallback() {
         }
 
         // Redirect to early access
-        setLocation("/early-access");
+              // Invalidate and refetch user data
+              await queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+              await queryClient.refetchQueries({ queryKey: ["/api/auth/user"] });
+              setLocation("/early-access");
       } catch (err: any) {
         console.error("Auth callback error:", err);
         setError(err.message || "Authentication failed");
