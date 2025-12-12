@@ -1,4 +1,6 @@
 // Vercel serverless function wrapper for Express app
+// IMPORTANT: This file must be able to resolve @shared/schema
+// The shared directory is copied to api/shared during build
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import express from 'express';
 import compression from 'compression';
@@ -6,6 +8,10 @@ import { registerRoutes } from '../server/routes.js';
 import { serveStatic } from '../server/static.js';
 import { setupAuth } from '../server/replitAuth.js';
 import { ensureEnvWarn, ensureEnvOrThrow } from '../server/env.js';
+
+// Ensure shared schema is accessible - Vercel needs this at runtime
+// The build script copies shared/ to api/shared/, but we need to ensure
+// the module resolution works. The package.json imports should handle this.
 
 // Create Express app instance
 const app = express();

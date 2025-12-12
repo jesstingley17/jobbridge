@@ -91,6 +91,7 @@ async function buildAll() {
     console.log("copying shared directory...");
     await cp("shared", "dist/shared", { recursive: true });
     // Also copy to api directory for Vercel serverless functions
+    // Vercel runs api/index.ts directly, so it needs shared/ accessible
     await cp("shared", "api/shared", { recursive: true });
   }
 }

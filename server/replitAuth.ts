@@ -113,6 +113,14 @@ async function upsertUser(claims: any) {
 }
 
 export async function setupAuth(app: Express) {
+  // Skip OIDC setup if not on Replit (use Supabase instead)
+  if (!process.env.REPL_ID) {
+    console.log('Skipping Replit Auth setup - using Supabase');
+    app.set("trust proxy", 1);
+    app.use(getSession());
+    return;
+  }
+
   app.set("trust proxy", 1);
   app.use(getSession());
   app.use(passport.initialize());
