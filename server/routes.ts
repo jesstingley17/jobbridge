@@ -187,10 +187,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   // Note: setupAuth is called in api/index.ts for Vercel
   // For local development, it's called in server/index.ts
-  // This prevents double initialization
-  if (!app.get('authInitialized')) {
-    await setupAuth(app);
-    app.set('authInitialized', true);
+  // SKIP Replit Auth setup on Vercel - we use Supabase instead
+  if (!process.env.VERCEL && !app.get('authInitialized')) {
+    // Only setup Replit Auth if we're on Replit (has REPL_ID)
+    if (process.env.REPL_ID) {
+      await setupAuth(app);
+      app.set('authInitialized', true);
+    }
   }
 
   // Seed initial data on startup

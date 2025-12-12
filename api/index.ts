@@ -6,7 +6,7 @@ import express from 'express';
 import compression from 'compression';
 import { registerRoutes } from '../server/routes.js';
 import { serveStatic } from '../server/static.js';
-import { setupAuth } from '../server/replitAuth.js';
+// Don't import setupAuth - we handle auth differently on Vercel
 import { ensureEnvWarn, ensureEnvOrThrow } from '../server/env.js';
 
 // Ensure shared schema is accessible - Vercel needs this at runtime
@@ -116,16 +116,11 @@ async function initializeApp() {
         console.error('Env validation error:', envErr.message);
         throw envErr;
       }
-      // Setup authentication (skip Replit Auth if using Supabase)
-      // Only setup Replit Auth if REPL_ID is set (for Replit deployments)
-      if (process.env.REPL_ID) {
-        await setupAuth(app);
-      } else {
-        // For Vercel/Supabase: Just setup session middleware without OIDC
-        const { getSession } = await import('../server/replitAuth.js');
-        app.set("trust proxy", 1);
-        app.use(getSession());
-      }
+      // For Vercel: Just setup session middleware without Replit Auth
+      // We use Supabase for authentication, not Replit OIDC
+      const { getSession } = await import('../server/replitAuth.js');
+      app.set("trust proxy", 1);
+      app.use(getSession());
 
       // Register all routes
       await registerRoutes(app);
