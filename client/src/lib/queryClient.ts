@@ -9,9 +9,24 @@ async function throwIfResNotOk(res: Response) {
 }
 
 // Get Supabase session token
+// This function ensures we always get the latest session, including after refresh
 async function getAuthToken(): Promise<string | null> {
-  const { data: { session } } = await supabase.auth.getSession();
-  return session?.access_token || null;
+  try {
+    // Get the current session (Supabase handles persistence automatically)
+    const { data: { session }, error } = await supabase.auth.getSession();
+    
+    if (error) {
+      console.error("Error getting session:", error);
+      return null;
+    }
+
+    // If session exists but token is expired, Supabase will auto-refresh
+    // We just need to return the current access token
+    return session?.access_token || null;
+  } catch (error) {
+    console.error("Error in getAuthToken:", error);
+    return null;
+  }
 }
 
 export async function apiRequest(

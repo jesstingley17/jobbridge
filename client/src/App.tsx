@@ -8,6 +8,7 @@ import { Navbar } from "@/components/navbar";
 import { Footer } from "@/components/footer";
 import { AIChatAssistant } from "@/components/ai-chat-assistant";
 import { CookieConsent } from "@/components/cookie-consent";
+import { AuthInitializer } from "@/components/auth-initializer";
 import { SubscriptionProvider } from "@/contexts/subscription-context";
 import { builder } from "@builder.io/react";
 import { registerBuilderComponents } from "@/lib/builder-registry";
@@ -96,6 +97,7 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <SubscriptionProvider>
+          <AuthInitializer />
           <div className="flex min-h-screen flex-col">
             <Navbar />
             <main id="main-content" className="flex-1">
