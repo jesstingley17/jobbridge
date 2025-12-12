@@ -100,12 +100,19 @@ async function buildAll() {
   if (existsSync("server/middleware")) {
     console.log("copying server/middleware directory...");
     // Ensure api/server directory exists
-    if (!existsSync("api/server")) {
-      await cp("server", "api/server", { recursive: true });
-    } else {
-      // Just copy middleware if server already exists
-      await cp("server/middleware", "api/server/middleware", { recursive: true });
+    const apiServerPath = "api/server";
+    if (!existsSync(apiServerPath)) {
+      // Create api/server directory structure
+      await mkdir(apiServerPath, { recursive: true });
     }
+    // Copy middleware directory
+    const apiMiddlewarePath = join(apiServerPath, "middleware");
+    // Remove existing middleware if it exists to avoid conflicts
+    if (existsSync(apiMiddlewarePath)) {
+      await rm(apiMiddlewarePath, { recursive: true, force: true });
+    }
+    await cp("server/middleware", apiMiddlewarePath, { recursive: true });
+    console.log("✓ Middleware copied successfully");
   }
 }
 

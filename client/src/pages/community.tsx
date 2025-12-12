@@ -37,7 +37,7 @@ export default function Community() {
   const [selectedMentor, setSelectedMentor] = useState<MentorWithUser | null>(null);
 
   // Use useAuth hook for authentication state
-  const { user: currentUser, isLoading: userLoading, isAuthenticated, error: userError } = useAuth();
+  const { user: currentUser, isLoading: userLoading, isAuthenticated, error: userError, clientSession } = useAuth();
 
   const { data: mentors, isLoading: mentorsLoading } = useQuery<MentorWithUser[]>({
     queryKey: ["/api/mentors"],
@@ -78,7 +78,12 @@ export default function Community() {
   };
 
   // Check if user is authenticated
-  if (!isAuthenticated || !currentUser) {
+  // Allow access if we have a client session (Supabase session) even if backend user query fails
+  // This provides better UX - user can still access community if backend is temporarily unavailable
+  const hasClientSession = clientSession !== null;
+  const canAccess = isAuthenticated || hasClientSession;
+  
+  if (!canAccess) {
     // If there was an error, show more helpful message
     if (userError) {
       console.error("Auth error in community:", userError);
@@ -90,7 +95,7 @@ export default function Community() {
           {userError ? "There was an error checking your authentication. Please try logging in again." : "You need to be logged in to view the community."}
         </p>
         <Button onClick={() => setLocation("/auth")}>
-          <a href="/auth" data-testid="link-login-community">Log In</a>
+          Log In
         </Button>
       </div>
     );
@@ -152,7 +157,7 @@ export default function Community() {
         <TabsContent value="mentors" className="space-y-6">
           <div className="flex items-center justify-between gap-4 flex-wrap">
             <h2 className="text-xl font-semibold">Available Mentors</h2>
-            <Badge variant="outline">{mentors?.length || 0} mentors available</Badge>
+            <Badge variant="outline">{Array.isArray(mentors) ? mentors.length : 0} mentors available</Badge>
           </div>
 
           {mentorsLoading ? (
