@@ -42,8 +42,19 @@ export function Navbar() {
   };
 
   const handleLogout = async () => {
-    await supabase.auth.signOut();
-    window.location.href = "/";
+    try {
+      await supabase.auth.signOut();
+      // Clear query cache
+      const { queryClient } = await import("@/lib/queryClient");
+      queryClient.setQueryData(["/api/auth/user"], null);
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+      // Redirect to home
+      setLocation("/");
+    } catch (error) {
+      console.error("Logout error:", error);
+      // Still redirect even if signOut fails
+      setLocation("/");
+    }
   };
 
   const getInitials = (firstName?: string | null, lastName?: string | null) => {
@@ -122,37 +133,48 @@ export function Navbar() {
               )}
               
               {/* Show user menu when authenticated */}
-              {isAuthenticated && userDisplay && (
+              {isAuthenticated && (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button variant="ghost" className="gap-2" data-testid="button-user-menu">
                       <Avatar className="h-7 w-7">
-                        <AvatarImage src={userDisplay.imageUrl} alt={`${userDisplay.firstName} ${userDisplay.lastName}`} />
-                        <AvatarFallback className="text-xs">{userDisplay.initials}</AvatarFallback>
+                        {userDisplay ? (
+                          <>
+                            <AvatarImage src={userDisplay.imageUrl} alt={`${userDisplay.firstName} ${userDisplay.lastName}`} />
+                            <AvatarFallback className="text-xs">{userDisplay.initials}</AvatarFallback>
+                          </>
+                        ) : (
+                          <AvatarFallback className="text-xs">U</AvatarFallback>
+                        )}
                       </Avatar>
-                      <span className="hidden sm:inline">{userDisplay.firstName}</span>
+                      {userDisplay && <span className="hidden sm:inline">{userDisplay.firstName}</span>}
+                      {!userDisplay && <span className="hidden sm:inline">User</span>}
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
-                    <DropdownMenuItem asChild>
-                      <Link href="/profile" className="flex items-center gap-2" data-testid="link-profile">
-                        <User className="h-4 w-4" />
-                        Profile
-                      </Link>
-                    </DropdownMenuItem>
-                    <DropdownMenuItem asChild>
-                      <Link href="/career-dna" className="flex items-center gap-2" data-testid="link-career-dna">
-                        <Dna className="h-4 w-4" />
-                        Career DNA
-                      </Link>
-                    </DropdownMenuItem>
-                    <DropdownMenuItem asChild>
-                      <Link href="/applications" className="flex items-center gap-2" data-testid="link-applications">
-                        <ClipboardList className="h-4 w-4" />
-                        My Applications
-                      </Link>
-                    </DropdownMenuItem>
-                    <DropdownMenuSeparator />
+                    {userDisplay && (
+                      <>
+                        <DropdownMenuItem asChild>
+                          <Link href="/profile" className="flex items-center gap-2" data-testid="link-profile">
+                            <User className="h-4 w-4" />
+                            Profile
+                          </Link>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem asChild>
+                          <Link href="/career-dna" className="flex items-center gap-2" data-testid="link-career-dna">
+                            <Dna className="h-4 w-4" />
+                            Career DNA
+                          </Link>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem asChild>
+                          <Link href="/applications" className="flex items-center gap-2" data-testid="link-applications">
+                            <ClipboardList className="h-4 w-4" />
+                            My Applications
+                          </Link>
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                      </>
+                    )}
                     <DropdownMenuItem onClick={handleLogout} data-testid="button-logout">
                       <LogOut className="h-4 w-4 mr-2" />
                       Log out

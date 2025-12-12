@@ -8,6 +8,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
+import { useLocation } from "wouter";
 import { 
   Users, UserPlus, MessageCircle, Star, Loader2, Briefcase, Code,
   Home, Users2, Calendar, MessageSquare, Bell
@@ -30,18 +32,12 @@ type MentorWithUser = {
 
 export default function Community() {
   const { toast } = useToast();
+  const [, setLocation] = useLocation();
   const [connectMessage, setConnectMessage] = useState("");
   const [selectedMentor, setSelectedMentor] = useState<MentorWithUser | null>(null);
 
-  // All hooks must be called before any conditional returns
-  const { data: currentUser, isLoading: userLoading, error: userError } = useQuery<User>({
-    queryKey: ["/api/auth/user"],
-    retry: false,
-    // Add error handling to see what's happening
-    onError: (error) => {
-      console.error("Error fetching user in community page:", error);
-    },
-  });
+  // Use useAuth hook for authentication state
+  const { user: currentUser, isLoading: userLoading, isAuthenticated, error: userError } = useAuth();
 
   const { data: mentors, isLoading: mentorsLoading } = useQuery<MentorWithUser[]>({
     queryKey: ["/api/mentors"],
@@ -85,8 +81,8 @@ export default function Community() {
     }
   };
 
-  // Check if user is authenticated - if error is 500, it might be a backend issue, not auth
-  if (!currentUser) {
+  // Check if user is authenticated
+  if (!isAuthenticated || !currentUser) {
     // If there was an error, show more helpful message
     if (userError) {
       console.error("Auth error in community:", userError);
@@ -95,9 +91,9 @@ export default function Community() {
       <div className="container mx-auto px-4 py-16 text-center">
         <h1 className="text-2xl font-bold mb-4">Please log in to access the community</h1>
         <p className="text-muted-foreground mb-4">
-          {userError ? "There was an error checking your authentication. Please try logging in again." : ""}
+          {userError ? "There was an error checking your authentication. Please try logging in again." : "You need to be logged in to view the community."}
         </p>
-        <Button asChild>
+        <Button onClick={() => setLocation("/auth")}>
           <a href="/auth" data-testid="link-login-community">Log In</a>
         </Button>
       </div>
