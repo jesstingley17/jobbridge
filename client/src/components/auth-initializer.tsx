@@ -22,9 +22,8 @@ export function AuthInitializer() {
 
         if (session && mounted) {
           console.log("Session restored:", session.user.email);
-          // Invalidate and refetch user data to sync with backend
-          await queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
-          await queryClient.refetchQueries({ queryKey: ["/api/auth/user"] });
+          // Invalidate user data - React Query will refetch automatically
+          queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
         }
       } catch (error) {
         console.error("Error initializing auth:", error);
@@ -44,8 +43,8 @@ export function AuthInitializer() {
       
       if (event === "SIGNED_IN" || event === "TOKEN_REFRESHED") {
         // Sync user data with backend when signed in or token refreshed
-        await queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
-        await queryClient.refetchQueries({ queryKey: ["/api/auth/user"] });
+        // Just invalidate - React Query will refetch automatically
+        queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
       } else if (event === "SIGNED_OUT") {
         // Clear user data when signed out
         queryClient.setQueryData(["/api/auth/user"], null);

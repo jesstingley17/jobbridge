@@ -94,6 +94,8 @@ export const queryClient = new QueryClient({
       refetchOnWindowFocus: true, // Refetch when window regains focus
       staleTime: 0, // Always consider data stale to get fresh auth state
       retry: false,
+      // Refetch immediately when query is invalidated (for faster auth sync)
+      refetchOnMount: true,
     },
     mutations: {
       retry: false,

@@ -69,12 +69,10 @@ export default function Auth() {
       if (error) throw error;
       return authData;
     },
-    onSuccess: async () => {
-      // Wait a bit for Supabase session to be fully established
-      await new Promise(resolve => setTimeout(resolve, 100));
-      // Invalidate and refetch user data
-      await queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
-      await queryClient.refetchQueries({ queryKey: ["/api/auth/user"] });
+    onSuccess: () => {
+      // Invalidate user data (will be refetched automatically by AuthInitializer)
+      // Don't wait - redirect immediately for faster UX
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
       setLocation("/early-access");
     },
     onError: (error: any) => {
@@ -150,10 +148,9 @@ export default function Auth() {
         // Show success message instead of redirecting
         setLocation("/early-access?confirm=email");
       } else {
-        // Wait a bit for Supabase session to be fully established
-        await new Promise(resolve => setTimeout(resolve, 100));
-        await queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
-        await queryClient.refetchQueries({ queryKey: ["/api/auth/user"] });
+        // Invalidate user data (will be refetched automatically by AuthInitializer)
+        // Don't wait - redirect immediately for faster UX
+        queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
         setLocation("/early-access");
       }
     },
