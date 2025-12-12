@@ -2,6 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage.js";
 import { isAuthenticated, isAdmin } from "./auth.js";
+import { requireSupabaseAuth } from "./middleware/supabaseAuth.js";
 import OpenAI from "openai";
 import { z } from "zod";
 import { getExternalJobs } from "./externalJobs.js";
@@ -521,158 +522,85 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Auth routes - support both Supabase and legacy auth
-  app.get('/api/auth/user', async (req: any, res) => {
+  // Auth routes - use JWT verification middleware
+  app.get('/api/auth/user', requireSupabaseAuth(), async (req: any, res) => {
     try {
-      // Try Supabase auth first
-      const authHeader = req.headers.authorization;
-      console.log('Auth header present:', !!authHeader);
-      console.log('Auth header starts with Bearer:', authHeader?.startsWith('Bearer '));
+      // JWT has been verified by middleware, user info is in req.supabaseUser
+      const supabaseUser = req.supabaseUser;
       
-      if (authHeader?.startsWith('Bearer ')) {
+      if (!supabaseUser || !supabaseUser.id) {
+        return res.status(401).json({ error: 'Not authenticated' });
+      }
+
+      // Get user from database using Supabase user ID
+      let user;
+      try {
+        user = await storage.getUser(supabaseUser.id);
+      } catch (getUserError: any) {
+        console.error('Error getting user from database:', getUserError);
+        // If it's a database connection error, return 500
+        if (getUserError.code === '42P01' || getUserError.message?.includes('does not exist')) {
+          console.error('Database tables not found');
+          return res.status(500).json({ 
+            error: 'Database not initialized',
+            message: 'Database tables do not exist. Please run migrations.'
+          });
+        }
+        // For other errors, try to continue
+      }
+      
+      // If user doesn't exist in our database yet, create it from Supabase data
+      if (!user && supabaseUser.email) {
+        console.log('User not found in database, creating from Supabase user:', supabaseUser.id);
+        
+        // Get full user data from Supabase to get metadata
         try {
-          // Check if Supabase is configured before trying to import
-          const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
-          const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-          
-          if (!supabaseUrl || !supabaseServiceRoleKey) {
-            console.error('Supabase not configured:', {
-              hasUrl: !!supabaseUrl,
-              hasServiceKey: !!supabaseServiceRoleKey
-            });
-            return res.status(500).json({ 
-              error: 'Authentication service not configured',
-              message: 'Supabase environment variables are missing'
-            });
-          }
-          
           const { getSupabaseAdmin } = await import('./supabase.js');
           const supabaseAdmin = getSupabaseAdmin();
-          const token = authHeader.replace('Bearer ', '');
+          const { data: { user: fullSupabaseUser } } = await supabaseAdmin.auth.admin.getUserById(supabaseUser.id);
           
-          console.log('Verifying Supabase token, length:', token.length);
-          console.log('Supabase URL:', process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL ? 'SET' : 'MISSING');
-          
-          // Verify token with Supabase
-          const { data: { user: supabaseUser }, error } = await supabaseAdmin.auth.getUser(token);
-          
-          // Always log for debugging
-          if (error) {
-            console.error('Token verification error:', error.message);
-            console.error('Error code:', error.status);
-            console.error('Error name:', error.name);
-          } else if (supabaseUser) {
-            console.log('Token verified for user:', supabaseUser.email || supabaseUser.id);
-          }
-          
-          if (!error && supabaseUser) {
-            // Get user from database using Supabase user ID
-            let user;
+          if (fullSupabaseUser) {
+            const userMetadata = fullSupabaseUser.user_metadata || {};
             try {
-              user = await storage.getUser(supabaseUser.id);
-            } catch (getUserError: any) {
-              console.error('Error getting user from database:', getUserError);
-              // If it's a database connection error, return 500
-              if (getUserError.code === '42P01' || getUserError.message?.includes('does not exist')) {
-                console.error('Database tables not found');
+              user = await storage.upsertUser({
+                id: supabaseUser.id,
+                email: supabaseUser.email,
+                firstName: userMetadata.first_name || userMetadata.full_name?.split(' ')[0] || null,
+                lastName: userMetadata.last_name || userMetadata.full_name?.split(' ').slice(1).join(' ') || null,
+                emailVerified: fullSupabaseUser.email_confirmed_at ? true : false,
+                termsAccepted: userMetadata.terms_accepted || false,
+                marketingConsent: userMetadata.marketing_consent || false,
+              });
+            } catch (upsertError: any) {
+              console.error('Error upserting user:', upsertError);
+              console.error('Upsert error stack:', upsertError.stack);
+              // If it's a database error, return 500
+              if (upsertError.code === '42P01' || upsertError.message?.includes('does not exist')) {
                 return res.status(500).json({ 
                   error: 'Database not initialized',
                   message: 'Database tables do not exist. Please run migrations.'
                 });
               }
-              // For other errors, try to continue
-            }
-            
-            // If user doesn't exist in our database yet, create it from Supabase data
-            if (!user && supabaseUser.email) {
-              console.log('User not found in database, creating from Supabase user:', supabaseUser.id);
-              const userMetadata = supabaseUser.user_metadata || {};
+              // Try to get user again as fallback
               try {
-                user = await storage.upsertUser({
-                  id: supabaseUser.id,
-                  email: supabaseUser.email,
-                  firstName: userMetadata.first_name || userMetadata.full_name?.split(' ')[0] || null,
-                  lastName: userMetadata.last_name || userMetadata.full_name?.split(' ').slice(1).join(' ') || null,
-                  emailVerified: supabaseUser.email_confirmed_at ? true : false,
-                  termsAccepted: userMetadata.terms_accepted || false,
-                  marketingConsent: userMetadata.marketing_consent || false,
-                });
-              } catch (upsertError: any) {
-                console.error('Error upserting user:', upsertError);
-                console.error('Upsert error stack:', upsertError.stack);
-                // If it's a database error, return 500
-                if (upsertError.code === '42P01' || upsertError.message?.includes('does not exist')) {
-                  return res.status(500).json({ 
-                    error: 'Database not initialized',
-                    message: 'Database tables do not exist. Please run migrations.'
-                  });
-                }
-                // Try to get user again as fallback
-                try {
-                  user = await storage.getUser(supabaseUser.id);
-                } catch (retryError) {
-                  console.error('Error retrying getUser:', retryError);
-                }
+                user = await storage.getUser(supabaseUser.id);
+              } catch (retryError) {
+                console.error('Error retrying getUser:', retryError);
               }
             }
-            
-            if (user) {
-              return res.json(user);
-            }
-          } else if (error) {
-            console.error('Supabase token verification error:', error);
-            // Invalid token - return 401 instead of 500
-            return res.status(401).json({ error: 'Not authenticated', message: 'Invalid token' });
           }
         } catch (supabaseError: any) {
-          console.error('Error verifying Supabase token:', supabaseError);
-          console.error('Supabase error stack:', supabaseError.stack);
-          console.error('Supabase error message:', supabaseError.message);
-          console.error('Supabase error name:', supabaseError.name);
-          
-          // If Supabase client failed to initialize, return 500
-          if (supabaseError.message?.includes('SUPABASE') || 
-              supabaseError.message?.includes('environment') ||
-              supabaseError.message?.includes('Missing') ||
-              supabaseError.name === 'Error' && supabaseError.message?.includes('SUPABASE')) {
-            console.error('Supabase configuration error detected');
-            return res.status(500).json({ 
-              error: 'Authentication service unavailable',
-              message: 'Supabase configuration error',
-              details: process.env.NODE_ENV === 'development' ? supabaseError.message : undefined
-            });
-          }
-          // For other errors, log and continue to fallback auth
-          console.warn('Supabase verification failed, trying fallback auth');
+          console.error('Error fetching full user from Supabase:', supabaseError);
+          // Continue without metadata - user will be created with minimal info
         }
       }
       
-      // Fallback to legacy session-based auth
-      if (req.user?.claims?.sub) {
-        try {
-          const userId = req.user.claims.sub;
-          const user = await storage.getUser(userId);
-          if (user) {
-            return res.json(user);
-          }
-        } catch (getUserError: any) {
-          console.error('Error getting user from session:', getUserError);
-          console.error('GetUser error stack:', getUserError.stack);
-          // If it's a database error, return 500
-          if (getUserError.code === '42P01' || getUserError.message?.includes('does not exist')) {
-            return res.status(500).json({ 
-              error: 'Database not initialized',
-              message: 'Database tables do not exist. Please run migrations.'
-            });
-          }
-        }
+      if (user) {
+        return res.json(user);
       }
       
-      // No user found - return 401 but don't throw error (allows frontend to handle gracefully)
-      if (process.env.NODE_ENV === 'development') {
-        console.log('No authentication found - returning 401');
-      }
-      res.status(401).json({ error: 'Not authenticated' });
+      // If we still don't have a user, return 401
+      return res.status(401).json({ error: 'User not found' });
     } catch (error: any) {
       console.error("Unexpected error in /api/auth/user:", error);
       console.error("Error name:", error.name);
@@ -689,22 +617,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
       
-      // Check for Supabase initialization errors
-      if (error.message?.includes('SUPABASE') || error.message?.includes('Missing')) {
-        return res.status(500).json({ 
-          error: 'Authentication service unavailable',
-          message: 'Supabase configuration error',
-          details: error.message
-        });
-      }
-      
       // For other unexpected errors, return 500 with details
       res.status(500).json({ 
         message: "Failed to fetch user", 
         error: error.message || 'Internal server error',
         code: error.code,
-        // Include stack in production for debugging (but not sensitive data)
-        stack: error.stack ? error.stack.split('\n').slice(0, 5).join('\n') : undefined
+        // Include stack in development for debugging
+        stack: process.env.NODE_ENV === 'development' && error.stack ? error.stack.split('\n').slice(0, 5).join('\n') : undefined
       });
     }
   });
