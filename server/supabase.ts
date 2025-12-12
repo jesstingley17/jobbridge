@@ -6,10 +6,12 @@ const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
 const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 if (!supabaseUrl || !supabaseServiceRoleKey) {
-  throw new Error(
-    'Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY environment variables. ' +
-    'Set them in your .env file or deployment environment (Vercel).'
-  );
+  const errorMsg = 'Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY environment variables. ' +
+    'Set them in your .env file or deployment environment (Vercel).';
+  console.error(errorMsg);
+  console.error('SUPABASE_URL:', supabaseUrl ? 'SET' : 'MISSING');
+  console.error('SUPABASE_SERVICE_ROLE_KEY:', supabaseServiceRoleKey ? 'SET' : 'MISSING');
+  throw new Error(errorMsg);
 }
 
 // Server-side Supabase client (bypasses RLS)

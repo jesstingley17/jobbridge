@@ -609,14 +609,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
         } catch (supabaseError: any) {
           console.error('Error verifying Supabase token:', supabaseError);
           console.error('Supabase error stack:', supabaseError.stack);
+          console.error('Supabase error message:', supabaseError.message);
+          console.error('Supabase error name:', supabaseError.name);
+          
           // If Supabase client failed to initialize, return 500
-          if (supabaseError.message?.includes('SUPABASE') || supabaseError.message?.includes('environment')) {
+          if (supabaseError.message?.includes('SUPABASE') || 
+              supabaseError.message?.includes('environment') ||
+              supabaseError.message?.includes('Missing') ||
+              supabaseError.name === 'Error' && supabaseError.message?.includes('SUPABASE')) {
+            console.error('Supabase configuration error detected');
             return res.status(500).json({ 
               error: 'Authentication service unavailable',
-              message: 'Supabase configuration error'
+              message: 'Supabase configuration error',
+              details: process.env.NODE_ENV === 'development' ? supabaseError.message : undefined
             });
           }
-          // For other errors, continue to fallback auth
+          // For other errors, log and continue to fallback auth
+          console.warn('Supabase verification failed, trying fallback auth');
         }
       }
       
@@ -630,6 +639,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
         } catch (getUserError: any) {
           console.error('Error getting user from session:', getUserError);
+          console.error('GetUser error stack:', getUserError.stack);
           // If it's a database error, return 500
           if (getUserError.code === '42P01' || getUserError.message?.includes('does not exist')) {
             return res.status(500).json({ 
@@ -641,14 +651,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // No user found - return 401 but don't throw error (allows frontend to handle gracefully)
+      if (process.env.NODE_ENV === 'development') {
+        console.log('No authentication found - returning 401');
+      }
       res.status(401).json({ error: 'Not authenticated' });
     } catch (error: any) {
-      console.error("Error fetching user:", error);
+      console.error("Unexpected error in /api/auth/user:", error);
+      console.error("Error name:", error.name);
+      console.error("Error message:", error.message);
       console.error("Error stack:", error.stack);
-      // Only return 500 for unexpected errors, not for missing auth
+      
+      // Check if it's a known error type
+      if (error.code === '42P01' || error.message?.includes('does not exist')) {
+        return res.status(500).json({ 
+          error: 'Database not initialized',
+          message: 'Database tables do not exist. Please run migrations.'
+        });
+      }
+      
+      // For other unexpected errors, return 500 with details in dev
       res.status(500).json({ 
         message: "Failed to fetch user", 
-        error: process.env.NODE_ENV === 'development' ? error.message : undefined,
+        error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error',
         stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
       });
     }
