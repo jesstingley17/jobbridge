@@ -94,6 +94,19 @@ async function buildAll() {
     // Vercel runs api/index.ts directly, so it needs shared/ accessible
     await cp("shared", "api/shared", { recursive: true });
   }
+
+  // Copy server/middleware directory to api/server/middleware for Vercel
+  // Vercel runs api/index.ts which imports from ../server/middleware
+  if (existsSync("server/middleware")) {
+    console.log("copying server/middleware directory...");
+    // Ensure api/server directory exists
+    if (!existsSync("api/server")) {
+      await cp("server", "api/server", { recursive: true });
+    } else {
+      // Just copy middleware if server already exists
+      await cp("server/middleware", "api/server/middleware", { recursive: true });
+    }
+  }
 }
 
 buildAll().catch((err) => {
