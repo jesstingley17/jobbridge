@@ -115,50 +115,72 @@ export function Navbar() {
             <div className="flex items-center gap-2">
               <ThemeToggle />
               
-              {/* Clerk User Button (if using Clerk) */}
-              {isUsingClerk && clerkAuth.isLoaded && (
+              {/* Show buttons when not authenticated */}
+              {!isAuthenticated && (
                 <>
-                  <SignedOut>
-                    <Link href="/auth/sign-in">
-                      <Button variant="ghost" data-testid="button-login">
-                        Log In
-                      </Button>
-                    </Link>
-                    <Link href="/auth/sign-up">
-                      <Button className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700" data-testid="button-get-started">
-                        Get Started
-                      </Button>
-                    </Link>
-                  </SignedOut>
-                  <SignedIn>
-                    <UserButton 
-                      afterSignOutUrl="/"
-                      appearance={{
-                        elements: {
-                          avatarBox: "w-8 h-8"
-                        }
-                      }}
-                    />
-                  </SignedIn>
+                  <Link href="/auth/sign-in">
+                    <Button variant="ghost" data-testid="button-login" onClick={() => console.log("Login clicked")}>
+                      Log In
+                    </Button>
+                  </Link>
+                  <Link href="/auth/sign-up">
+                    <Button className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700" data-testid="button-get-started" onClick={() => console.log("Get Started clicked")}>
+                      Get Started
+                    </Button>
+                  </Link>
                 </>
               )}
               
-              {/* Fallback while Clerk loads or if not using Clerk */}
-              {(!isUsingClerk || !clerkAuth.isLoaded) && !isLoading && (
-                !isAuthenticated ? (
-                  <>
-                    <Link href="/auth">
-                      <Button variant="ghost" data-testid="button-login">
-                        Log In
-                      </Button>
-                    </Link>
-                    <Link href="/auth">
-                      <Button className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700" data-testid="button-get-started">
-                        Get Started
-                      </Button>
-                    </Link>
-                  </>
-                ) : null
+              {/* Show user button when authenticated with Clerk */}
+              {isUsingClerk && clerkAuth.isLoaded && isAuthenticated && (
+                <UserButton 
+                  afterSignOutUrl="/"
+                  appearance={{
+                    elements: {
+                      avatarBox: "w-8 h-8"
+                    }
+                  }}
+                />
+              )}
+              
+              {/* Show user menu when authenticated with custom auth */}
+              {!isUsingClerk && isAuthenticated && userDisplay && (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" className="gap-2" data-testid="button-user-menu">
+                      <Avatar className="h-7 w-7">
+                        <AvatarImage src={userDisplay.imageUrl} alt={`${userDisplay.firstName} ${userDisplay.lastName}`} />
+                        <AvatarFallback className="text-xs">{userDisplay.initials}</AvatarFallback>
+                      </Avatar>
+                      <span className="hidden sm:inline">{userDisplay.firstName}</span>
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem asChild>
+                      <Link href="/profile" className="flex items-center gap-2" data-testid="link-profile">
+                        <User className="h-4 w-4" />
+                        Profile
+                      </Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild>
+                      <Link href="/career-dna" className="flex items-center gap-2" data-testid="link-career-dna">
+                        <Dna className="h-4 w-4" />
+                        Career DNA
+                      </Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild>
+                      <Link href="/applications" className="flex items-center gap-2" data-testid="link-applications">
+                        <ClipboardList className="h-4 w-4" />
+                        My Applications
+                      </Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={handleLogout} data-testid="button-logout">
+                      <LogOut className="h-4 w-4 mr-2" />
+                      Log out
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               )}
               
               {/* Custom Auth (if not using Clerk) */}
