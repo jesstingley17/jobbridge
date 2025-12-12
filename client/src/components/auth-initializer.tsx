@@ -22,8 +22,9 @@ export function AuthInitializer() {
 
         if (session && mounted) {
           console.log("Session restored:", session.user.email);
-          // Invalidate user data - React Query will refetch automatically
-          queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+          // Invalidate and refetch user data to sync with backend
+          await queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+          await queryClient.refetchQueries({ queryKey: ["/api/auth/user"] });
         }
       } catch (error) {
         console.error("Error initializing auth:", error);
