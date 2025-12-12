@@ -33,9 +33,19 @@ export default function Community() {
   const [connectMessage, setConnectMessage] = useState("");
   const [selectedMentor, setSelectedMentor] = useState<MentorWithUser | null>(null);
 
-  const { data: currentUser } = useQuery<User>({
+  const { data: currentUser, isLoading: userLoading } = useQuery<User>({
     queryKey: ["/api/auth/user"],
+    retry: false,
   });
+  
+  // Show loading state while checking auth
+  if (userLoading) {
+    return (
+      <div className="container mx-auto px-4 py-16 text-center">
+        <p>Loading...</p>
+      </div>
+    );
+  }
 
   const { data: mentors, isLoading: mentorsLoading } = useQuery<MentorWithUser[]>({
     queryKey: ["/api/mentors"],

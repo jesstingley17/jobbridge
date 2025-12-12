@@ -69,8 +69,12 @@ export default function Auth() {
       if (error) throw error;
       return authData;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+    onSuccess: async () => {
+      // Wait a bit for Supabase session to be fully established
+      await new Promise(resolve => setTimeout(resolve, 100));
+      // Invalidate and refetch user data
+      await queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+      await queryClient.refetchQueries({ queryKey: ["/api/auth/user"] });
       setLocation("/early-access");
     },
     onError: (error: any) => {
