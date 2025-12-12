@@ -34,9 +34,13 @@ export default function Community() {
   const [selectedMentor, setSelectedMentor] = useState<MentorWithUser | null>(null);
 
   // All hooks must be called before any conditional returns
-  const { data: currentUser, isLoading: userLoading } = useQuery<User>({
+  const { data: currentUser, isLoading: userLoading, error: userError } = useQuery<User>({
     queryKey: ["/api/auth/user"],
     retry: false,
+    // Add error handling to see what's happening
+    onError: (error) => {
+      console.error("Error fetching user in community page:", error);
+    },
   });
 
   const { data: mentors, isLoading: mentorsLoading } = useQuery<MentorWithUser[]>({
@@ -67,6 +71,7 @@ export default function Community() {
   if (userLoading) {
     return (
       <div className="container mx-auto px-4 py-16 text-center">
+        <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4" />
         <p>Loading...</p>
       </div>
     );
@@ -80,10 +85,18 @@ export default function Community() {
     }
   };
 
+  // Check if user is authenticated - if error is 500, it might be a backend issue, not auth
   if (!currentUser) {
+    // If there was an error, show more helpful message
+    if (userError) {
+      console.error("Auth error in community:", userError);
+    }
     return (
       <div className="container mx-auto px-4 py-16 text-center">
         <h1 className="text-2xl font-bold mb-4">Please log in to access the community</h1>
+        <p className="text-muted-foreground mb-4">
+          {userError ? "There was an error checking your authentication. Please try logging in again." : ""}
+        </p>
         <Button asChild>
           <a href="/auth" data-testid="link-login-community">Log In</a>
         </Button>

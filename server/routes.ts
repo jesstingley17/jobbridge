@@ -539,12 +539,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // Verify token with Supabase
           const { data: { user: supabaseUser }, error } = await supabaseAdmin.auth.getUser(token);
           
-          if (process.env.NODE_ENV === 'development') {
-            if (error) {
-              console.error('Token verification error:', error.message);
-            } else if (supabaseUser) {
-              console.log('Token verified for user:', supabaseUser.email);
-            }
+          // Always log in production for debugging (but not sensitive data)
+          if (error) {
+            console.error('Token verification error:', error.message);
+            console.error('Error code:', error.status);
+          } else if (supabaseUser) {
+            console.log('Token verified for user:', supabaseUser.email || supabaseUser.id);
           }
           
           if (!error && supabaseUser) {
