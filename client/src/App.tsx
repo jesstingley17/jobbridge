@@ -39,7 +39,6 @@ import AdminBlog from "@/pages/admin-blog";
 import AdminLogin from "@/pages/admin-login";
 import NotFound from "@/pages/not-found";
 import BuilderPage from "@/pages/builder";
-import ClerkTest from "@/pages/clerk-test";
 
 // Initialize Builder.io if API key is available
 const BUILDER_API_KEY = import.meta.env.VITE_BUILDER_API_KEY || "";
@@ -48,10 +47,6 @@ if (BUILDER_API_KEY) {
   // Register custom components for Builder.io
   registerBuilderComponents();
 }
-
-// Get Clerk publishable key (for Vite, use VITE_ prefix)
-const CLERK_PUBLISHABLE_KEY = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY || 
-  import.meta.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY || "";
 
 function CatchAllRoute() {
   const [location] = useLocation();
@@ -89,41 +84,12 @@ function Router() {
       <Route path="/auth/sign-up" component={AuthWrapper} />
       <Route path="/auth/verify" component={ResetPassword} />
       <Route path="/cms" component={BuilderPage} />
-      <Route path="/clerk-test" component={ClerkTest} />
       <Route component={CatchAllRoute} />
     </Switch>
   );
 }
 
 function App() {
-  // If Clerk is configured, wrap with ClerkProvider
-  if (CLERK_PUBLISHABLE_KEY) {
-    return (
-      <ClerkProvider 
-        publishableKey={CLERK_PUBLISHABLE_KEY}
-        domain="thejobbridge-inc.com"
-      >
-        <QueryClientProvider client={queryClient}>
-          <TooltipProvider>
-            <SubscriptionProvider>
-              <div className="flex min-h-screen flex-col">
-                <Navbar />
-                <main id="main-content" className="flex-1">
-                  <Router />
-                </main>
-                <Footer />
-              </div>
-              <Toaster />
-              <AIChatAssistant />
-              <CookieConsent />
-            </SubscriptionProvider>
-          </TooltipProvider>
-        </QueryClientProvider>
-      </ClerkProvider>
-    );
-  }
-
-  // Fallback if Clerk is not configured
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>

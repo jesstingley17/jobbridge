@@ -136,6 +136,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Register sitemap and robots.txt routes (before auth)
   registerSitemapRoute(app);
   
+  // Supabase user sync endpoint - called after Supabase signup
+  app.post('/api/auth/sync-supabase-user', async (req, res) => {
+    try {
+      const { supabaseUserId, email, firstName, lastName, termsAccepted, marketingConsent } = req.body;
+      
+      if (!supabaseUserId || !email) {
+        return res.status(400).json({ error: 'Missing required fields' });
+      }
+
+      // Upsert user to database using Supabase user ID
+      const user = await storage.upsertUser({
+        id: supabaseUserId,
+        email,
+        firstName: firstName || null,
+        lastName: lastName || null,
+        emailVerified: false, // Will be true after email verification
+        termsAccepted: termsAccepted || false,
+        marketingConsent: marketingConsent || false,
+      });
+
+      res.json({ user });
+    } catch (error: any) {
+      console.error('Error syncing Supabase user:', error);
+      res.status(500).json({ error: error.message || 'Failed to sync user' });
+    }
+  });
+  
   // Note: setupAuth is called in api/index.ts for Vercel
   // For local development, it's called in server/index.ts
   // This prevents double initialization

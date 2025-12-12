@@ -11,8 +11,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Menu, X, Briefcase, FileText, MessageSquare, LayoutDashboard, Sparkles, User, LogOut, Dna, ClipboardList, Users, CreditCard } from "lucide-react";
-import { useAuth as useCustomAuth } from "@/hooks/useAuth";
-import { useUser, useClerk, useAuth as useClerkAuth, SignedIn, SignedOut, UserButton, SignInButton, SignUpButton } from "@clerk/clerk-react";
+import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/utils/supabase/client";
 import { Logo } from "./logo";
 
 const navItems = [
@@ -28,49 +28,22 @@ export function Navbar() {
   const [isOpen, setIsOpen] = useState(false);
   const [location, setLocation] = useLocation();
   
-  // Try Clerk first, fallback to custom auth
-  const clerkUser = useUser();
-  const clerkAuth = useClerkAuth();
-  const customAuth = useCustomAuth();
-  const clerk = useClerk();
-  
-  // Determine which auth system to use
-  const CLERK_PUBLISHABLE_KEY = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY || 
-    import.meta.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY || "";
-  
-  const isUsingClerk = !!CLERK_PUBLISHABLE_KEY && clerkAuth.isLoaded;
-  const user = isUsingClerk ? clerkUser.user : customAuth.user;
-  const isLoading = isUsingClerk ? !clerkAuth.isLoaded : customAuth.isLoading;
-  const isAuthenticated = isUsingClerk ? clerkAuth.isSignedIn : customAuth.isAuthenticated;
-
-  // Debug logging
-  console.log("Navbar - isAuthenticated:", isAuthenticated);
-  console.log("Navbar - isUsingClerk:", isUsingClerk);
-  console.log("Navbar - clerkAuth.isLoaded:", clerkAuth.isLoaded);
-  console.log("Navbar - clerkAuth.isSignedIn:", clerkAuth.isSignedIn);
-  console.log("Navbar - customAuth.isAuthenticated:", customAuth.isAuthenticated);
+  // Use Supabase Auth
+  const { user, isLoading, isAuthenticated } = useAuth();
 
   const handleSignInClick = (e: React.MouseEvent) => {
     e.preventDefault();
-    console.log("Sign In button clicked, redirecting to Clerk hosted page");
-    // Redirect to Clerk's hosted sign-in page
-    window.location.href = "https://accounts.thejobbridge-inc.com/sign-in";
+    setLocation("/auth/sign-in");
   };
 
   const handleSignUpClick = (e: React.MouseEvent) => {
     e.preventDefault();
-    console.log("Sign Up button clicked, redirecting to Clerk hosted page");
-    // Redirect to Clerk's hosted sign-up page
-    window.location.href = "https://accounts.thejobbridge-inc.com/sign-up";
+    setLocation("/auth/sign-up");
   };
 
   const handleLogout = async () => {
-    if (isUsingClerk && clerk) {
-      await clerk.signOut();
-      window.location.href = "/";
-    } else {
-      window.location.href = "/api/logout";
-    }
+    await supabase.auth.signOut();
+    window.location.href = "/";
   };
 
   const getInitials = (firstName?: string | null, lastName?: string | null) => {
@@ -79,22 +52,14 @@ export function Navbar() {
     return (first + last).toUpperCase() || "U";
   };
 
-  // Helper to get user display info (works for both Clerk and custom auth)
+  // Helper to get user display info
   const getUserDisplayInfo = () => {
-    if (isUsingClerk && clerkUser.user) {
+    if (user) {
       return {
-        firstName: clerkUser.user.firstName || "",
-        lastName: clerkUser.user.lastName || "",
-        imageUrl: clerkUser.user.imageUrl || undefined,
-        initials: getInitials(clerkUser.user.firstName, clerkUser.user.lastName),
-      };
-    } else if (user && !isUsingClerk) {
-      const customUser = user as any;
-      return {
-        firstName: customUser.firstName || "",
-        lastName: customUser.lastName || "",
-        imageUrl: customUser.profileImageUrl || undefined,
-        initials: getInitials(customUser.firstName, customUser.lastName),
+        firstName: user.firstName || "",
+        lastName: user.lastName || "",
+        imageUrl: user.profileImageUrl || undefined,
+        initials: getInitials(user.firstName, user.lastName),
       };
     }
     return null;
@@ -156,72 +121,8 @@ export function Navbar() {
                 </>
               )}
               
-              {/* Show user button when authenticated with Clerk */}
-              {isUsingClerk && clerkAuth.isLoaded && isAuthenticated && (
-                <UserButton 
-                  afterSignOutUrl="/"
-                  appearance={{
-                    elements: {
-                      avatarBox: "w-8 h-8"
-                    }
-                  }}
-                />
-              )}
-              
-              {/* Show user menu when authenticated with custom auth */}
-              {!isUsingClerk && isAuthenticated && userDisplay && (
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" className="gap-2" data-testid="button-user-menu">
-                      <Avatar className="h-7 w-7">
-                        <AvatarImage src={userDisplay.imageUrl} alt={`${userDisplay.firstName} ${userDisplay.lastName}`} />
-                        <AvatarFallback className="text-xs">{userDisplay.initials}</AvatarFallback>
-                      </Avatar>
-                      <span className="hidden sm:inline">{userDisplay.firstName}</span>
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem asChild>
-                      <Link href="/profile" className="flex items-center gap-2" data-testid="link-profile">
-                        <User className="h-4 w-4" />
-                        Profile
-                      </Link>
-                    </DropdownMenuItem>
-                    <DropdownMenuItem asChild>
-                      <Link href="/career-dna" className="flex items-center gap-2" data-testid="link-career-dna">
-                        <Dna className="h-4 w-4" />
-                        Career DNA
-                      </Link>
-                    </DropdownMenuItem>
-                    <DropdownMenuItem asChild>
-                      <Link href="/applications" className="flex items-center gap-2" data-testid="link-applications">
-                        <ClipboardList className="h-4 w-4" />
-                        My Applications
-                      </Link>
-                    </DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={handleLogout} data-testid="button-logout">
-                      <LogOut className="h-4 w-4 mr-2" />
-                      Log out
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              )}
-              
-              {/* Show user button when authenticated with Clerk */}
-              {isUsingClerk && clerkAuth.isLoaded && isAuthenticated && (
-                <UserButton 
-                  afterSignOutUrl="/"
-                  appearance={{
-                    elements: {
-                      avatarBox: "w-8 h-8"
-                    }
-                  }}
-                />
-              )}
-              
-              {/* Show user menu when authenticated with custom auth */}
-              {!isUsingClerk && isAuthenticated && userDisplay && (
+              {/* Show user menu when authenticated */}
+              {isAuthenticated && userDisplay && (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button variant="ghost" className="gap-2" data-testid="button-user-menu">

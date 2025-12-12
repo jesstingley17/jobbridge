@@ -1,13 +1,10 @@
 import { useEffect, useState } from "react";
 import { BuilderComponent, builder, useIsPreviewing } from "@builder.io/react";
 import { registerBuilderComponents } from "@/lib/builder-registry";
-import AuthClerk from "./auth-clerk";
 import Auth from "./auth";
 
 // Get API keys from environment variables
 const BUILDER_API_KEY = import.meta.env.VITE_BUILDER_API_KEY || "";
-const CLERK_PUBLISHABLE_KEY = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY || 
-  import.meta.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY || "";
 
 // Initialize Builder.io if API key is available
 if (BUILDER_API_KEY) {
@@ -68,12 +65,6 @@ export default function AuthWrapper() {
     );
   }
 
-  // If Builder.io is still loading, show auth immediately (don't wait)
-  // Priority: Clerk > Default Auth
-  if (CLERK_PUBLISHABLE_KEY) {
-    return <AuthClerk />;
-  }
-
-  // Fall back to default auth
+  // Use Supabase Auth
   return <Auth />;
 }

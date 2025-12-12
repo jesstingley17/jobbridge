@@ -58,8 +58,12 @@ export default function Auth() {
 
   const loginMutation = useMutation({
     mutationFn: async (data: { email: string; password: string }) => {
-      const response = await apiRequest("POST", "/api/auth/login", data);
-      return response.json();
+      const { data: authData, error } = await supabase.auth.signInWithPassword({
+        email: data.email,
+        password: data.password,
+      });
+      if (error) throw error;
+      return authData;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
@@ -72,8 +76,39 @@ export default function Auth() {
 
   const registerMutation = useMutation({
     mutationFn: async (data: { email: string; password: string; firstName: string; lastName?: string; termsAccepted: boolean; marketingConsent?: boolean }) => {
-      const response = await apiRequest("POST", "/api/auth/register", data);
-      return response.json();
+      // Sign up with Supabase
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email: data.email,
+        password: data.password,
+        options: {
+          data: {
+            first_name: data.firstName,
+            last_name: data.lastName,
+            terms_accepted: data.termsAccepted,
+            marketing_consent: data.marketingConsent,
+          },
+        },
+      });
+      if (authError) throw authError;
+      
+      // Sync user to your database via API
+      if (authData.user) {
+        try {
+          await apiRequest("POST", "/api/auth/sync-supabase-user", {
+            supabaseUserId: authData.user.id,
+            email: data.email,
+            firstName: data.firstName,
+            lastName: data.lastName,
+            termsAccepted: data.termsAccepted,
+            marketingConsent: data.marketingConsent,
+          });
+        } catch (syncError) {
+          console.error("Failed to sync user to database:", syncError);
+          // Don't fail registration if sync fails
+        }
+      }
+      
+      return authData;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
