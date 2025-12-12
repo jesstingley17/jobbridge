@@ -50,14 +50,22 @@ async function verifyJwtWithJwks(token: string, projectUrl: string) {
   }
 
   // Build public key from JWK
-  // Convert JWK to PEM format for verification
-  const publicKey = crypto.createPublicKey({
+  // First create a public key from JWK format
+  const jwkKey = crypto.createPublicKey({
     key: {
-      kty: jwk.kty,
+      kty: "RSA",
       n: jwk.n,
       e: jwk.e,
     },
     format: "jwk",
+  });
+  
+  // Export to PEM format, then recreate (this ensures proper format)
+  const pemKey = jwkKey.export({ type: "spki", format: "pem" }) as string;
+  const publicKey = crypto.createPublicKey({
+    key: pemKey,
+    format: "pem",
+    type: "spki",
   });
 
   // Verify signature
