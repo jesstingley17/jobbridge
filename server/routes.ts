@@ -546,10 +546,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
             });
           }
           
-          const { supabaseAdmin } = await import('./supabase.js');
+          const { getSupabaseAdmin } = await import('./supabase.js');
+          const supabaseAdmin = getSupabaseAdmin();
           const token = authHeader.replace('Bearer ', '');
           
           console.log('Verifying Supabase token, length:', token.length);
+          console.log('Supabase URL:', process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL ? 'SET' : 'MISSING');
           
           // Verify token with Supabase
           const { data: { user: supabaseUser }, error } = await supabaseAdmin.auth.getUser(token);
