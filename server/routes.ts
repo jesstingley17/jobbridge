@@ -532,15 +532,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
             if (!user && supabaseUser.email) {
               console.log('User not found in database, creating from Supabase user:', supabaseUser.id);
               const userMetadata = supabaseUser.user_metadata || {};
-              user = await storage.upsertUser({
-                id: supabaseUser.id,
-                email: supabaseUser.email,
-                firstName: userMetadata.first_name || userMetadata.full_name?.split(' ')[0] || null,
-                lastName: userMetadata.last_name || userMetadata.full_name?.split(' ').slice(1).join(' ') || null,
-                emailVerified: supabaseUser.email_confirmed_at ? true : false,
-                termsAccepted: userMetadata.terms_accepted || false,
-                marketingConsent: userMetadata.marketing_consent || false,
-              });
+              try {
+                user = await storage.upsertUser({
+                  id: supabaseUser.id,
+                  email: supabaseUser.email,
+                  firstName: userMetadata.first_name || userMetadata.full_name?.split(' ')[0] || null,
+                  lastName: userMetadata.last_name || userMetadata.full_name?.split(' ').slice(1).join(' ') || null,
+                  emailVerified: supabaseUser.email_confirmed_at ? true : false,
+                  termsAccepted: userMetadata.terms_accepted || false,
+                  marketingConsent: userMetadata.marketing_consent || false,
+                });
+              } catch (upsertError: any) {
+                console.error('Error upserting user:', upsertError);
+                // Continue - try to get user again
+                user = await storage.getUser(supabaseUser.id);
+              }
             }
             
             if (user) {
@@ -552,6 +558,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
         } catch (supabaseError: any) {
           console.error('Error verifying Supabase token:', supabaseError);
+          console.error('Supabase error stack:', supabaseError.stack);
           // Continue to fallback auth
         }
       }
@@ -570,19 +577,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       console.error("Error fetching user:", error);
       console.error("Error stack:", error.stack);
-      res.status(500).json({ message: "Failed to fetch user", error: process.env.NODE_ENV === 'development' ? error.message : undefined });
+      res.status(500).json({ 
+        message: "Failed to fetch user", 
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined,
+        stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+      });
     }
   });
 
   // Get subscription status
   app.get('/api/subscription/status', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user?.claims?.sub;
+      if (!userId) {
+        return res.status(401).json({ error: "User not authenticated" });
+      }
       const status = await getUserSubscriptionStatus(userId);
       res.json(status);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching subscription status:", error);
-      res.status(500).json({ error: "Failed to fetch subscription status" });
+      console.error("Error stack:", error.stack);
+      res.status(500).json({ 
+        error: "Failed to fetch subscription status",
+        message: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
     }
   });
 
