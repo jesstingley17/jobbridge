@@ -12,10 +12,6 @@
     "@shared/schema": {
       "types": "./shared/schema.ts",
       "default": "./shared/schema.ts"
-    },
-    "./shared/schema": {
-      "types": "./shared/schema.ts",
-      "default": "./shared/schema.ts"
     }
   },
   "engines": {
