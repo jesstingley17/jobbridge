@@ -116,49 +116,49 @@ export function Navbar() {
               <ThemeToggle />
               
               {/* Clerk User Button (if using Clerk) */}
-              {isUsingClerk && (
+              {isUsingClerk && clerkAuth.isLoaded && (
                 <>
-                  {!clerkAuth.isLoaded ? (
-                    // Show loading state or fallback buttons while Clerk loads
-                    <>
-                      <Link href="/auth/sign-in">
-                        <Button variant="ghost" data-testid="button-login">
-                          Log In
-                        </Button>
-                      </Link>
-                      <Link href="/auth/sign-up">
-                        <Button className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700" data-testid="button-get-started">
-                          Get Started
-                        </Button>
-                      </Link>
-                    </>
-                  ) : (
-                    <>
-                      <SignedOut>
-                        <SignInButton mode="modal" fallbackRedirectUrl="/early-access">
-                          <Button variant="ghost" data-testid="button-login">
-                            Log In
-                          </Button>
-                        </SignInButton>
-                        <SignUpButton mode="modal" fallbackRedirectUrl="/early-access">
-                          <Button className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700" data-testid="button-get-started">
-                            Get Started
-                          </Button>
-                        </SignUpButton>
-                      </SignedOut>
-                      <SignedIn>
-                        <UserButton 
-                          afterSignOutUrl="/"
-                          appearance={{
-                            elements: {
-                              avatarBox: "w-8 h-8"
-                            }
-                          }}
-                        />
-                      </SignedIn>
-                    </>
-                  )}
+                  <SignedOut>
+                    <Link href="/auth/sign-in">
+                      <Button variant="ghost" data-testid="button-login">
+                        Log In
+                      </Button>
+                    </Link>
+                    <Link href="/auth/sign-up">
+                      <Button className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700" data-testid="button-get-started">
+                        Get Started
+                      </Button>
+                    </Link>
+                  </SignedOut>
+                  <SignedIn>
+                    <UserButton 
+                      afterSignOutUrl="/"
+                      appearance={{
+                        elements: {
+                          avatarBox: "w-8 h-8"
+                        }
+                      }}
+                    />
+                  </SignedIn>
                 </>
+              )}
+              
+              {/* Fallback while Clerk loads or if not using Clerk */}
+              {(!isUsingClerk || !clerkAuth.isLoaded) && !isLoading && (
+                !isAuthenticated ? (
+                  <>
+                    <Link href="/auth">
+                      <Button variant="ghost" data-testid="button-login">
+                        Log In
+                      </Button>
+                    </Link>
+                    <Link href="/auth">
+                      <Button className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700" data-testid="button-get-started">
+                        Get Started
+                      </Button>
+                    </Link>
+                  </>
+                ) : null
               )}
               
               {/* Custom Auth (if not using Clerk) */}
