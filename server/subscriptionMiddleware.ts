@@ -2,7 +2,7 @@ import { Response, NextFunction } from 'express';
 import { storage } from './storage.js';
 import { getTierLimits, hasFeatureAccess, FEATURE_DESCRIPTIONS, TierLimits } from './subscriptionLimits.js';
 import { db } from "./db";
-import { users } from '../shared/schema';
+import { users } from '@shared/schema';
 import { eq } from "drizzle-orm";
 
 export function requireFeature(feature: keyof TierLimits) {
