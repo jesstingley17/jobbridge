@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, useLocation } from "wouter";
+import { Link, useLocation, useRoute } from "wouter";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "./theme-toggle";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -26,7 +26,7 @@ const navItems = [
 
 export function Navbar() {
   const [isOpen, setIsOpen] = useState(false);
-  const [location] = useLocation();
+  const [location, setLocation] = useLocation();
   
   // Try Clerk first, fallback to custom auth
   const clerkUser = useUser();
@@ -42,6 +42,25 @@ export function Navbar() {
   const user = isUsingClerk ? clerkUser.user : customAuth.user;
   const isLoading = isUsingClerk ? !clerkAuth.isLoaded : customAuth.isLoading;
   const isAuthenticated = isUsingClerk ? clerkAuth.isSignedIn : customAuth.isAuthenticated;
+
+  // Debug logging
+  console.log("Navbar - isAuthenticated:", isAuthenticated);
+  console.log("Navbar - isUsingClerk:", isUsingClerk);
+  console.log("Navbar - clerkAuth.isLoaded:", clerkAuth.isLoaded);
+  console.log("Navbar - clerkAuth.isSignedIn:", clerkAuth.isSignedIn);
+  console.log("Navbar - customAuth.isAuthenticated:", customAuth.isAuthenticated);
+
+  const handleSignInClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    console.log("Sign In button clicked, navigating to /auth/sign-in");
+    setLocation("/auth/sign-in");
+  };
+
+  const handleSignUpClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    console.log("Sign Up button clicked, navigating to /auth/sign-up");
+    setLocation("/auth/sign-up");
+  };
 
   const handleLogout = async () => {
     if (isUsingClerk && clerk) {
@@ -118,16 +137,20 @@ export function Navbar() {
               {/* Show buttons when not authenticated */}
               {!isAuthenticated && (
                 <>
-                  <Link href="/auth/sign-in">
-                    <Button variant="ghost" data-testid="button-login" onClick={() => console.log("Login clicked")}>
-                      Log In
-                    </Button>
-                  </Link>
-                  <Link href="/auth/sign-up">
-                    <Button className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700" data-testid="button-get-started" onClick={() => console.log("Get Started clicked")}>
-                      Get Started
-                    </Button>
-                  </Link>
+                  <Button 
+                    variant="ghost" 
+                    data-testid="button-login" 
+                    onClick={handleSignInClick}
+                  >
+                    Log In
+                  </Button>
+                  <Button 
+                    className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700" 
+                    data-testid="button-get-started" 
+                    onClick={handleSignUpClick}
+                  >
+                    Get Started
+                  </Button>
                 </>
               )}
               
