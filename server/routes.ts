@@ -1112,9 +1112,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const mentors = await storage.getMentors();
       res.json(mentors);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching mentors:", error);
-      res.status(500).json({ error: "Failed to fetch mentors" });
+      console.error("Error stack:", error.stack);
+      // Check if it's a database table error
+      if (error.code === '42P01' || error.message?.includes('does not exist') || error.message?.includes('relation')) {
+        return res.status(500).json({ 
+          error: "Database not initialized",
+          message: "Mentors table does not exist. Please run migrations."
+        });
+      }
+      res.status(500).json({ 
+        error: "Failed to fetch mentors",
+        message: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
     }
   });
 

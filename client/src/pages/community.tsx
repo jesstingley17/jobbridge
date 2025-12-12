@@ -41,16 +41,12 @@ export default function Community() {
 
   const { data: mentors, isLoading: mentorsLoading } = useQuery<MentorWithUser[]>({
     queryKey: ["/api/mentors"],
+    retry: false,
+    // Don't fail the whole page if mentors endpoint fails
+    onError: (error) => {
+      console.error("Failed to load mentors:", error);
+    },
   });
-  
-  // Show loading state while checking auth
-  if (userLoading) {
-    return (
-      <div className="container mx-auto px-4 py-16 text-center">
-        <p>Loading...</p>
-      </div>
-    );
-  }
 
   const connectMutation = useMutation({
     mutationFn: async ({ mentorId, message }: { mentorId: string; message: string }) => {
@@ -66,6 +62,15 @@ export default function Community() {
       toast({ title: "Error", description: "Failed to send connection request", variant: "destructive" });
     },
   });
+  
+  // Show loading state while checking auth
+  if (userLoading) {
+    return (
+      <div className="container mx-auto px-4 py-16 text-center">
+        <p>Loading...</p>
+      </div>
+    );
+  }
 
   const getRoleIcon = (role: string | null) => {
     switch (role) {
