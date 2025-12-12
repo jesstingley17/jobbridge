@@ -256,15 +256,46 @@ export const isAdmin: RequestHandler = async (req: any, res, next) => {
   // Try Supabase auth first (for Vercel)
   const supabaseUserId = await checkSupabaseAuth(req);
   if (supabaseUserId) {
-    // Check if user is admin in database
-    const user = await storage.getUser(supabaseUserId);
-    if (user && user.role === 'admin') {
-      req.user = {
-        claims: { sub: supabaseUserId }
-      };
-      return next();
+    try {
+      const user = await storage.getUser(supabaseUserId);
+      if (!user) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      // Check if user has admin role
+      if (user.role === "admin") {
+        req.user = {
+          claims: { sub: supabaseUserId }
+        };
+        return next();
+      }
+
+      // Check admin emails from env
+      const adminEmails = process.env.ADMIN_EMAILS?.split(",").map(e => e.trim()) || [];
+      if (user.email && adminEmails.includes(user.email)) {
+        req.user = {
+          claims: { sub: supabaseUserId }
+        };
+        return next();
+      }
+
+      // Check admin email pattern
+      const adminPattern = process.env.ADMIN_EMAIL_PATTERN;
+      if (adminPattern && user.email) {
+        const regex = new RegExp(adminPattern);
+        if (regex.test(user.email)) {
+          req.user = {
+            claims: { sub: supabaseUserId }
+          };
+          return next();
+        }
+      }
+
+      return res.status(403).json({ message: "Admin access required" });
+    } catch (error) {
+      console.error("Error checking admin access:", error);
+      return res.status(500).json({ message: "Internal server error" });
     }
-    return res.status(403).json({ error: 'Admin access required' });
   }
   
   // Fallback to Replit Auth (for Replit deployments)
