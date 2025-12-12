@@ -188,3 +188,4 @@ export async function addDocumentsToStore(documents: Array<{ id?: string; text: 
   return client.addDocuments(documents);
 }
 
+

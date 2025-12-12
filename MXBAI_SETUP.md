@@ -114,3 +114,4 @@ For full API documentation, visit: https://docs.mixedbread.ai
 - **API errors**: Verify your API key is valid and has the necessary permissions
 - **Store not found**: Ensure the `MXBAI_STORE_ID` matches an existing store in your MXBAI account
 
+

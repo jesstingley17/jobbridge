@@ -74,3 +74,4 @@ const browserVerification = `
 console.log("\nBrowser Verification Code:");
 console.log(browserVerification);
 
+

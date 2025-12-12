@@ -223,3 +223,4 @@ CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id);
 CREATE INDEX IF NOT EXISTS idx_notifications_read ON notifications(user_id, is_read);
 CREATE INDEX IF NOT EXISTS idx_notifications_created ON notifications(created_at DESC);
 
+

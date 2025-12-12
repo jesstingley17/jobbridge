@@ -76,3 +76,4 @@ Keep components embedded in pages if:
 
 **Recommendation**: Extract components to match Figma structure for better maintainability and consistency.
 
+

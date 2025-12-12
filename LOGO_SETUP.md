@@ -78,3 +78,4 @@ client/public/
 - For best results, use PNG format with transparent background
 - Ensure logo is optimized for web (compressed but high quality)
 
+

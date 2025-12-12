@@ -90,3 +90,4 @@ If you don't want automatic deployments, you can use the database sync webhook i
 - This syncs content to your database without triggering Vercel deployments
 - Content updates immediately without rebuilding
 
+

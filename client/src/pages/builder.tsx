@@ -1,70 +1,125 @@
-import { useLocation } from 'wouter';
-import { useEffect, useState } from 'react';
-import '../utils/builder';
+import { BuilderComponent, builder, useIsPreviewing } from "@builder.io/react";
+import { useEffect, useState } from "react";
+import { useLocation } from "wouter";
+import { registerBuilderComponents } from "@/lib/builder-registry";
+
+// Get API key from environment variable
+const BUILDER_API_KEY = import.meta.env.VITE_BUILDER_API_KEY || "";
+
+// Initialize Builder.io if API key is available
+if (BUILDER_API_KEY) {
+  builder.init(BUILDER_API_KEY);
+  // Register custom components for Builder.io
+  registerBuilderComponents();
+}
 
 export default function BuilderPage() {
   const [location] = useLocation();
-  const [BuilderComponent, setBuilderComponent] = useState<any>(null);
-  const [isPreviewing, setIsPreviewing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [content, setContent] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const isPreviewing = useIsPreviewing();
+
+  // Extract page path from URL (e.g., /cms/page-name or /cms/)
+  // Remove /cms prefix and use the remaining path, default to "/" if empty
+  const pagePath = location.startsWith("/cms") 
+    ? (location === "/cms" ? "/" : location.replace("/cms", "") || "/")
+    : location;
 
   useEffect(() => {
-    const loadBuilder = async () => {
-      try {
-        const { BuilderComponent, useIsPreviewing } = await import('@builder.io/react');
-        setBuilderComponent(() => BuilderComponent);
-        setIsPreviewing(useIsPreviewing());
-      } catch (err) {
-        const errorMsg = err instanceof Error ? err.message : 'Failed to load Builder.io';
-        setError(errorMsg);
-        console.error('Builder.io loading error:', err);
-      }
-    };
+    if (!BUILDER_API_KEY) {
+      setLoading(false);
+      return;
+    }
 
-    loadBuilder();
-  }, []);
+    setLoading(true);
+    
+    // Fetch Builder.io content using userAttributes.urlPath
+    builder
+      .get("page", {
+        userAttributes: {
+          urlPath: pagePath,
+        },
+        options: {
+          includeRefs: true,
+        },
+      })
+      .promise()
+      .then((data) => {
+        setContent(data);
+        setLoading(false);
+      })
+      .catch((error) => {
+        console.error("Error fetching Builder.io content:", error);
+        setLoading(false);
+      });
+  }, [pagePath]);
 
-  if (error) {
+  // Show error if no API key
+  if (!BUILDER_API_KEY) {
     return (
-      <div className="min-h-screen bg-white flex items-center justify-center">
-        <div className="bg-red-50 border border-red-200 rounded-lg p-8 max-w-md">
-          <h2 className="text-lg font-semibold text-red-800 mb-2">Builder.io Not Available</h2>
-          <p className="text-red-700 mb-4">{error}</p>
-          <p className="text-sm text-red-600">
-            Install Builder.io SDK: <code className="bg-red-100 px-2 py-1 rounded">npm install @builder.io/react</code>
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-center max-w-md p-6">
+          <h2 className="text-2xl font-bold mb-4">Builder.io Not Configured</h2>
+          <p className="text-gray-600 dark:text-gray-400 mb-4">
+            Please set the <code className="bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded">VITE_BUILDER_API_KEY</code> environment variable.
+          </p>
+          <p className="text-sm text-gray-500 dark:text-gray-500">
+            You can get your API key from{" "}
+            <a
+              href="https://builder.io/account/space"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-blue-600 dark:text-blue-400 hover:underline"
+            >
+              Builder.io Settings
+            </a>
           </p>
         </div>
       </div>
     );
   }
 
-  if (!BuilderComponent) {
+  // Show loading state
+  if (loading && !isPreviewing) {
     return (
-      <div className="min-h-screen bg-white flex items-center justify-center">
+      <div className="flex items-center justify-center min-h-[400px]">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading Builder.io...</p>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900 dark:border-gray-100 mx-auto mb-4"></div>
+          <p className="text-gray-600 dark:text-gray-400">Loading page...</p>
         </div>
       </div>
     );
   }
 
-  const path = location.replace(/^\/builder/, '') || '/';
+  // Show message if no content found (only if not previewing)
+  if (!content && !isPreviewing) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-center max-w-md p-6">
+          <h2 className="text-2xl font-bold mb-4">Page Not Found</h2>
+          <p className="text-gray-600 dark:text-gray-400 mb-4">
+            No Builder.io content found for path: <code className="bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded">{pagePath}</code>
+          </p>
+          <p className="text-sm text-gray-500 dark:text-gray-500">
+            Create this page in{" "}
+            <a
+              href="https://builder.io"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-blue-600 dark:text-blue-400 hover:underline"
+            >
+              Builder.io
+            </a>{" "}
+            and set the URL path to match this route.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="min-h-screen bg-white">
-      <BuilderComponent 
-        model="page" 
-        entry={path}
-        options={{
-          includeRefs: true,
-        }}
-      />
-      {isPreviewing && (
-        <div className="fixed bottom-4 right-4 bg-blue-500 text-white px-4 py-2 rounded">
-          Preview Mode
-        </div>
-      )}
+    <div className="builder-page">
+      <BuilderComponent model="page" content={content} />
     </div>
   );
 }
