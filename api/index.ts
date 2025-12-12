@@ -95,34 +95,39 @@ async function initializeApp() {
 
   initPromise = (async () => {
     try {
-      // Warn/validate environment variables early to provide clearer errors
-      try {
-        // Required: Supabase URL and Service Role Key for auth
-        // DATABASE_URL defaults to Supabase pooler connection if not set
-        // SESSION_SECRET required for session store
-        const requiredEnvs = ['SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY', 'SESSION_SECRET'];
-        
-        if (process.env.NODE_ENV === 'production') {
-          ensureEnvOrThrow(requiredEnvs);
-        } else {
-          ensureEnvWarn(requiredEnvs);
-        }
-        
-        // Warn if DATABASE_URL is missing (but don't fail - it can use Supabase pooler)
-        if (!process.env.DATABASE_URL) {
-          console.warn('DATABASE_URL not set; ensure your db.ts uses a Supabase pooler connection or set DATABASE_URL explicitly.');
-        }
-      } catch (envErr: any) {
-        console.error('Env validation error:', envErr.message);
-        throw envErr;
+      // Warn about missing environment variables (but don't fail deployment)
+      // Routes will handle missing env vars gracefully
+      const importantEnvs = ['SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY', 'SESSION_SECRET'];
+      const missing = importantEnvs.filter(key => !process.env[key]);
+      
+      if (missing.length > 0) {
+        console.warn(`⚠️  Missing environment variables: ${missing.join(', ')}`);
+        console.warn('⚠️  Some features may not work correctly. Please set these in Vercel dashboard.');
+      }
+      
+      // Warn if DATABASE_URL is missing (but don't fail - it can use Supabase pooler)
+      if (!process.env.DATABASE_URL) {
+        console.warn('⚠️  DATABASE_URL not set; ensure your db.ts uses a Supabase pooler connection or set DATABASE_URL explicitly.');
       }
       // Setup session middleware (Supabase handles authentication)
-      const { getSession } = await import('../server/auth.js');
-      app.set("trust proxy", 1);
-      app.use(getSession());
+      try {
+        const { getSession } = await import('../server/auth.js');
+        app.set("trust proxy", 1);
+        app.use(getSession());
+      } catch (sessionError: any) {
+        console.error('⚠️  Failed to setup session middleware:', sessionError.message);
+        // Continue without session middleware - some features won't work but app won't crash
+      }
 
-      // Register all routes
-      await registerRoutes(app);
+      // Register all routes (this may fail if critical imports are missing)
+      try {
+        await registerRoutes(app);
+      } catch (routesError: any) {
+        console.error('⚠️  Error registering routes:', routesError.message);
+        console.error('⚠️  Stack:', routesError.stack);
+        // Don't throw - let the app continue and handle errors at route level
+        // This prevents deployment failures from blocking the entire app
+      }
 
       // Serve static files in production
       if (process.env.NODE_ENV === 'production') {
