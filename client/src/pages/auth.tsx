@@ -141,17 +141,19 @@ export default function Auth() {
       
       return authData;
     },
-    onSuccess: (data) => {
+    onSuccess: async (data) => {
       // Check if email confirmation is required
       if (data.user && !data.session) {
         // Email confirmation required
         setRegisterError("");
-        queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+        await queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
         // Show success message instead of redirecting
         setLocation("/early-access?confirm=email");
       } else {
-        // User is signed in immediately
-        queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+        // Wait a bit for Supabase session to be fully established
+        await new Promise(resolve => setTimeout(resolve, 100));
+        await queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+        await queryClient.refetchQueries({ queryKey: ["/api/auth/user"] });
         setLocation("/early-access");
       }
     },
