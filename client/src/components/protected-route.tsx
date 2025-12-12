@@ -1,22 +1,21 @@
-import { useAuth } from "@clerk/clerk-react";
+import { useAuth } from "@/hooks/useAuth";
 import { useLocation } from "wouter";
 import { useEffect } from "react";
 
 /**
  * ProtectedRoute component - redirects to sign-in if user is not authenticated
- * This is the React/Vite equivalent of Next.js middleware protection
  */
 export function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { isSignedIn, isLoaded } = useAuth();
+  const { isAuthenticated, isLoading } = useAuth();
   const [, setLocation] = useLocation();
 
   useEffect(() => {
-    if (isLoaded && !isSignedIn) {
+    if (!isLoading && !isAuthenticated) {
       setLocation("/auth/sign-in");
     }
-  }, [isLoaded, isSignedIn, setLocation]);
+  }, [isLoading, isAuthenticated, setLocation]);
 
-  if (!isLoaded) {
+  if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
@@ -27,7 +26,7 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
     );
   }
 
-  if (!isSignedIn) {
+  if (!isAuthenticated) {
     return null; // Will redirect via useEffect
   }
 

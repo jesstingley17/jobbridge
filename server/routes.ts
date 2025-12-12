@@ -497,12 +497,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Auth routes
-  app.get('/api/auth/user', isAuthenticated, async (req: any, res) => {
+  // Auth routes - support both Supabase and legacy auth
+  app.get('/api/auth/user', async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
-      const user = await storage.getUser(userId);
-      res.json(user);
+      // Try Supabase auth first
+      const authHeader = req.headers.authorization;
+      if (authHeader?.startsWith('Bearer ')) {
+        const { supabaseAdmin } = await import('./supabase.js');
+        const token = authHeader.replace('Bearer ', '');
+        const { data: { user: supabaseUser }, error } = await supabaseAdmin.auth.getUser(token);
+        
+        if (!error && supabaseUser) {
+          // Get user from database using Supabase user ID
+          const user = await storage.getUser(supabaseUser.id);
+          if (user) {
+            return res.json(user);
+          }
+        }
+      }
+      
+      // Fallback to legacy session-based auth
+      if (req.user?.claims?.sub) {
+        const userId = req.user.claims.sub;
+        const user = await storage.getUser(userId);
+        if (user) {
+          return res.json(user);
+        }
+      }
+      
+      // No user found
+      res.status(401).json({ error: 'Not authenticated' });
     } catch (error) {
       console.error("Error fetching user:", error);
       res.status(500).json({ message: "Failed to fetch user" });
