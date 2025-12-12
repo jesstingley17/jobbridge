@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Menu, X, Briefcase, FileText, MessageSquare, LayoutDashboard, Sparkles, User, LogOut, Dna, ClipboardList, Users, CreditCard } from "lucide-react";
 import { useAuth as useCustomAuth } from "@/hooks/useAuth";
-import { useUser, useClerk, useAuth as useClerkAuth, SignedIn, SignedOut, UserButton } from "@clerk/clerk-react";
+import { useUser, useClerk, useAuth as useClerkAuth, SignedIn, SignedOut, UserButton, SignInButton, SignUpButton } from "@clerk/clerk-react";
 import { Logo } from "./logo";
 
 const navItems = [
@@ -118,28 +118,46 @@ export function Navbar() {
               {/* Clerk User Button (if using Clerk) */}
               {isUsingClerk && (
                 <>
-                  <SignedOut>
-                    <Link href="/auth/sign-in">
-                      <Button variant="ghost" data-testid="button-login">
-                        Log In
-                      </Button>
-                    </Link>
-                    <Link href="/auth/sign-up">
-                      <Button className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700" data-testid="button-get-started">
-                        Get Started
-                      </Button>
-                    </Link>
-                  </SignedOut>
-                  <SignedIn>
-                    <UserButton 
-                      afterSignOutUrl="/"
-                      appearance={{
-                        elements: {
-                          avatarBox: "w-8 h-8"
-                        }
-                      }}
-                    />
-                  </SignedIn>
+                  {!clerkAuth.isLoaded ? (
+                    // Show loading state or fallback buttons while Clerk loads
+                    <>
+                      <Link href="/auth/sign-in">
+                        <Button variant="ghost" data-testid="button-login">
+                          Log In
+                        </Button>
+                      </Link>
+                      <Link href="/auth/sign-up">
+                        <Button className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700" data-testid="button-get-started">
+                          Get Started
+                        </Button>
+                      </Link>
+                    </>
+                  ) : (
+                    <>
+                      <SignedOut>
+                        <SignInButton mode="modal" fallbackRedirectUrl="/early-access">
+                          <Button variant="ghost" data-testid="button-login">
+                            Log In
+                          </Button>
+                        </SignInButton>
+                        <SignUpButton mode="modal" fallbackRedirectUrl="/early-access">
+                          <Button className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700" data-testid="button-get-started">
+                            Get Started
+                          </Button>
+                        </SignUpButton>
+                      </SignedOut>
+                      <SignedIn>
+                        <UserButton 
+                          afterSignOutUrl="/"
+                          appearance={{
+                            elements: {
+                              avatarBox: "w-8 h-8"
+                            }
+                          }}
+                        />
+                      </SignedIn>
+                    </>
+                  )}
                 </>
               )}
               
