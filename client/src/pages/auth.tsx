@@ -255,12 +255,14 @@ export default function Auth() {
                     <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                     <Input
                       id="forgot-email"
+                      name="email"
                       type="email"
                       placeholder="you@example.com"
                       value={forgotEmail}
                       onChange={(e) => setForgotEmail(e.target.value)}
                       className="pl-10"
                       required
+                      autoComplete="email"
                       data-testid="input-forgot-email"
                     />
                   </div>
@@ -342,12 +344,14 @@ export default function Auth() {
                       <Label htmlFor="login-email">Email</Label>
                       <Input
                         id="login-email"
+                        name="email"
                         type="email"
                         placeholder="m@example.com"
                         value={loginEmail}
                         onChange={(e) => setLoginEmail(e.target.value)}
                         className="rounded-md"
                         required
+                        autoComplete="email"
                         data-testid="input-login-email"
                       />
                     </div>
@@ -357,12 +361,14 @@ export default function Auth() {
                       <div className="relative">
                         <Input
                           id="login-password"
+                          name="password"
                           type={showPassword ? "text" : "password"}
                           placeholder="Enter your password"
                           value={loginPassword}
                           onChange={(e) => setLoginPassword(e.target.value)}
                           className="pr-10 rounded-md"
                           required
+                          autoComplete="current-password"
                           data-testid="input-login-password"
                         />
                         <Button
@@ -470,12 +476,14 @@ export default function Auth() {
                         <Label htmlFor="first-name">First Name</Label>
                         <Input
                           id="first-name"
+                          name="firstName"
                           type="text"
                           placeholder="John"
                           value={firstName}
                           onChange={(e) => setFirstName(e.target.value)}
                           className="rounded-md"
                           required
+                          autoComplete="given-name"
                           data-testid="input-first-name"
                         />
                       </div>
@@ -484,11 +492,13 @@ export default function Auth() {
                         <Label htmlFor="last-name">Last Name</Label>
                         <Input
                           id="last-name"
+                          name="lastName"
                           type="text"
                           placeholder="Doe"
                           value={lastName}
                           onChange={(e) => setLastName(e.target.value)}
                           className="rounded-md"
+                          autoComplete="family-name"
                           data-testid="input-last-name"
                         />
                       </div>
@@ -498,12 +508,14 @@ export default function Auth() {
                       <Label htmlFor="register-email">Email</Label>
                       <Input
                         id="register-email"
+                        name="email"
                         type="email"
                         placeholder="you@example.com"
                         value={registerEmail}
                         onChange={(e) => setRegisterEmail(e.target.value)}
                         className="rounded-md"
                         required
+                        autoComplete="email"
                         data-testid="input-register-email"
                       />
                     </div>
@@ -513,6 +525,7 @@ export default function Auth() {
                       <div className="relative">
                         <Input
                           id="register-password"
+                          name="password"
                           type={showPassword ? "text" : "password"}
                           placeholder="At least 8 characters"
                           value={registerPassword}
@@ -520,6 +533,7 @@ export default function Auth() {
                           className="pr-10 rounded-md"
                           required
                           minLength={8}
+                          autoComplete="new-password"
                           data-testid="input-register-password"
                         />
                         <Button
@@ -543,12 +557,14 @@ export default function Auth() {
                       <Label htmlFor="confirm-password">Confirm Password</Label>
                       <Input
                         id="confirm-password"
+                        name="confirmPassword"
                         type={showPassword ? "text" : "password"}
                         placeholder="Confirm your password"
                         value={registerConfirmPassword}
                         onChange={(e) => setRegisterConfirmPassword(e.target.value)}
                         className="rounded-md"
                         required
+                        autoComplete="new-password"
                         data-testid="input-confirm-password"
                       />
                     </div>
