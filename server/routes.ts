@@ -411,12 +411,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "Admin access required" });
       }
       
-      // Create session
-      (req.session as any).userId = user.id;
-      (req.session as any).user = {
-        claims: { sub: user.id }
-      };
-      (req.session as any).isAdmin = true;
+      // Create session (check if session exists)
+      if (req.session) {
+        (req.session as any).userId = user.id;
+        (req.session as any).user = {
+          claims: { sub: user.id }
+        };
+        (req.session as any).isAdmin = true;
+      } else {
+        console.warn('Session not available for admin login');
+      }
       
       res.json({ 
         message: "Login successful",
@@ -430,10 +434,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } catch (error: any) {
       console.error("Admin login error:", error);
+      console.error("Admin login error stack:", error.stack);
       if (error.name === 'ZodError') {
         return res.status(400).json({ message: error.errors[0].message });
       }
-      res.status(500).json({ message: "Login failed" });
+      res.status(500).json({ 
+        message: "Login failed",
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
     }
   });
 
