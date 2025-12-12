@@ -45,32 +45,13 @@ export default function AuthWrapper() {
       })
       .catch((error) => {
         console.error("Error fetching Builder.io content:", error);
+        setContent(null);
         setLoading(false);
       });
   }, []);
 
-  // Priority: Builder.io (only if content exists) > Clerk > Default Auth
-  // If Builder.io content exists, use it
-  if (BUILDER_API_KEY && content && !isPreviewing) {
-    return (
-      <div className="builder-auth-page">
-        <BuilderComponent model="page" content={content} />
-      </div>
-    );
-  }
-
-  // If Builder.io is loading and we're previewing, show Builder.io
+  // If Builder.io is previewing, always show Builder.io
   if (BUILDER_API_KEY && isPreviewing) {
-    if (loading) {
-      return (
-        <div className="flex items-center justify-center min-h-screen">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900 dark:border-gray-100 mx-auto mb-4"></div>
-            <p className="text-gray-600 dark:text-gray-400">Loading...</p>
-          </div>
-        </div>
-      );
-    }
     return (
       <div className="builder-auth-page">
         <BuilderComponent model="page" content={content} />
@@ -78,7 +59,17 @@ export default function AuthWrapper() {
     );
   }
 
-  // If Clerk is configured, use Clerk auth (skip Builder.io if no content)
+  // If Builder.io content exists and is loaded, use it
+  if (BUILDER_API_KEY && content && !loading) {
+    return (
+      <div className="builder-auth-page">
+        <BuilderComponent model="page" content={content} />
+      </div>
+    );
+  }
+
+  // If Builder.io is still loading, show auth immediately (don't wait)
+  // Priority: Clerk > Default Auth
   if (CLERK_PUBLISHABLE_KEY) {
     return <AuthClerk />;
   }
