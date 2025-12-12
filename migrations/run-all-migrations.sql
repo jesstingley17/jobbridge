@@ -276,14 +276,16 @@ USING (true);
 -- PART 3: Add User Consent Fields
 -- ============================================
 
+-- Add consent fields to public.users table (idempotent)
+
 -- Add termsAccepted column if it doesn't exist
 DO $$ 
 BEGIN
   IF NOT EXISTS (
     SELECT 1 FROM information_schema.columns 
-    WHERE table_name = 'users' AND column_name = 'terms_accepted'
+    WHERE table_schema = 'public' AND table_name = 'users' AND column_name = 'terms_accepted'
   ) THEN
-    ALTER TABLE users ADD COLUMN terms_accepted BOOLEAN DEFAULT false NOT NULL;
+    ALTER TABLE public.users ADD COLUMN terms_accepted BOOLEAN DEFAULT false NOT NULL;
   END IF;
 END $$;
 
@@ -292,9 +294,9 @@ DO $$
 BEGIN
   IF NOT EXISTS (
     SELECT 1 FROM information_schema.columns 
-    WHERE table_name = 'users' AND column_name = 'terms_accepted_at'
+    WHERE table_schema = 'public' AND table_name = 'users' AND column_name = 'terms_accepted_at'
   ) THEN
-    ALTER TABLE users ADD COLUMN terms_accepted_at TIMESTAMP;
+    ALTER TABLE public.users ADD COLUMN terms_accepted_at TIMESTAMPTZ;
   END IF;
 END $$;
 
@@ -303,9 +305,9 @@ DO $$
 BEGIN
   IF NOT EXISTS (
     SELECT 1 FROM information_schema.columns 
-    WHERE table_name = 'users' AND column_name = 'marketing_consent'
+    WHERE table_schema = 'public' AND table_name = 'users' AND column_name = 'marketing_consent'
   ) THEN
-    ALTER TABLE users ADD COLUMN marketing_consent BOOLEAN DEFAULT false NOT NULL;
+    ALTER TABLE public.users ADD COLUMN marketing_consent BOOLEAN DEFAULT false NOT NULL;
   END IF;
 END $$;
 
@@ -314,9 +316,9 @@ DO $$
 BEGIN
   IF NOT EXISTS (
     SELECT 1 FROM information_schema.columns 
-    WHERE table_name = 'users' AND column_name = 'marketing_consent_at'
+    WHERE table_schema = 'public' AND table_name = 'users' AND column_name = 'marketing_consent_at'
   ) THEN
-    ALTER TABLE users ADD COLUMN marketing_consent_at TIMESTAMP;
+    ALTER TABLE public.users ADD COLUMN marketing_consent_at TIMESTAMPTZ;
   END IF;
 END $$;
 
