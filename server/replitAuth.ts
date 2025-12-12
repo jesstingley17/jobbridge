@@ -188,7 +188,36 @@ export async function setupAuth(app: Express) {
   });
 }
 
+// Supabase-compatible authentication middleware
+async function checkSupabaseAuth(req: any): Promise<string | null> {
+  try {
+    const authHeader = req.headers.authorization;
+    if (authHeader?.startsWith('Bearer ')) {
+      const { supabaseAdmin } = await import('./supabase.js');
+      const token = authHeader.replace('Bearer ', '');
+      const { data: { user }, error } = await supabaseAdmin.auth.getUser(token);
+      if (!error && user) {
+        return user.id;
+      }
+    }
+  } catch (error) {
+    console.error('Supabase auth check error:', error);
+  }
+  return null;
+}
+
 export const isAuthenticated: RequestHandler = async (req, res, next) => {
+  // Try Supabase auth first (for Vercel)
+  const supabaseUserId = await checkSupabaseAuth(req);
+  if (supabaseUserId) {
+    // Set req.user for compatibility with existing code
+    req.user = {
+      claims: { sub: supabaseUserId }
+    };
+    return next();
+  }
+  
+  // Fallback to Replit Auth (for Replit deployments)
   const user = req.user as any;
 
   if (!req.isAuthenticated() || !user.expires_at) {
@@ -224,6 +253,21 @@ export const isAuthenticated: RequestHandler = async (req, res, next) => {
 // 3. User email matches ADMIN_EMAIL_PATTERN env var (regex pattern)
 // 4. Session has isAdmin flag (for admin login)
 export const isAdmin: RequestHandler = async (req: any, res, next) => {
+  // Try Supabase auth first (for Vercel)
+  const supabaseUserId = await checkSupabaseAuth(req);
+  if (supabaseUserId) {
+    // Check if user is admin in database
+    const user = await storage.getUser(supabaseUserId);
+    if (user && user.role === 'admin') {
+      req.user = {
+        claims: { sub: supabaseUserId }
+      };
+      return next();
+    }
+    return res.status(403).json({ error: 'Admin access required' });
+  }
+  
+  // Fallback to Replit Auth (for Replit deployments)
   // Check session-based auth first (for admin login)
   const sessionUserId = (req.session as any)?.userId;
   const sessionIsAdmin = (req.session as any)?.isAdmin;
