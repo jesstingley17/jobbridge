@@ -8,6 +8,14 @@
       "default": "./shared/*"
     }
   },
+  "exports": {
+    "@shared/schema": {
+      "default": "./shared/schema.ts"
+    },
+    "./shared/schema": {
+      "default": "./shared/schema.ts"
+    }
+  },
   "engines": {
     "node": ">=18.x"
   },
