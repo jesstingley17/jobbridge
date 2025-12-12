@@ -16,10 +16,18 @@ export function useAuth() {
   useEffect(() => {
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((event, session) => {
+    } = supabase.auth.onAuthStateChange(async (event, session) => {
       console.log('Auth state changed:', event, session?.user?.email);
-      // Invalidate the user query when auth state changes
-      queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+      // Invalidate and refetch the user query when auth state changes
+      if (event === "SIGNED_IN" || event === "TOKEN_REFRESHED") {
+        // Wait a moment for session to be fully established
+        setTimeout(async () => {
+          await queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+          await queryClient.refetchQueries({ queryKey: ["/api/auth/user"] });
+        }, 200);
+      } else {
+        queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+      }
     });
 
     return () => {

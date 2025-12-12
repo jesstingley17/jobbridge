@@ -22,6 +22,8 @@ export function AuthInitializer() {
 
         if (session && mounted) {
           console.log("Session restored:", session.user.email);
+          // Wait a moment to ensure session is fully ready
+          await new Promise(resolve => setTimeout(resolve, 100));
           // Invalidate and refetch user data to sync with backend
           await queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
           await queryClient.refetchQueries({ queryKey: ["/api/auth/user"] });
@@ -44,13 +46,15 @@ export function AuthInitializer() {
       
       if (event === "SIGNED_IN" || event === "TOKEN_REFRESHED") {
         // Sync user data with backend when signed in or token refreshed
-        // Wait a moment for session to be fully established, then invalidate
-        setTimeout(() => {
-          if (mounted) {
-            console.log("Invalidating user query after", event);
-            queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+        // Wait a moment for session to be fully established, then invalidate and refetch
+        setTimeout(async () => {
+          if (mounted && session) {
+            console.log("Invalidating and refetching user query after", event);
+            await queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+            // Explicitly refetch to ensure we get the user data immediately
+            await queryClient.refetchQueries({ queryKey: ["/api/auth/user"] });
           }
-        }, 100);
+        }, 200); // Increased delay to ensure session is fully established
       } else if (event === "SIGNED_OUT") {
         // Clear user data when signed out
         queryClient.setQueryData(["/api/auth/user"], null);
