@@ -114,7 +114,7 @@ export default function Auth() {
       
       // Sync user to your database via API
       try {
-        await apiRequest("POST", "/api/auth/sync-supabase-user", {
+        const syncResponse = await apiRequest("POST", "/api/auth/sync-supabase-user", {
           supabaseUserId: authData.user.id,
           email: data.email,
           firstName: data.firstName,
@@ -122,10 +122,17 @@ export default function Auth() {
           termsAccepted: data.termsAccepted,
           marketingConsent: data.marketingConsent,
         });
+        
+        if (!syncResponse.ok) {
+          const errorData = await syncResponse.json().catch(() => ({}));
+          console.error("Failed to sync user to database:", errorData);
+          // Don't throw - allow registration to continue
+          // The /api/auth/user endpoint will auto-create the user if needed
+        }
       } catch (syncError: any) {
         console.error("Failed to sync user to database:", syncError);
         // If sync fails, still allow registration but log the error
-        // The user can still use the app, we'll sync later if needed
+        // The /api/auth/user endpoint will auto-create the user from Supabase data if needed
       }
       
       return authData;

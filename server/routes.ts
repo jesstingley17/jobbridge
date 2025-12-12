@@ -142,8 +142,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { supabaseUserId, email, firstName, lastName, termsAccepted, marketingConsent } = req.body;
       
       if (!supabaseUserId || !email) {
-        return res.status(400).json({ error: 'Missing required fields' });
+        return res.status(400).json({ error: 'Missing required fields: supabaseUserId and email are required' });
       }
+
+      console.log('Syncing Supabase user:', { supabaseUserId, email, firstName, lastName });
 
       // Upsert user to database using Supabase user ID
       const user = await storage.upsertUser({
@@ -156,10 +158,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
         marketingConsent: marketingConsent || false,
       });
 
-      res.json({ user });
+      console.log('Successfully synced user:', user.id);
+      res.json({ user, success: true });
     } catch (error: any) {
       console.error('Error syncing Supabase user:', error);
-      res.status(500).json({ error: error.message || 'Failed to sync user' });
+      console.error('Error details:', {
+        message: error.message,
+        stack: error.stack,
+        code: error.code,
+        name: error.name
+      });
+      
+      // Check if it's a database table error
+      if (error.code === '42P01' || error.message?.includes('does not exist') || error.message?.includes('relation')) {
+        return res.status(500).json({ 
+          error: 'Database not initialized',
+          message: 'Database tables do not exist. Please run migrations.',
+          details: error.message
+        });
+      }
+      
+      res.status(500).json({ 
+        error: error.message || 'Failed to sync user',
+        details: process.env.NODE_ENV === 'development' ? error.stack : undefined
+      });
     }
   });
   
@@ -503,16 +525,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Try Supabase auth first
       const authHeader = req.headers.authorization;
       if (authHeader?.startsWith('Bearer ')) {
-        const { supabaseAdmin } = await import('./supabase.js');
-        const token = authHeader.replace('Bearer ', '');
-        const { data: { user: supabaseUser }, error } = await supabaseAdmin.auth.getUser(token);
-        
-        if (!error && supabaseUser) {
-          // Get user from database using Supabase user ID
-          const user = await storage.getUser(supabaseUser.id);
-          if (user) {
-            return res.json(user);
+        try {
+          const { supabaseAdmin } = await import('./supabase.js');
+          const token = authHeader.replace('Bearer ', '');
+          const { data: { user: supabaseUser }, error } = await supabaseAdmin.auth.getUser(token);
+          
+          if (!error && supabaseUser) {
+            // Get user from database using Supabase user ID
+            let user = await storage.getUser(supabaseUser.id);
+            
+            // If user doesn't exist in our database yet, create it from Supabase data
+            if (!user && supabaseUser.email) {
+              console.log('User not found in database, creating from Supabase user:', supabaseUser.id);
+              const userMetadata = supabaseUser.user_metadata || {};
+              user = await storage.upsertUser({
+                id: supabaseUser.id,
+                email: supabaseUser.email,
+                firstName: userMetadata.first_name || userMetadata.full_name?.split(' ')[0] || null,
+                lastName: userMetadata.last_name || userMetadata.full_name?.split(' ').slice(1).join(' ') || null,
+                emailVerified: supabaseUser.email_confirmed_at ? true : false,
+                termsAccepted: userMetadata.terms_accepted || false,
+                marketingConsent: userMetadata.marketing_consent || false,
+              });
+            }
+            
+            if (user) {
+              return res.json(user);
+            }
+          } else if (error) {
+            console.error('Supabase token verification error:', error);
+            // Continue to fallback auth instead of failing immediately
           }
+        } catch (supabaseError: any) {
+          console.error('Error verifying Supabase token:', supabaseError);
+          // Continue to fallback auth
         }
       }
       
@@ -525,11 +571,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
-      // No user found
+      // No user found - return 401 but don't throw error (allows frontend to handle gracefully)
       res.status(401).json({ error: 'Not authenticated' });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching user:", error);
-      res.status(500).json({ message: "Failed to fetch user" });
+      console.error("Error stack:", error.stack);
+      res.status(500).json({ message: "Failed to fetch user", error: process.env.NODE_ENV === 'development' ? error.message : undefined });
     }
   });
 
