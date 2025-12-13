@@ -23,9 +23,10 @@ export default function Profile() {
   const { hasFeature } = useSubscriptionContext();
   const [isEditing, setIsEditing] = useState(false);
 
-  const { data: profile, isLoading: profileLoading } = useQuery<UserProfile>({
+  const { data: profile, isLoading: profileLoading, error: profileError } = useQuery<UserProfile>({
     queryKey: ["/api/profile"],
     enabled: isAuthenticated,
+    retry: 1,
   });
 
   const { data: dimensions } = useQuery<CareerDimension[]>({
@@ -181,38 +182,41 @@ export default function Profile() {
                   <h1 className="text-2xl font-bold" data-testid="text-user-name">
                     {displayUser.firstName} {displayUser.lastName}
                   </h1>
-                  {!isEditing && (
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        console.log("Edit Profile button clicked");
-                        startEditing();
-                      }} 
-                      data-testid="button-edit-profile"
-                      className="cursor-pointer"
-                    >
-                      <Pencil className="h-4 w-4 mr-2" />
-                      Edit Profile
-                    </Button>
-                  )}
-                  {isEditing && (
-                    <Button 
-                      variant="ghost" 
-                      size="sm" 
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        cancelEditing();
-                      }}
-                      className="cursor-pointer"
-                    >
-                      <X className="h-4 w-4 mr-2" />
-                      Cancel
-                    </Button>
-                  )}
+                  <div className="flex gap-2">
+                    {!isEditing ? (
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          console.log("Edit Profile button clicked, isAuthenticated:", isAuthenticated, "profile:", profile);
+                          startEditing();
+                        }} 
+                        data-testid="button-edit-profile"
+                        className="cursor-pointer"
+                        disabled={profileLoading}
+                      >
+                        <Pencil className="h-4 w-4 mr-2" />
+                        {profileLoading ? "Loading..." : "Edit Profile"}
+                      </Button>
+                    ) : (
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          console.log("Cancel editing");
+                          cancelEditing();
+                        }}
+                        className="cursor-pointer"
+                      >
+                        <X className="h-4 w-4 mr-2" />
+                        Cancel
+                      </Button>
+                    )}
+                  </div>
                 </div>
                 {profile?.headline && !isEditing && (
                   <p className="text-muted-foreground" data-testid="text-headline">{profile.headline}</p>
@@ -237,12 +241,19 @@ export default function Profile() {
         </Card>
 
         {isEditing && (
-          <Card data-testid="card-profile-edit">
+          <Card data-testid="card-profile-edit" className="border-2 border-primary">
             <CardHeader>
               <CardTitle>Edit Your Profile</CardTitle>
               <CardDescription>Update your information to get better job recommendations</CardDescription>
             </CardHeader>
             <CardContent>
+              {profileError && (
+                <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md">
+                  <p className="text-sm text-red-600 dark:text-red-400">
+                    Error loading profile: {profileError instanceof Error ? profileError.message : "Unknown error"}
+                  </p>
+                </div>
+              )}
               <form onSubmit={handleSubmit} className="space-y-6">
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="space-y-2">
