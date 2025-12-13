@@ -1070,6 +1070,80 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Newsletter signup (no authentication required)
+  app.post('/api/newsletter/signup', async (req, res) => {
+    try {
+      const { email } = req.body;
+      
+      if (!email) {
+        return res.status(400).json({ error: "Email is required" });
+      }
+      
+      // Basic email validation
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(email)) {
+        return res.status(400).json({ error: "Invalid email address" });
+      }
+      
+      // Check if user already exists
+      const existingUser = await storage.getUserByEmail(email);
+      
+      if (existingUser) {
+        // User exists - update their marketing consent
+        try {
+          await storage.updateUser(existingUser.id, {
+            marketingConsent: true,
+            marketingConsentAt: new Date(),
+          });
+          return res.json({ 
+            success: true, 
+            message: "You're already subscribed! We'll keep you updated.",
+            alreadySubscribed: true
+          });
+        } catch (updateError) {
+          console.error("Error updating user marketing consent:", updateError);
+          // Continue to return success even if update fails
+          return res.json({ 
+            success: true, 
+            message: "Thank you for subscribing!",
+            alreadySubscribed: true
+          });
+        }
+      }
+      
+      // Create new user with just email and marketing consent
+      try {
+        const user = await storage.upsertUser({
+          email,
+          marketingConsent: true,
+          marketingConsentAt: new Date(),
+          termsAccepted: false, // They haven't accepted terms yet, just newsletter
+        });
+        
+        return res.json({ 
+          success: true, 
+          message: "Thank you for subscribing to our newsletter!",
+          user: {
+            id: user.id,
+            email: user.email,
+          }
+        });
+      } catch (createError: any) {
+        console.error("Error creating newsletter subscriber:", createError);
+        return res.status(500).json({ 
+          error: "Failed to process newsletter signup",
+          message: createError?.message || "Database error"
+        });
+      }
+    } catch (error: any) {
+      console.error("Error in newsletter signup:", error);
+      res.status(500).json({ 
+        error: "Failed to process signup",
+        message: error?.message || "Internal server error"
+      });
+    }
+  });
+
   // Update community username
   app.patch('/api/user/community-username', isAuthenticated, async (req: any, res) => {
     try {

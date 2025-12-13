@@ -1,6 +1,7 @@
 import { Link } from "wouter";
 import { Heart, Shield, Accessibility, Mail, Phone } from "lucide-react";
 import { Logo } from "./logo";
+import { NewsletterSignup } from "./newsletter-signup";
 
 export function Footer() {
   return (
@@ -111,8 +112,15 @@ export function Footer() {
           </div>
         </div>
 
-        {/* Bottom Bar */}
+        {/* Newsletter Signup */}
         <div className="mt-12 border-t pt-8">
+          <div className="mx-auto max-w-md">
+            <NewsletterSignup variant="inline" />
+          </div>
+        </div>
+
+        {/* Bottom Bar */}
+        <div className="mt-8 border-t pt-8">
           <div className="flex flex-col items-center justify-between gap-4 md:flex-row">
             <p className="text-sm text-foreground/70">
               &copy; {new Date().getFullYear()} The Job Bridge Inc. All rights reserved.
