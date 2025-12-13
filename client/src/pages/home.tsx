@@ -2,6 +2,14 @@ import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Sparkles,
   FileText,
@@ -89,33 +97,84 @@ const howItWorks = [
 
 export default function Home() {
   const { toast } = useToast();
-  const [email, setEmail] = useState("");
+  const [formData, setFormData] = useState({
+    firstName: "",
+    lastName: "",
+    email: "",
+    role: "",
+    company: "",
+  });
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const waitlistMutation = useMutation({
-    mutationFn: async (email: string) => {
-      const response = await apiRequest("POST", "/api/waitlist", { email });
-      return response.json();
-    },
-    onSuccess: () => {
+  const handleWaitlistSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!formData.firstName || !formData.lastName || !formData.email) {
       toast({
-        title: "Success!",
-        description: "You've been added to the waitlist. Check your email for confirmation.",
-      });
-      setEmail("");
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to join waitlist. Please try again.",
+        title: "Missing information",
+        description: "Please fill in all required fields.",
         variant: "destructive",
       });
-    },
-  });
+      return;
+    }
 
-  const handleWaitlistSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!email) return;
-    waitlistMutation.mutate(email);
+    setIsSubmitting(true);
+
+    // Create a form element to submit to AWeber
+    const form = document.createElement("form");
+    form.method = "POST";
+    form.action = "https://www.aweber.com/scripts/addlead.pl";
+    form.acceptCharset = "UTF-8";
+    form.style.display = "none";
+
+    // Add hidden fields
+    const addHiddenField = (name: string, value: string) => {
+      const input = document.createElement("input");
+      input.type = "hidden";
+      input.name = name;
+      input.value = value;
+      form.appendChild(input);
+    };
+
+    addHiddenField("meta_web_form_id", "539205314");
+    addHiddenField("meta_split_id", "");
+    addHiddenField("listname", "awlist6912956");
+    addHiddenField("redirect", window.location.href);
+    addHiddenField("meta_adtracking", "Waitlist");
+    addHiddenField("meta_message", "1");
+    addHiddenField("meta_required", "name (awf_first),name (awf_last),email");
+    addHiddenField("meta_tooltip", "");
+
+    // Add form data
+    addHiddenField("name (awf_first)", formData.firstName);
+    addHiddenField("name (awf_last)", formData.lastName);
+    addHiddenField("email", formData.email);
+    if (formData.role) {
+      addHiddenField("custom Your Role", formData.role);
+    }
+    if (formData.company) {
+      addHiddenField("custom Organization", formData.company);
+    }
+
+    document.body.appendChild(form);
+    form.submit();
+    
+    // Show success message
+    toast({
+      title: "Success!",
+      description: "You've been added to the waitlist. Check your email for confirmation.",
+    });
+    
+    // Reset form
+    setFormData({
+      firstName: "",
+      lastName: "",
+      email: "",
+      role: "",
+      company: "",
+    });
+    
+    setIsSubmitting(false);
   };
 
   return (
