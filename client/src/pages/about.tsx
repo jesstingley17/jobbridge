@@ -276,7 +276,7 @@ export default function About() {
             Whether you&apos;re a job seeker, job developer, or employer — join us in rewriting the hiring world.
           </p>
           <div className="mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row">
-            <Link href="/">
+            <Link href="/beta-tester">
               <Button
                 size="lg"
                 variant="secondary"

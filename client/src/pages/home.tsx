@@ -337,7 +337,7 @@ export default function Home() {
             Join thousands of job seekers who have found meaningful employment through The Job Bridge.
           </p>
           <div className="mt-10">
-            <Link href="/jobs">
+            <Link href="/beta-tester">
               <Button
                 size="lg"
                 variant="secondary"

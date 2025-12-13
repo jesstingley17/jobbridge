@@ -40,7 +40,7 @@ export function Navbar() {
 
   const handleSignUpClick = (e: React.MouseEvent) => {
     e.preventDefault();
-    setLocation("/auth/sign-up");
+    setLocation("/beta-tester");
   };
 
   const handleLogout = async () => {
