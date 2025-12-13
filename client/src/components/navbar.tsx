@@ -40,7 +40,7 @@ export function Navbar() {
 
   const handleSignUpClick = (e: React.MouseEvent) => {
     e.preventDefault();
-    setLocation("/beta-tester");
+    setLocation("/beta-tester"); // Links to beta tester signup page
   };
 
   const handleLogout = async () => {
