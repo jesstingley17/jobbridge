@@ -111,6 +111,9 @@ export default function BetaTester() {
             <p className="text-xl text-muted-foreground mb-2">
               Be among the first to experience The JobBridge, Inc
             </p>
+            <p className="text-sm text-muted-foreground italic">
+              Help us build the future of accessible job searching
+            </p>
             <p className="text-muted-foreground">
               Help shape the future of accessible job searching
             </p>
