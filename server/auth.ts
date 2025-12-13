@@ -1,6 +1,17 @@
 import session from "express-session";
-import type { Express, RequestHandler } from "express";
+import type { Express, RequestHandler, Request } from "express";
 import { storage } from "./storage.js";
+
+// Extend Express Request type to include user property
+declare module "express-serve-static-core" {
+  interface Request {
+    user?: {
+      claims: {
+        sub: string;
+      };
+    };
+  }
+}
 
 // Simple session middleware for Vercel (Supabase handles auth)
 export function getSession() {
