@@ -33,33 +33,6 @@ export function Footer() {
             </div>
           </div>
 
-          {/* Platform Column */}
-          <div>
-            <h3 className="font-semibold mb-4 text-purple-600 dark:text-purple-400">Platform</h3>
-            <ul className="space-y-3" role="list">
-              <li>
-                <Link href="/jobs" className="text-sm text-foreground/70 hover:text-purple-600 dark:hover:text-purple-400 transition-colors" data-testid="link-footer-jobs">
-                  Find Jobs
-                </Link>
-              </li>
-              <li>
-                <Link href="/resume" className="text-sm text-foreground/70 hover:text-purple-600 dark:hover:text-purple-400 transition-colors" data-testid="link-footer-resume">
-                  Resume Builder
-                </Link>
-              </li>
-              <li>
-                <Link href="/interview" className="text-sm text-foreground/70 hover:text-purple-600 dark:hover:text-purple-400 transition-colors" data-testid="link-footer-interview">
-                  Interview Prep
-                </Link>
-              </li>
-              <li>
-                <Link href="/dashboard" className="text-sm text-foreground/70 hover:text-purple-600 dark:hover:text-purple-400 transition-colors" data-testid="link-footer-dashboard">
-                  Dashboard
-                </Link>
-              </li>
-            </ul>
-          </div>
-
           {/* Company Column */}
           <div>
             <h3 className="font-semibold mb-4 text-teal-600 dark:text-teal-400">Company</h3>
