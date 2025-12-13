@@ -614,26 +614,63 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   marketingConsent: userMetadata.marketing_consent || false,
                 });
               } catch (upsertError: any) {
-              console.error('Error upserting user:', upsertError);
-              console.error('Upsert error stack:', upsertError.stack);
-              // If it's a database error, return 500
-              if (upsertError.code === '42P01' || upsertError.message?.includes('does not exist')) {
-                return res.status(500).json({ 
-                  error: 'Database not initialized',
-                  message: 'Database tables do not exist. Please run migrations.'
-                });
+                console.error('Error upserting user:', upsertError);
+                console.error('Upsert error stack:', upsertError.stack);
+                // If it's a database error, return 500
+                if (upsertError.code === '42P01' || upsertError.message?.includes('does not exist')) {
+                  return res.status(500).json({ 
+                    error: 'Database not initialized',
+                    message: 'Database tables do not exist. Please run migrations.'
+                  });
+                }
+                // Try to get user again as fallback
+                try {
+                  user = await storage.getUser(supabaseUser.id);
+                } catch (retryError) {
+                  console.error('Error retrying getUser:', retryError);
+                }
               }
-              // Try to get user again as fallback
+            } else {
+              // No fullSupabaseUser returned, create with minimal data
               try {
-                user = await storage.getUser(supabaseUser.id);
-              } catch (retryError) {
-                console.error('Error retrying getUser:', retryError);
+                user = await storage.upsertUser({
+                  id: supabaseUser.id,
+                  email: supabaseUser.email,
+                  firstName: null,
+                  lastName: null,
+                  emailVerified: false,
+                  termsAccepted: false,
+                  marketingConsent: false,
+                });
+              } catch (minimalUpsertError: any) {
+                console.error('Error creating user with minimal data:', minimalUpsertError);
+                return res.status(500).json({ 
+                  error: 'Failed to create user',
+                  message: minimalUpsertError?.message || 'Database error'
+                });
               }
             }
           }
         } catch (supabaseError: any) {
-          console.error('Error fetching full user from Supabase:', supabaseError);
-          // Continue without metadata - user will be created with minimal info
+          console.error('Error accessing Supabase admin:', supabaseError);
+          // If we can't access Supabase admin, try to create user with minimal data
+          try {
+            user = await storage.upsertUser({
+              id: supabaseUser.id,
+              email: supabaseUser.email,
+              firstName: null,
+              lastName: null,
+              emailVerified: false,
+              termsAccepted: false,
+              marketingConsent: false,
+            });
+          } catch (minimalUpsertError: any) {
+            console.error('Error creating user with minimal data:', minimalUpsertError);
+            return res.status(500).json({ 
+              error: 'Failed to create user',
+              message: minimalUpsertError?.message || 'Database error'
+            });
+          }
         }
       }
       
