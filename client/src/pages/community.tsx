@@ -19,6 +19,7 @@ import type { User } from "@shared/schema";
 import { CommunityFeed } from "@/components/community/CommunityFeed";
 import { GroupsList } from "@/components/community/GroupsList";
 import { EventsList } from "@/components/community/EventsList";
+import { getCommunityDisplayName, getInitials } from "@/utils/community-utils";
 
 type MentorWithUser = {
   id: string;

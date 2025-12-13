@@ -13,6 +13,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import type { User } from "@shared/schema";
+import { getCommunityDisplayName, getInitials } from "@/utils/community-utils";
 
 type CommunityPost = {
   id: string;
