@@ -23,6 +23,7 @@ const navItems = [
   { href: "/blog", label: "Blog" },
   { href: "/community", label: "Community" },
   { href: "/pricing", label: "Pricing" },
+  { href: "/beta-tester", label: "Beta" },
 ];
 
 export function Navbar() {

@@ -83,6 +83,11 @@ export function Footer() {
                   Contact
                 </Link>
               </li>
+              <li>
+                <Link href="/beta-tester" className="text-sm text-foreground/70 hover:text-teal-600 dark:hover:text-teal-400 transition-colors" data-testid="link-footer-beta">
+                  Join Beta Program
+                </Link>
+              </li>
             </ul>
           </div>
 
