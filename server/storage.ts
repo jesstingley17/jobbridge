@@ -38,6 +38,7 @@ export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
   upsertUser(user: UpsertUser): Promise<User>;
   updateUserRole(id: string, role: string): Promise<User | undefined>;
+  updateUserCommunityUsername(id: string, username: string | null): Promise<User | undefined>;
   getCommunityMembers(): Promise<User[]>;
   
   // User profile operations

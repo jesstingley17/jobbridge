@@ -901,6 +901,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Update community username
+  app.patch('/api/user/community-username', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { username } = req.body;
+      
+      // Validate username (optional, can be null to clear it)
+      if (username !== null && username !== undefined) {
+        if (typeof username !== 'string') {
+          return res.status(400).json({ error: "Username must be a string" });
+        }
+        // Basic validation: alphanumeric, underscore, hyphen, 3-30 chars
+        if (username.length < 3 || username.length > 30) {
+          return res.status(400).json({ error: "Username must be between 3 and 30 characters" });
+        }
+        if (!/^[a-zA-Z0-9_-]+$/.test(username)) {
+          return res.status(400).json({ error: "Username can only contain letters, numbers, underscores, and hyphens" });
+        }
+      }
+      
+      const updated = await storage.updateUserCommunityUsername(userId, username || null);
+      if (!updated) {
+        return res.status(404).json({ error: "User not found" });
+      }
+      
+      res.json({ user: updated });
+    } catch (error: any) {
+      console.error("Error updating community username:", error);
+      res.status(500).json({ error: "Failed to update community username" });
+    }
+  });
+
   // Career DNA routes
   app.get('/api/career-dna/dimensions', async (_req, res) => {
     try {

@@ -14,6 +14,7 @@ import { Menu, X, Briefcase, FileText, MessageSquare, LayoutDashboard, Sparkles,
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/utils/supabase/client";
 import { Logo } from "./logo";
+import { CommunityUsernameEditor } from "./community-username-editor";
 
 const navItems = [
   { href: "/", label: "Home" },
@@ -172,6 +173,10 @@ export function Navbar() {
                             My Applications
                           </Link>
                         </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <div className="px-2 py-1.5">
+                          <CommunityUsernameEditor />
+                        </div>
                         <DropdownMenuSeparator />
                       </>
                     )}
