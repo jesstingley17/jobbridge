@@ -42,7 +42,12 @@ export default function BetaTester() {
       const response = await apiRequest("POST", "/api/beta-tester/signup", data);
       return response.json();
     },
-    onSuccess: () => {
+    onSuccess: (_, variables) => {
+      // If marketing consent is checked, also submit to AWeber newsletter
+      if (variables.marketingConsent) {
+        submitToAWeberNewsletter(variables.firstName, variables.lastName, variables.email);
+      }
+      
       toast({
         title: "Thank you for signing up!",
         description: "We'll be in touch soon with beta access details.",
@@ -65,6 +70,44 @@ export default function BetaTester() {
       });
     },
   });
+
+  const submitToAWeberNewsletter = (firstName: string, lastName: string, email: string) => {
+    // Create a form element to submit to AWeber newsletter
+    const form = document.createElement("form");
+    form.method = "POST";
+    form.action = "https://www.aweber.com/scripts/addlead.pl";
+    form.acceptCharset = "UTF-8";
+    form.style.display = "none";
+
+    // Add hidden fields
+    const addHiddenField = (name: string, value: string) => {
+      const input = document.createElement("input");
+      input.type = "hidden";
+      input.name = name;
+      input.value = value;
+      form.appendChild(input);
+    };
+
+    addHiddenField("meta_web_form_id", "305644354");
+    addHiddenField("meta_split_id", "");
+    addHiddenField("listname", "awlist6912956");
+    addHiddenField("redirect", window.location.href);
+    addHiddenField("meta_adtracking", "Newsletter");
+    addHiddenField("meta_message", "1");
+    addHiddenField("meta_required", "name (awf_first),name (awf_last),email");
+    addHiddenField("meta_tooltip", "");
+
+    // Add form data
+    addHiddenField("name (awf_first)", firstName);
+    addHiddenField("name (awf_last)", lastName);
+    addHiddenField("email", email);
+
+    document.body.appendChild(form);
+    form.submit();
+    
+    // Note: We don't show a separate toast for newsletter signup
+    // since it happens automatically in the background
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -268,7 +311,7 @@ export default function BetaTester() {
                       onCheckedChange={(checked) => setMarketingConsent(checked === true)}
                     />
                     <Label htmlFor="marketing" className="text-sm leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-                      I'd like to receive updates about new features and beta program news
+                      I'd like to receive updates about new features and beta program news (also signs you up for our newsletter)
                     </Label>
                   </div>
                 </div>
