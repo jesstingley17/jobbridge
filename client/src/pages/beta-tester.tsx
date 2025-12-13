@@ -16,6 +16,9 @@ import { Logo } from "@/components/logo";
 export default function BetaTester() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+  
+  // Debug: Log that component is rendering
+  console.log("BetaTester component rendered");
   const [email, setEmail] = useState("");
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
@@ -108,6 +111,7 @@ export default function BetaTester() {
               </div>
             </div>
             <h1 className="text-4xl font-bold mb-4">Join Our Beta Program</h1>
+            <div className="mb-2 text-xs text-muted-foreground">Beta Tester Signup Page</div>
             <p className="text-xl text-muted-foreground mb-2">
               Be among the first to experience The JobBridge, Inc
             </p>
