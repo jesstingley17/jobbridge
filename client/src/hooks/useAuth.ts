@@ -41,10 +41,12 @@ export function useAuth() {
 
   const { data: user, isLoading, error } = useQuery<User>({
     queryKey: ["/api/auth/user"],
-    retry: false,
+    retry: 1, // Retry once if it fails
     staleTime: 0, // Always refetch to get latest auth state
     refetchOnWindowFocus: true, // Refetch when window regains focus
-    enabled: sessionChecked, // Only run query after we've checked the session
+    enabled: sessionChecked && !!clientSession, // Only run query if we have a session
+    // Don't fail the query if backend is temporarily unavailable
+    // We'll show authenticated based on clientSession, backend will sync when available
   });
 
   // Listen to Supabase auth state changes and invalidate query
@@ -65,15 +67,18 @@ export function useAuth() {
       if (event === "SIGNED_IN" || event === "TOKEN_REFRESHED") {
         // Wait a moment for session to be fully established
         setTimeout(async () => {
+          // Ensure clientSession is set first (it should be from the if above)
+          // Then sync with backend
           await queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
           await queryClient.refetchQueries({ queryKey: ["/api/auth/user"] });
-        }, 200);
+        }, 300); // Increased delay to ensure session is fully ready
       } else if (event === "SIGNED_OUT") {
         // Clear everything on sign out
         setClientSession(null);
         queryClient.setQueryData(["/api/auth/user"], null);
         queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
-      } else {
+      } else if (event === "USER_UPDATED") {
+        // User data changed, refresh
         queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
       }
     });
@@ -83,9 +88,10 @@ export function useAuth() {
     };
   }, []);
 
-  // Only authenticated if backend confirms user exists AND we have a valid session
-  // Don't rely on clientSession alone - it might be stale
-  const isAuthenticated = !!user && !!clientSession;
+  // Authenticated if we have a valid Supabase session
+  // Backend user query will sync in the background, but don't block UI on it
+  // This allows immediate feedback when user signs in, while backend validates
+  const isAuthenticated = !!clientSession;
 
   return {
     user,

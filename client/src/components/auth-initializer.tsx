@@ -33,11 +33,16 @@ export function AuthInitializer() {
         if (session && mounted) {
           console.log("Session restored:", session.user.email);
           // Wait a moment to ensure session is fully ready
-          await new Promise(resolve => setTimeout(resolve, 100));
+          await new Promise(resolve => setTimeout(resolve, 200));
           // Invalidate and refetch user data to sync with backend
           // This will verify the session is still valid on the backend
-          await queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
-          await queryClient.refetchQueries({ queryKey: ["/api/auth/user"] });
+          // Use setTimeout to ensure this happens after useAuth hook has set clientSession
+          setTimeout(async () => {
+            if (mounted) {
+              await queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+              await queryClient.refetchQueries({ queryKey: ["/api/auth/user"] });
+            }
+          }, 100);
         } else if (mounted) {
           // No session found, clear any stale user data
           queryClient.setQueryData(["/api/auth/user"], null);
