@@ -111,12 +111,8 @@ export default function BetaTester() {
               </div>
             </div>
             <h1 className="text-4xl font-bold mb-4">Join Our Beta Program</h1>
-            <div className="mb-2 text-xs text-muted-foreground">Beta Tester Signup Page</div>
             <p className="text-xl text-muted-foreground mb-2">
               Be among the first to experience The JobBridge, Inc
-            </p>
-            <p className="text-sm text-muted-foreground italic">
-              Help us build the future of accessible job searching
             </p>
             <p className="text-muted-foreground">
               Help shape the future of accessible job searching
