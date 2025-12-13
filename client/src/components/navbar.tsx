@@ -117,22 +117,13 @@ export function Navbar() {
               
               {/* Show buttons when not authenticated */}
               {!isAuthenticated && (
-                <>
-                  <Button 
-                    variant="ghost" 
-                    data-testid="button-login" 
-                    onClick={handleSignInClick}
-                  >
-                    Log In
-                  </Button>
-                  <Button 
-                    className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700" 
-                    data-testid="button-get-started" 
-                    onClick={handleSignUpClick}
-                  >
-                    Get Started
-                  </Button>
-                </>
+                <Button 
+                  variant="ghost" 
+                  data-testid="button-login" 
+                  onClick={handleSignInClick}
+                >
+                  Log In
+                </Button>
               )}
               
               {/* Show user menu when authenticated */}
