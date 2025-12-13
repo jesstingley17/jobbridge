@@ -320,10 +320,9 @@ export default function Auth() {
         <div className="w-full max-w-md mx-auto">
           <Card className="w-full">
             <CardContent className="p-8">
-              <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "login" | "register")}>
-                <TabsList className="grid w-full grid-cols-2 mb-8">
+              <Tabs value="login">
+                <TabsList className="grid w-full grid-cols-1 mb-8">
                   <TabsTrigger value="login" data-testid="tab-login">Login</TabsTrigger>
-                  <TabsTrigger value="register" data-testid="tab-register">Register</TabsTrigger>
                 </TabsList>
 
                 <TabsContent value="login" className="space-y-6 mt-0">
@@ -447,9 +446,19 @@ export default function Auth() {
                   >
                     Forgot your password?
                   </Button>
+                  
+                  <div className="mt-6 text-center">
+                    <p className="text-sm text-muted-foreground">
+                      Don't have an account?{" "}
+                      <Link href="/beta-tester" className="text-primary hover:underline font-medium">
+                        Join our beta program
+                      </Link>
+                    </p>
+                  </div>
                 </TabsContent>
 
-                <TabsContent value="register" className="space-y-6 mt-0">
+                {/* Register tab removed - users should sign up via beta tester page */}
+                <TabsContent value="register" className="hidden">
                   <div className="bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-950/30 dark:to-pink-950/30 border border-purple-200 dark:border-purple-800 rounded-lg p-4 mb-6">
                     <p className="text-sm font-semibold text-purple-900 dark:text-purple-100 mb-2">
                       🎉 Join Early Access - Become a Beta Tester!
@@ -667,6 +676,15 @@ export default function Auth() {
                       )}
                     </Button>
                   </form>
+                  
+                  <div className="mt-6 text-center">
+                    <p className="text-sm text-muted-foreground">
+                      Don't have an account?{" "}
+                      <Link href="/beta-tester" className="text-primary hover:underline font-medium">
+                        Join our beta program
+                      </Link>
+                    </p>
+                  </div>
                 </TabsContent>
               </Tabs>
             </CardContent>
