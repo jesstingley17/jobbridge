@@ -37,6 +37,7 @@ import Privacy from "@/pages/privacy";
 import Cookies from "@/pages/cookies";
 import Terms from "@/pages/terms";
 import EarlyAccess from "@/pages/early-access";
+import BetaTester from "@/pages/beta-tester";
 import AdminBlog from "@/pages/admin-blog";
 import AdminLogin from "@/pages/admin-login";
 import NotFound from "@/pages/not-found";
@@ -81,6 +82,8 @@ function Router() {
           <Route path="/cookies" component={Cookies} />
           <Route path="/terms" component={Terms} />
           <Route path="/early-access" component={EarlyAccess} />
+          <Route path="/beta-tester" component={BetaTester} />
+          <Route path="/beta" component={BetaTester} />
           <Route path="/auth" component={AuthWrapper} />
       <Route path="/auth/sign-in" component={AuthWrapper} />
       <Route path="/auth/sign-up" component={AuthWrapper} />

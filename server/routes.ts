@@ -988,6 +988,88 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Beta tester signup (no authentication required)
+  app.post('/api/beta-tester/signup', async (req, res) => {
+    try {
+      const { email, firstName, lastName, company, role, feedback, termsAccepted, marketingConsent } = req.body;
+      
+      // Basic validation
+      if (!email || !firstName || !lastName) {
+        return res.status(400).json({ error: "Email, first name, and last name are required" });
+      }
+      
+      if (!termsAccepted) {
+        return res.status(400).json({ error: "You must accept the terms and conditions" });
+      }
+      
+      // Check if email already exists
+      const existingUser = await storage.getUserByEmail(email);
+      
+      if (existingUser) {
+        // User already exists - just update their marketing consent if provided
+        if (marketingConsent !== undefined) {
+          // Could update user here if needed
+        }
+        return res.json({ 
+          success: true, 
+          message: "You're already registered! We'll keep you updated.",
+          alreadyRegistered: true
+        });
+      }
+      
+      // Create user account for beta tester (they can set password later)
+      // For now, just store their info - they'll need to complete registration later
+      try {
+        const user = await storage.upsertUser({
+          email,
+          firstName,
+          lastName,
+          termsAccepted: true,
+          termsAcceptedAt: new Date(),
+          marketingConsent: marketingConsent || false,
+          marketingConsentAt: marketingConsent ? new Date() : null,
+          // Mark as beta tester in role or add a note
+          role: "participant", // Default role
+        });
+        
+        // Send welcome email for beta testers
+        try {
+          const { sendWelcomeEmail } = await import('./email.js');
+          await sendWelcomeEmail({ 
+            email: user.email!, 
+            firstName: user.firstName || undefined 
+          });
+        } catch (emailError) {
+          console.error("Failed to send beta tester welcome email:", emailError);
+          // Don't fail the request if email fails
+        }
+        
+        return res.json({ 
+          success: true, 
+          message: "Thank you for joining our beta program! We'll be in touch soon.",
+          user: {
+            id: user.id,
+            email: user.email,
+            firstName: user.firstName,
+            lastName: user.lastName,
+          }
+        });
+      } catch (createError: any) {
+        console.error("Error creating beta tester:", createError);
+        return res.status(500).json({ 
+          error: "Failed to process beta tester signup",
+          message: createError?.message || "Database error"
+        });
+      }
+    } catch (error: any) {
+      console.error("Error in beta tester signup:", error);
+      res.status(500).json({ 
+        error: "Failed to process signup",
+        message: error?.message || "Internal server error"
+      });
+    }
+  });
+
   // Update community username
   app.patch('/api/user/community-username', isAuthenticated, async (req: any, res) => {
     try {
