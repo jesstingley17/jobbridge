@@ -7,7 +7,7 @@ export function Footer() {
   return (
     <footer className="border-t bg-gradient-to-br from-purple-50/50 via-teal-50/30 to-pink-50/50 dark:from-purple-950/20 dark:via-teal-950/10 dark:to-pink-950/20" role="contentinfo">
       <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
-        <div className="grid grid-cols-1 gap-8 md:grid-cols-4">
+        <div className="grid grid-cols-1 gap-8 md:grid-cols-3">
           {/* Brand Column */}
           <div className="md:col-span-1">
             <Link href="/" data-testid="link-footer-logo">

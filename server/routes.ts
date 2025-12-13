@@ -1144,6 +1144,53 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Contact form submission
+  app.post('/api/contact', async (req, res) => {
+    try {
+      const { name, email, subject, message, type } = req.body;
+      
+      // Basic validation
+      if (!name || !email || !subject || !message) {
+        return res.status(400).json({ error: "Name, email, subject, and message are required" });
+      }
+      
+      // Email validation
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(email)) {
+        return res.status(400).json({ error: "Invalid email address" });
+      }
+      
+      // In a real application, you would:
+      // 1. Send an email notification to your team
+      // 2. Store the message in a database
+      // 3. Send an auto-reply to the user
+      
+      // For now, we'll just log it and return success
+      console.log("Contact form submission:", {
+        name,
+        email,
+        subject,
+        message,
+        type: type || "general",
+        timestamp: new Date().toISOString(),
+      });
+      
+      // TODO: Implement email sending service (e.g., SendGrid, Resend, etc.)
+      // TODO: Store in database if needed
+      
+      return res.json({ 
+        success: true, 
+        message: "Thank you for contacting us! We'll get back to you within 24-48 hours."
+      });
+    } catch (error: any) {
+      console.error("Error processing contact form:", error);
+      res.status(500).json({ 
+        error: "Failed to process contact form",
+        message: error?.message || "Internal server error"
+      });
+    }
+  });
+
   // Update community username
   app.patch('/api/user/community-username', isAuthenticated, async (req: any, res) => {
     try {
