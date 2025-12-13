@@ -12,6 +12,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Logo } from "@/components/logo";
 
+// Beta tester signup page - accessible at /beta-tester and /beta
 export default function BetaTester() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
