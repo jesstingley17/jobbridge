@@ -83,8 +83,9 @@ export function useAuth() {
     };
   }, []);
 
-  // Use backend user if available, otherwise fall back to client session for UI
-  const isAuthenticated = !!user || !!clientSession;
+  // Only authenticated if backend confirms user exists AND we have a valid session
+  // Don't rely on clientSession alone - it might be stale
+  const isAuthenticated = !!user && !!clientSession;
 
   return {
     user,
