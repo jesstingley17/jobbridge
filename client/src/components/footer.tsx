@@ -88,6 +88,7 @@ export function Footer() {
         {/* Newsletter Signup */}
         <div className="mt-12 border-t pt-8">
           <div className="mx-auto max-w-md">
+            <h3 className="text-lg font-semibold mb-4 text-center">Sign Up for Our Newsletter</h3>
             <NewsletterSignup variant="inline" />
           </div>
         </div>
