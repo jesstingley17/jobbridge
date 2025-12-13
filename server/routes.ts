@@ -557,21 +557,63 @@ export async function registerRoutes(app: Express): Promise<Server> {
         try {
           const { getSupabaseAdmin } = await import('./supabase.js');
           const supabaseAdmin = getSupabaseAdmin();
-          const { data: { user: fullSupabaseUser } } = await supabaseAdmin.auth.admin.getUserById(supabaseUser.id);
           
-          if (fullSupabaseUser) {
-            const userMetadata = fullSupabaseUser.user_metadata || {};
+          if (!supabaseAdmin) {
+            console.error('Failed to get Supabase admin client');
+            // Create user with minimal data from JWT payload
             try {
               user = await storage.upsertUser({
                 id: supabaseUser.id,
                 email: supabaseUser.email,
-                firstName: userMetadata.first_name || userMetadata.full_name?.split(' ')[0] || null,
-                lastName: userMetadata.last_name || userMetadata.full_name?.split(' ').slice(1).join(' ') || null,
-                emailVerified: fullSupabaseUser.email_confirmed_at ? true : false,
-                termsAccepted: userMetadata.terms_accepted || false,
-                marketingConsent: userMetadata.marketing_consent || false,
+                firstName: null,
+                lastName: null,
+                emailVerified: false,
+                termsAccepted: false,
+                marketingConsent: false,
               });
-            } catch (upsertError: any) {
+            } catch (minimalUpsertError: any) {
+              console.error('Error creating user with minimal data:', minimalUpsertError);
+              return res.status(500).json({ 
+                error: 'Failed to create user',
+                message: minimalUpsertError?.message || 'Database error'
+              });
+            }
+          } else {
+            const { data: { user: fullSupabaseUser }, error: getUserError } = await supabaseAdmin.auth.admin.getUserById(supabaseUser.id);
+          
+            if (getUserError) {
+              console.error('Error getting user from Supabase admin:', getUserError);
+              // Try to create user with minimal data
+              try {
+                user = await storage.upsertUser({
+                  id: supabaseUser.id,
+                  email: supabaseUser.email,
+                  firstName: null,
+                  lastName: null,
+                  emailVerified: false,
+                  termsAccepted: false,
+                  marketingConsent: false,
+                });
+              } catch (minimalUpsertError: any) {
+                console.error('Error creating user with minimal data:', minimalUpsertError);
+                return res.status(500).json({ 
+                  error: 'Failed to create user',
+                  message: minimalUpsertError?.message || 'Database error'
+                });
+              }
+            } else if (fullSupabaseUser) {
+              const userMetadata = fullSupabaseUser.user_metadata || {};
+              try {
+                user = await storage.upsertUser({
+                  id: supabaseUser.id,
+                  email: supabaseUser.email,
+                  firstName: userMetadata.first_name || userMetadata.full_name?.split(' ')[0] || null,
+                  lastName: userMetadata.last_name || userMetadata.full_name?.split(' ').slice(1).join(' ') || null,
+                  emailVerified: fullSupabaseUser.email_confirmed_at ? true : false,
+                  termsAccepted: userMetadata.terms_accepted || false,
+                  marketingConsent: userMetadata.marketing_consent || false,
+                });
+              } catch (upsertError: any) {
               console.error('Error upserting user:', upsertError);
               console.error('Upsert error stack:', upsertError.stack);
               // If it's a database error, return 500
