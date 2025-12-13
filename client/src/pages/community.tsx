@@ -174,12 +174,12 @@ export default function Community() {
                       <Avatar className="w-12 h-12">
                         <AvatarImage src={mentor.user.profileImageUrl || undefined} />
                         <AvatarFallback>
-                          {mentor.user.firstName?.[0]}{mentor.user.lastName?.[0]}
+                          {getInitials(mentor.user)}
                         </AvatarFallback>
                       </Avatar>
                       <div className="flex-1 min-w-0">
                         <CardTitle className="text-lg">
-                          {mentor.user.firstName} {mentor.user.lastName}
+                          {getCommunityDisplayName(mentor.user)}
                         </CardTitle>
                         <CardDescription>{mentor.availability}</CardDescription>
                       </div>
@@ -216,7 +216,7 @@ export default function Community() {
                       </DialogTrigger>
                       <DialogContent>
                         <DialogHeader>
-                          <DialogTitle>Connect with {mentor.user.firstName}</DialogTitle>
+                          <DialogTitle>Connect with {getCommunityDisplayName(mentor.user)}</DialogTitle>
                           <DialogDescription>
                             Send a message introducing yourself and why you'd like to connect
                           </DialogDescription>

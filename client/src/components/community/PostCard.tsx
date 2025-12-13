@@ -100,12 +100,12 @@ export function PostCard({ post, currentUserId, onDelete }: PostCardProps) {
             <Avatar>
               <AvatarImage src={post.author.profileImageUrl || undefined} />
               <AvatarFallback>
-                {post.author.firstName?.[0]}{post.author.lastName?.[0]}
+                {getInitials(post.author)}
               </AvatarFallback>
             </Avatar>
             <div>
               <p className="font-semibold">
-                {post.author.firstName} {post.author.lastName}
+                {getCommunityDisplayName(post.author)}
               </p>
               <p className="text-sm text-muted-foreground">
                 {formatDistanceToNow(new Date(post.createdAt), { addSuffix: true })}
