@@ -109,7 +109,20 @@ export default function Profile() {
     );
   }
 
-  if (!isAuthenticated || !user) {
+  // Show loading state while checking auth
+  if (authLoading) {
+    return (
+      <div className="mx-auto max-w-4xl px-4 py-8 sm:px-6 lg:px-8">
+        <div className="space-y-6">
+          <Skeleton className="h-48 w-full" />
+          <Skeleton className="h-64 w-full" />
+        </div>
+      </div>
+    );
+  }
+
+  // If not authenticated, show sign in prompt
+  if (!isAuthenticated) {
     return (
       <div className="mx-auto max-w-4xl px-4 py-8 sm:px-6 lg:px-8">
         <Card>
@@ -128,6 +141,21 @@ export default function Profile() {
       </div>
     );
   }
+
+  // If authenticated but user data is still loading, show loading state
+  if (!user && isAuthenticated) {
+    return (
+      <div className="mx-auto max-w-4xl px-4 py-8 sm:px-6 lg:px-8">
+        <div className="space-y-6">
+          <Skeleton className="h-48 w-full" />
+          <Skeleton className="h-64 w-full" />
+        </div>
+      </div>
+    );
+  }
+
+  // Fallback if user is null but we're authenticated (shouldn't happen, but handle gracefully)
+  const displayUser = user || { firstName: "", lastName: "", email: "" };
 
   const getInitials = (firstName?: string | null, lastName?: string | null) => {
     const first = firstName?.charAt(0) || "";
@@ -154,13 +182,13 @@ export default function Profile() {
           <CardContent className="pt-6">
             <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
               <Avatar className="h-20 w-20">
-                <AvatarImage src={user.profileImageUrl || undefined} alt={`${user.firstName} ${user.lastName}`} />
-                <AvatarFallback className="text-2xl">{getInitials(user.firstName, user.lastName)}</AvatarFallback>
+                <AvatarImage src={displayUser.profileImageUrl || undefined} alt={`${displayUser.firstName} ${displayUser.lastName}`} />
+                <AvatarFallback className="text-2xl">{getInitials(displayUser.firstName, displayUser.lastName)}</AvatarFallback>
               </Avatar>
               <div className="flex-1">
                 <div className="flex items-center justify-between gap-4 flex-wrap">
                   <h1 className="text-2xl font-bold" data-testid="text-user-name">
-                    {user.firstName} {user.lastName}
+                    {displayUser.firstName} {displayUser.lastName}
                   </h1>
                   {!isEditing && (
                     <Button variant="outline" size="sm" onClick={startEditing} data-testid="button-edit-profile">
@@ -173,10 +201,10 @@ export default function Profile() {
                   <p className="text-muted-foreground" data-testid="text-headline">{profile.headline}</p>
                 )}
                 <div className="flex flex-wrap gap-4 mt-2">
-                  {user.email && (
+                  {displayUser.email && (
                     <div className="flex items-center gap-1 text-sm text-muted-foreground">
                       <Mail className="h-4 w-4" />
-                      <span data-testid="text-email">{user.email}</span>
+                      <span data-testid="text-email">{displayUser.email}</span>
                     </div>
                   )}
                   {profile?.location && !isEditing && (
