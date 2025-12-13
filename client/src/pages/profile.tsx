@@ -98,17 +98,6 @@ export default function Profile() {
   };
 
 
-  if (authLoading) {
-    return (
-      <div className="mx-auto max-w-4xl px-4 py-8 sm:px-6 lg:px-8">
-        <div className="space-y-6">
-          <Skeleton className="h-48 w-full" />
-          <Skeleton className="h-64 w-full" />
-        </div>
-      </div>
-    );
-  }
-
   // Show loading state while checking auth
   if (authLoading) {
     return (
