@@ -11,6 +11,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Menu, X, Briefcase, FileText, MessageSquare, LayoutDashboard, Sparkles, User, LogOut, Dna, ClipboardList, Users, CreditCard } from "lucide-react";
+// Navbar component with beta tester signup integration
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/utils/supabase/client";
 import { Logo } from "./logo";
