@@ -17,6 +17,16 @@ export function AuthInitializer() {
         
         if (error) {
           console.error("Error getting session:", error);
+          // Clear any stale session data
+          queryClient.setQueryData(["/api/auth/user"], null);
+          return;
+        }
+
+        // Check if session is expired
+        if (session && session.expires_at && session.expires_at < Date.now() / 1000) {
+          console.log("Session expired, signing out");
+          await supabase.auth.signOut();
+          queryClient.setQueryData(["/api/auth/user"], null);
           return;
         }
 
@@ -25,11 +35,17 @@ export function AuthInitializer() {
           // Wait a moment to ensure session is fully ready
           await new Promise(resolve => setTimeout(resolve, 100));
           // Invalidate and refetch user data to sync with backend
+          // This will verify the session is still valid on the backend
           await queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
           await queryClient.refetchQueries({ queryKey: ["/api/auth/user"] });
+        } else if (mounted) {
+          // No session found, clear any stale user data
+          queryClient.setQueryData(["/api/auth/user"], null);
         }
       } catch (error) {
         console.error("Error initializing auth:", error);
+        // On error, clear stale data
+        queryClient.setQueryData(["/api/auth/user"], null);
       }
     };
 

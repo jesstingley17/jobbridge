@@ -7,14 +7,34 @@ import type { User } from "@shared/schema";
 export function useAuth() {
   // Client-side session fallback for immediate UI feedback
   const [clientSession, setClientSession] = useState<{ email?: string; id?: string } | null>(null);
+  const [sessionChecked, setSessionChecked] = useState(false);
 
-  // Initialize client session on mount
+  // Initialize client session on mount - but only after checking if it's valid
   useEffect(() => {
     const initClientSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
+      const { data: { session }, error } = await supabase.auth.getSession();
+      
+      // If there's an error or no session, clear client session
+      if (error || !session) {
+        setClientSession(null);
+        setSessionChecked(true);
+        return;
+      }
+
+      // Check if session is expired
+      if (session.expires_at && session.expires_at < Date.now() / 1000) {
+        // Session expired, sign out
+        await supabase.auth.signOut();
+        setClientSession(null);
+        setSessionChecked(true);
+        return;
+      }
+
+      // Only set client session if session is valid
       if (session?.user) {
         setClientSession({ email: session.user.email, id: session.user.id });
       }
+      setSessionChecked(true);
     };
     initClientSession();
   }, []);
@@ -24,6 +44,7 @@ export function useAuth() {
     retry: false,
     staleTime: 0, // Always refetch to get latest auth state
     refetchOnWindowFocus: true, // Refetch when window regains focus
+    enabled: sessionChecked, // Only run query after we've checked the session
   });
 
   // Listen to Supabase auth state changes and invalidate query
@@ -47,6 +68,11 @@ export function useAuth() {
           await queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
           await queryClient.refetchQueries({ queryKey: ["/api/auth/user"] });
         }, 200);
+      } else if (event === "SIGNED_OUT") {
+        // Clear everything on sign out
+        setClientSession(null);
+        queryClient.setQueryData(["/api/auth/user"], null);
+        queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
       } else {
         queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
       }
