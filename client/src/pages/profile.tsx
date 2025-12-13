@@ -73,6 +73,7 @@ export default function Profile() {
   });
 
   const startEditing = () => {
+    console.log("Start editing clicked, profile:", profile);
     setFormData({
       headline: profile?.headline || "",
       bio: profile?.bio || "",
@@ -86,6 +87,7 @@ export default function Profile() {
       preferredLocations: profile?.preferredLocations?.join(", ") || "",
     });
     setIsEditing(true);
+    console.log("isEditing set to true");
   };
 
   const cancelEditing = () => {
@@ -180,9 +182,35 @@ export default function Profile() {
                     {displayUser.firstName} {displayUser.lastName}
                   </h1>
                   {!isEditing && (
-                    <Button variant="outline" size="sm" onClick={startEditing} data-testid="button-edit-profile">
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        console.log("Edit Profile button clicked");
+                        startEditing();
+                      }} 
+                      data-testid="button-edit-profile"
+                      className="cursor-pointer"
+                    >
                       <Pencil className="h-4 w-4 mr-2" />
                       Edit Profile
+                    </Button>
+                  )}
+                  {isEditing && (
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        cancelEditing();
+                      }}
+                      className="cursor-pointer"
+                    >
+                      <X className="h-4 w-4 mr-2" />
+                      Cancel
                     </Button>
                   )}
                 </div>
