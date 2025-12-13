@@ -947,9 +947,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // User profile routes
-  app.get('/api/profile', isAuthenticated, async (req: any, res) => {
+  app.get('/api/profile', requireSupabaseAuth(), async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const supabaseUser = req.supabaseUser;
+      if (!supabaseUser || !supabaseUser.id) {
+        return res.status(401).json({ error: 'Not authenticated' });
+      }
+      const userId = supabaseUser.id;
       const profile = await storage.getUserProfile(userId);
       res.json(profile || null);
     } catch (error) {
@@ -958,9 +962,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post('/api/profile', isAuthenticated, async (req: any, res) => {
+  app.post('/api/profile', requireSupabaseAuth(), async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const supabaseUser = req.supabaseUser;
+      if (!supabaseUser || !supabaseUser.id) {
+        return res.status(401).json({ error: 'Not authenticated' });
+      }
+      const userId = supabaseUser.id;
       const parsed = updateProfileSchema.safeParse(req.body);
       if (!parsed.success) {
         return res.status(400).json({ error: "Invalid profile data", details: parsed.error.errors });
