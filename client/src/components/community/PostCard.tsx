@@ -206,12 +206,12 @@ export function PostCard({ post, currentUserId, onDelete }: PostCardProps) {
                   <Avatar className="h-8 w-8">
                     <AvatarImage src={comment.author?.profileImageUrl || undefined} />
                     <AvatarFallback>
-                      {comment.author?.firstName?.[0]}{comment.author?.lastName?.[0]}
+                      {getInitials(comment.author || null)}
                     </AvatarFallback>
                   </Avatar>
                   <div className="flex-1">
                     <p className="text-sm font-semibold">
-                      {comment.author?.firstName} {comment.author?.lastName}
+                      {getCommunityDisplayName(comment.author || null)}
                     </p>
                     <p className="text-sm">{comment.content}</p>
                     <p className="text-xs text-muted-foreground mt-1">
