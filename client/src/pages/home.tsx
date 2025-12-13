@@ -216,36 +216,117 @@ export default function Home() {
               The most comprehensive, accessible, and user-friendly job search platform designed with the success and wellbeing of people with disabilities in mind.
             </p>
 
-            {/* Waitlist Form */}
-            <form onSubmit={handleWaitlistSubmit} className="mt-10 mx-auto max-w-md">
-              <div className="flex flex-col sm:flex-row gap-3">
+            {/* Waitlist Form - AWeber Integration */}
+            <form onSubmit={handleWaitlistSubmit} className="mt-10 mx-auto max-w-md space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="waitlist-first-name" className="text-sm font-medium">
+                    First Name <span className="text-red-500">*</span>
+                  </Label>
+                  <Input
+                    id="waitlist-first-name"
+                    type="text"
+                    placeholder="John"
+                    value={formData.firstName}
+                    onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
+                    className="rounded-md"
+                    required
+                    data-testid="input-waitlist-first-name"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="waitlist-last-name" className="text-sm font-medium">
+                    Last Name <span className="text-red-500">*</span>
+                  </Label>
+                  <Input
+                    id="waitlist-last-name"
+                    type="text"
+                    placeholder="Doe"
+                    value={formData.lastName}
+                    onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
+                    className="rounded-md"
+                    required
+                    data-testid="input-waitlist-last-name"
+                  />
+                </div>
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="waitlist-email" className="text-sm font-medium">
+                  Email <span className="text-red-500">*</span>
+                </Label>
                 <Input
+                  id="waitlist-email"
                   type="email"
-                  placeholder="Enter your email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="flex-1 rounded-md"
+                  placeholder="you@example.com"
+                  value={formData.email}
+                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                  className="rounded-md"
                   required
                   data-testid="input-waitlist-email"
                 />
-                <Button
-                  type="submit"
-                  className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white border-0 gap-2 px-8"
-                  disabled={waitlistMutation.isPending}
-                  data-testid="button-join-waitlist"
-                >
-                  {waitlistMutation.isPending ? (
-                    "Joining..."
-                  ) : (
-                    <>
-                      Join Waitlist
-                      <ArrowRight className="h-4 w-4" aria-hidden="true" />
-                    </>
-                  )}
-                </Button>
               </div>
-              <p className="mt-3 text-sm text-muted-foreground">
-                Get 30-day free premium trial + priority access
+
+              <div className="space-y-2">
+                <Label htmlFor="waitlist-role" className="text-sm font-medium">
+                  Your Role
+                </Label>
+                <Select
+                  value={formData.role}
+                  onValueChange={(value) => setFormData({ ...formData, role: value })}
+                >
+                  <SelectTrigger id="waitlist-role" className="rounded-md">
+                    <SelectValue placeholder="Select your role" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Job Developer">Job Developer</SelectItem>
+                    <SelectItem value="Participant">Participant</SelectItem>
+                    <SelectItem value="Business">Business</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="waitlist-company" className="text-sm font-medium">
+                  Company
+                </Label>
+                <Input
+                  id="waitlist-company"
+                  type="text"
+                  placeholder="Your Company"
+                  value={formData.company}
+                  onChange={(e) => setFormData({ ...formData, company: e.target.value })}
+                  className="rounded-md"
+                  data-testid="input-waitlist-company"
+                />
+              </div>
+
+              <Button
+                type="submit"
+                className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white border-0 gap-2"
+                disabled={isSubmitting}
+                data-testid="button-join-waitlist"
+              >
+                {isSubmitting ? (
+                  "Submitting..."
+                ) : (
+                  <>
+                    Join Waitlist
+                    <ArrowRight className="h-4 w-4" aria-hidden="true" />
+                  </>
+                )}
+              </Button>
+
+              <p className="text-xs text-center text-muted-foreground">
+                We respect your{" "}
+                <a
+                  href="https://www.aweber.com/permission.htm"
+                  target="_blank"
+                  rel="nofollow"
+                  className="text-primary hover:underline"
+                >
+                  email privacy
+                </a>
               </p>
             </form>
           </div>
