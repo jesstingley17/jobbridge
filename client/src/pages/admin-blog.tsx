@@ -52,18 +52,32 @@ export default function AdminBlog() {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [postToDelete, setPostToDelete] = useState<BlogPost | null>(null);
 
-  const { data: postsData, isLoading } = useQuery<{ posts: BlogPost[] }>({
+  // Redirect to login if there's an auth error
+  if (error && (error as any)?.message?.includes("Admin access required") || (error as any)?.message?.includes("Unauthorized")) {
+    // This will be handled by the query error, but we can also redirect here
+  }
+
+  const { data: postsData, isLoading, error } = useQuery<{ posts: BlogPost[] }>({
     queryKey: ["/api/admin/blog/posts"],
     queryFn: async () => {
-      const response = await apiRequest("GET", "/api/admin/blog/posts");
-      if (!response.ok) {
-        if (response.status === 401 || response.status === 403) {
-          setLocation("/admin/login");
-          throw new Error("Admin access required");
+      try {
+        const response = await apiRequest("GET", "/api/admin/blog/posts");
+        if (!response.ok) {
+          if (response.status === 401 || response.status === 403) {
+            setLocation("/admin/login");
+            throw new Error("Admin access required");
+          }
+          const errorData = await response.json().catch(() => ({ error: "Failed to fetch posts" }));
+          throw new Error(errorData.error || errorData.message || "Failed to fetch posts");
         }
-        throw new Error("Failed to fetch posts");
+        return response.json();
+      } catch (err: any) {
+        // If it's a network error or 401/403, redirect to login
+        if (err.message?.includes("401") || err.message?.includes("403") || err.message?.includes("Unauthorized")) {
+          setLocation("/admin/login");
+        }
+        throw err;
       }
-      return response.json();
     },
     retry: false,
   });
@@ -228,6 +242,51 @@ export default function AdminBlog() {
               <Skeleton key={i} className="h-32 w-full" />
             ))}
           </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Show error state and redirect to login if unauthorized
+  if (error) {
+    const errorMessage = (error as any)?.message || "Failed to load blog posts";
+    const isAuthError = errorMessage.includes("Admin access required") || 
+                       errorMessage.includes("Unauthorized") ||
+                       errorMessage.includes("401") ||
+                       errorMessage.includes("403");
+    
+    if (isAuthError) {
+      // Redirect will happen via the query error handler, but show message briefly
+      return (
+        <div className="min-h-screen bg-background p-8">
+          <div className="mx-auto max-w-7xl">
+            <Card>
+              <CardContent className="pt-6">
+                <p className="text-center text-muted-foreground">
+                  Redirecting to login...
+                </p>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div className="min-h-screen bg-background p-8">
+        <div className="mx-auto max-w-7xl">
+          <Card>
+            <CardContent className="pt-6">
+              <p className="text-center text-destructive">
+                Error: {errorMessage}
+              </p>
+              <div className="mt-4 text-center">
+                <Button onClick={() => window.location.reload()}>
+                  Retry
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
         </div>
       </div>
     );
