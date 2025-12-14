@@ -504,6 +504,7 @@ function BlogPostForm({
   const [published, setPublished] = useState(post?.published ?? true);
   const [tags, setTags] = useState(post?.tags?.join(", ") || "");
   const [syncToContentful, setSyncToContentful] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
   const [publishedAt, setPublishedAt] = useState(
     post?.publishedAt ? new Date(post.publishedAt).toISOString().split("T")[0] : new Date().toISOString().split("T")[0]
   );
@@ -737,15 +738,42 @@ function BlogPostForm({
         </div>
       </div>
     </form>
-    
-    {/* Preview Dialog */}
-    {showPreview && (
-      <Dialog open={showPreview} onOpenChange={setShowPreview}>
-        <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Blog Post Preview</DialogTitle>
-          </DialogHeader>
-          <div className="min-h-screen bg-background">
+  );
+}
+
+// Separate Preview Dialog Component to avoid nesting issues
+function BlogPostPreviewDialog({
+  open,
+  onOpenChange,
+  title,
+  slug,
+  excerpt,
+  content,
+  authorName,
+  featuredImage,
+  featuredImageAltText,
+  tags,
+  publishedAt,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  title: string;
+  slug: string;
+  excerpt?: string;
+  content: string;
+  authorName: string;
+  featuredImage?: string;
+  featuredImageAltText?: string;
+  tags: string;
+  publishedAt: string;
+}) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Blog Post Preview</DialogTitle>
+        </DialogHeader>
+        <div className="bg-background">
             {/* Article Header */}
             <article>
               <header className="border-b bg-muted/30">
