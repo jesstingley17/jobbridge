@@ -153,42 +153,60 @@ export const isAdmin: RequestHandler = async (req: any, res, next) => {
     }
     
     // Run database checks in parallel with timeout
-    const checks = Promise.race([
-      Promise.allSettled([
-        // Check 1: Get user from database
-        storage.getUser(userId).catch(() => null),
-        // Check 2: Check user_roles table
-        pool.query(
-          `SELECT EXISTS (
-            SELECT 1 FROM public.user_roles ur
-            JOIN public.roles r ON r.id = ur.role_id
-            WHERE ur.user_id = $1 AND r.name = 'admin'
-          ) AS is_admin`,
-          [userId]
-        ).then(r => r.rows[0]?.is_admin === true).catch(() => false),
-        // Check 3: Check Supabase metadata (with timeout)
-        (async () => {
-          try {
-            const { getSupabaseAdmin } = await import('./supabase.js');
-            const supabaseAdmin = getSupabaseAdmin();
-            const { data: { user: fullUser }, error } = await supabaseAdmin.auth.admin.getUserById(userId);
-            if (!error && fullUser) {
-              return fullUser.app_metadata?.role === 'admin' || 
-                     fullUser.app_metadata?.is_admin === true ||
-                     fullUser.user_metadata?.role === 'admin' ||
-                     fullUser.user_metadata?.is_admin === true;
-            }
-          } catch {}
-          return false;
-        })()
-      ]),
-      // Timeout after 2 seconds
-      new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 2000))
-    ]).catch(() => null) as Promise<PromiseSettledResult<any>[] | null>;
+    // Use Promise.allSettled so we get partial results even if some fail
+    const allChecks = Promise.allSettled([
+      // Check 1: Get user from database
+      storage.getUser(userId).catch(() => null),
+      // Check 2: Check user_roles table
+      pool.query(
+        `SELECT EXISTS (
+          SELECT 1 FROM public.user_roles ur
+          JOIN public.roles r ON r.id = ur.role_id
+          WHERE ur.user_id = $1 AND r.name = 'admin'
+        ) AS is_admin`,
+        [userId]
+      ).then(r => r.rows[0]?.is_admin === true).catch(() => false),
+      // Check 3: Check Supabase metadata
+      (async () => {
+        try {
+          const { getSupabaseAdmin } = await import('./supabase.js');
+          const supabaseAdmin = getSupabaseAdmin();
+          const { data: { user: fullUser }, error } = await supabaseAdmin.auth.admin.getUserById(userId);
+          if (!error && fullUser) {
+            return fullUser.app_metadata?.role === 'admin' || 
+                   fullUser.app_metadata?.is_admin === true ||
+                   fullUser.user_metadata?.role === 'admin' ||
+                   fullUser.user_metadata?.is_admin === true;
+          }
+        } catch {}
+        return false;
+      })()
+    ]);
     
-    const results = await checks;
+    // Race against timeout - but still get partial results
+    let results: PromiseSettledResult<any>[] | null = null;
+    try {
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        setTimeout(() => reject(new Error('timeout')), 2000);
+      });
+      results = await Promise.race([allChecks, timeoutPromise]);
+    } catch (error: any) {
+      if (error.message === 'timeout') {
+        // Timeout occurred, but try to get partial results
+        try {
+          results = await Promise.race([
+            allChecks,
+            new Promise<PromiseSettledResult<any>[]>((resolve) => {
+              setTimeout(() => resolve([]), 100); // Give it 100ms more
+            })
+          ]);
+        } catch {
+          // If still no results, continue with null
+        }
+      }
+    }
     
-    if (results) {
+    if (results && results.length >= 3) {
       const [userResult, rolesResult, metadataResult] = results;
       
       // Check user.role from database
