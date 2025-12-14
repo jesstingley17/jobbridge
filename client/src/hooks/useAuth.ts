@@ -93,6 +93,24 @@ export function useAuth() {
   // This allows immediate feedback when user signs in, while backend validates
   const isAuthenticated = !!clientSession;
 
+  // Helper function to refresh session (useful after admin role assignment)
+  const refreshSession = async () => {
+    try {
+      const { data, error } = await supabase.auth.refreshSession();
+      if (error) throw error;
+      
+      if (data.session) {
+        setClientSession({ email: data.session.user.email, id: data.session.user.id });
+        await queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+        await queryClient.refetchQueries({ queryKey: ["/api/auth/user"] });
+      }
+      return data.session;
+    } catch (err: any) {
+      console.error("Error refreshing session:", err);
+      throw err;
+    }
+  };
+
   return {
     user,
     isLoading,
@@ -100,5 +118,7 @@ export function useAuth() {
     error,
     // Expose client session for debugging/fallback UI
     clientSession: clientSession ? { email: clientSession.email, id: clientSession.id } : null,
+    // Helper to refresh session (useful after role updates)
+    refreshSession,
   };
 }

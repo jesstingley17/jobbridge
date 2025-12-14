@@ -162,7 +162,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Supabase user sync endpoint - called after Supabase signup
   app.post('/api/auth/sync-supabase-user', async (req, res) => {
     try {
-      const { supabaseUserId, email, firstName, lastName, termsAccepted, marketingConsent } = req.body;
+      const { supabaseUserId, email, firstName, lastName, termsAccepted, marketingConsent, emailVerified } = req.body;
       
       if (!supabaseUserId || !email) {
         return res.status(400).json({ error: 'Missing required fields: supabaseUserId and email are required' });
@@ -170,13 +170,96 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       console.log('Syncing Supabase user:', { supabaseUserId, email, firstName, lastName });
 
-      // Upsert user to database using Supabase user ID
+      // CRITICAL: Check if a user with this email already exists (from beta signup, newsletter, etc.)
+      const existingUserByEmail = await storage.getUserByEmail(email);
+      
+      if (existingUserByEmail) {
+        // User exists with different ID - merge by updating ID to Supabase ID
+        if (existingUserByEmail.id !== supabaseUserId) {
+          console.log(`Merging user: Found existing user ${existingUserByEmail.id} for email ${email}, updating to Supabase ID ${supabaseUserId}`);
+          
+          // Update the existing user's ID to Supabase ID and merge data
+          // This requires a special merge operation since we can't directly change primary key
+          // We'll need to handle this carefully to avoid conflicts
+          try {
+            // First, check if Supabase ID already exists (shouldn't happen, but safety check)
+            const existingSupabaseUser = await storage.getUser(supabaseUserId);
+            
+            if (existingSupabaseUser) {
+              // Supabase ID already exists - this is a conflict
+              console.warn(`Both email-based user (${existingUserByEmail.id}) and Supabase user (${supabaseUserId}) exist for ${email}`);
+              // Use the Supabase user as canonical, but merge data
+              const mergedUser = await storage.upsertUser({
+                id: supabaseUserId,
+                email,
+                firstName: firstName || existingUserByEmail.firstName || null,
+                lastName: lastName || existingUserByEmail.lastName || null,
+                emailVerified: emailVerified ?? existingUserByEmail.emailVerified ?? false,
+                termsAccepted: termsAccepted ?? existingUserByEmail.termsAccepted ?? false,
+                marketingConsent: marketingConsent ?? existingUserByEmail.marketingConsent ?? false,
+                role: existingUserByEmail.role || null,
+                stripeCustomerId: existingUserByEmail.stripeCustomerId || null,
+                stripeSubscriptionId: existingUserByEmail.stripeSubscriptionId || null,
+                subscriptionTier: existingUserByEmail.subscriptionTier || null,
+              });
+              
+              // Delete the old user record (optional - you may want to keep it for audit)
+              // For now, we'll just use the Supabase ID as canonical
+              console.log('Using Supabase user as canonical:', mergedUser.id);
+              res.json({ user: mergedUser, success: true, merged: true });
+              return;
+            }
+            
+            // No Supabase user exists - we need to merge by updating the existing user
+            // Since we can't change primary key, we'll create a new user with Supabase ID
+            // and mark the old one for deletion (or handle via a migration)
+            const mergedUser = await storage.upsertUser({
+              id: supabaseUserId,
+              email,
+              firstName: firstName || existingUserByEmail.firstName || null,
+              lastName: lastName || existingUserByEmail.lastName || null,
+              emailVerified: emailVerified ?? existingUserByEmail.emailVerified ?? false,
+              termsAccepted: termsAccepted ?? existingUserByEmail.termsAccepted ?? false,
+              marketingConsent: marketingConsent ?? existingUserByEmail.marketingConsent ?? false,
+              role: existingUserByEmail.role || null,
+              stripeCustomerId: existingUserByEmail.stripeCustomerId || null,
+              stripeSubscriptionId: existingUserByEmail.stripeSubscriptionId || null,
+              subscriptionTier: existingUserByEmail.subscriptionTier || null,
+            });
+            
+            // TODO: Migrate related records (applications, profiles, etc.) from old ID to new ID
+            // For now, we'll log a warning
+            console.warn(`User merged: Old ID ${existingUserByEmail.id} -> New ID ${supabaseUserId}. Related records may need migration.`);
+            
+            res.json({ user: mergedUser, success: true, merged: true, oldId: existingUserByEmail.id });
+            return;
+          } catch (mergeError: any) {
+            console.error('Error merging users:', mergeError);
+            // Fall through to regular upsert
+          }
+        } else {
+          // Same ID - just update
+          const user = await storage.upsertUser({
+            id: supabaseUserId,
+            email,
+            firstName: firstName || existingUserByEmail.firstName || null,
+            lastName: lastName || existingUserByEmail.lastName || null,
+            emailVerified: emailVerified ?? existingUserByEmail.emailVerified ?? false,
+            termsAccepted: termsAccepted ?? existingUserByEmail.termsAccepted ?? false,
+            marketingConsent: marketingConsent ?? existingUserByEmail.marketingConsent ?? false,
+          });
+          res.json({ user, success: true });
+          return;
+        }
+      }
+
+      // No existing user - create new with Supabase ID
       const user = await storage.upsertUser({
         id: supabaseUserId,
         email,
         firstName: firstName || null,
         lastName: lastName || null,
-        emailVerified: false, // Will be true after email verification
+        emailVerified: emailVerified ?? false,
         termsAccepted: termsAccepted || false,
         marketingConsent: marketingConsent || false,
       });
@@ -972,19 +1055,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const existingUser = await storage.getUserByEmail(email);
       
       if (existingUser) {
-        // User already exists - just update their marketing consent if provided
-        if (marketingConsent !== undefined) {
-          // Could update user here if needed
+        // User already exists - update their info if needed
+        if (marketingConsent !== undefined || firstName || lastName) {
+          await storage.updateUser(existingUser.id, {
+            firstName: firstName || existingUser.firstName || null,
+            lastName: lastName || existingUser.lastName || null,
+            marketingConsent: marketingConsent ?? existingUser.marketingConsent ?? false,
+            marketingConsentAt: marketingConsent ? new Date() : existingUser.marketingConsentAt || null,
+            termsAccepted: existingUser.termsAccepted || true,
+            termsAcceptedAt: existingUser.termsAcceptedAt || new Date(),
+          });
         }
         return res.json({ 
           success: true, 
           message: "You're already registered! We'll keep you updated.",
-          alreadyRegistered: true
+          alreadyRegistered: true,
+          user: existingUser
         });
       }
       
-      // Create user account for beta tester (they can set password later)
-      // For now, just store their info - they'll need to complete registration later
+      // Check if user exists in Supabase Auth (they may have signed up via Supabase first)
+      // If so, use their Supabase ID; otherwise, let database generate one
+      // Note: We can't check Supabase Auth directly here, so we'll create with auto-generated ID
+      // The sync-supabase-user endpoint will handle merging if they sign up via Supabase later
       try {
         const user = await storage.upsertUser({
           email,
@@ -1053,7 +1146,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Check if user already exists
       const existingUser = await storage.getUserByEmail(email);
-      
+
       if (existingUser) {
         // User exists - update their marketing consent
         // Using updateUser for app-specific fields (Supabase best practice)
@@ -1061,6 +1154,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
           await storage.updateUser(existingUser.id, {
             marketingConsent: true,
             marketingConsentAt: new Date(),
+          });
+          // Return existing user
+          return res.json({
+            success: true,
+            message: "Thank you for subscribing to our newsletter!",
+            user: existingUser,
           });
           return res.json({ 
             success: true, 
