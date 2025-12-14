@@ -2608,19 +2608,6 @@ Return JSON with:
     }
   });
 
-  // Site manifest route (for PWA)
-  app.get("/site.webmanifest", (_req, res) => {
-    res.json({
-      name: "The JobBridge",
-      short_name: "JobBridge",
-      description: "AI-powered employment platform for people with disabilities",
-      start_url: "/",
-      display: "standalone",
-      background_color: "#ffffff",
-      theme_color: "#000000",
-      icons: []
-    });
-  });
 
   // Admin blog management routes
   app.get("/api/admin/blog/posts", isAuthenticated, isAdmin, async (req: any, res) => {
