@@ -2550,6 +2550,20 @@ Return JSON with:
     }
   });
 
+  // Site manifest route (for PWA)
+  app.get("/site.webmanifest", (_req, res) => {
+    res.json({
+      name: "The JobBridge",
+      short_name: "JobBridge",
+      description: "AI-powered employment platform for people with disabilities",
+      start_url: "/",
+      display: "standalone",
+      background_color: "#ffffff",
+      theme_color: "#000000",
+      icons: []
+    });
+  });
+
   // Admin blog management routes
   app.get("/api/admin/blog/posts", isAuthenticated, isAdmin, async (req: any, res) => {
     try {
@@ -2558,20 +2572,23 @@ Return JSON with:
         return res.status(401).json({ error: "Unauthorized" });
       }
       
-      const posts = await storage.getAllBlogPosts();
-      res.json({ posts });
+      try {
+        const posts = await storage.getAllBlogPosts();
+        res.json({ posts });
+      } catch (dbError: any) {
+        // Database errors - return empty array instead of 500 to prevent UI breakage
+        console.error("Database error fetching blog posts:", dbError);
+        res.json({ posts: [] });
+      }
     } catch (error: any) {
-      console.error("Error fetching all blog posts:", error);
-      console.error("Error stack:", error?.stack);
-      console.error("Error details:", {
-        message: error?.message,
-        code: error?.code,
-        name: error?.name
-      });
-      res.status(500).json({ 
-        error: "Failed to fetch blog posts",
-        message: process.env.NODE_ENV === 'development' ? error?.message : undefined
-      });
+      // This should rarely happen if middleware works correctly
+      console.error("Error in admin blog posts endpoint:", error);
+      // Return 401 instead of 500 for auth-related errors
+      if (error?.message?.includes('Unauthorized') || error?.message?.includes('authentication')) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+      // For other errors, return empty array to prevent UI breakage
+      res.json({ posts: [] });
     }
   });
 
