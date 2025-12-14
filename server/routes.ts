@@ -670,6 +670,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ error: 'Not authenticated' });
       }
 
+      // Check Supabase Auth metadata for admin status (in case user is admin in Supabase but not synced to DB)
+      let isAdminFromSupabase = false;
+      try {
+        const { getSupabaseAdmin } = await import('./supabase.js');
+        const supabaseAdmin = getSupabaseAdmin();
+        const { data: { user: fullUser }, error: getUserError } = await supabaseAdmin.auth.admin.getUserById(supabaseUser.id);
+        if (!getUserError && fullUser) {
+          // Check app_metadata or user_metadata for admin status
+          isAdminFromSupabase = fullUser.app_metadata?.role === 'admin' || 
+                                fullUser.app_metadata?.is_admin === true ||
+                                fullUser.user_metadata?.role === 'admin' ||
+                                fullUser.user_metadata?.is_admin === true;
+        }
+      } catch (metadataError: any) {
+        // If we can't check metadata, continue with database check
+        console.warn('Could not check Supabase metadata for admin status:', metadataError.message);
+      }
+
       // Fast path: Try to get user from database first (most common case)
       // Add timeout to prevent hanging
       let user;
@@ -682,7 +700,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         user = await Promise.race([getUserPromise, timeoutPromise]) as any;
         
         // If user exists, return immediately (fast path)
+        // But override role if user is admin in Supabase but not in database
         if (user) {
+          // If user is admin in Supabase but not in database, update the role
+          if (isAdminFromSupabase && user.role !== 'admin') {
+            user.role = 'admin';
+            // Optionally sync to database (async, don't wait)
+            storage.updateUserRole(supabaseUser.id, 'admin').catch(err => {
+              console.warn('Failed to sync admin role to database:', err.message);
+            });
+          }
           return res.json(user);
         }
       } catch (timeoutError: any) {
