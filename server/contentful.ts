@@ -238,6 +238,7 @@ export function convertDbPostToContentfulFormat(post: {
   }
 
   if (post.tags && post.tags.length > 0) {
+    // Contentful expects tags as an array of strings
     fields.tags = { 'en-US': post.tags };
   }
 
@@ -326,7 +327,8 @@ export async function upsertContentfulPost(
     if (error.response?.data) {
       console.error('Contentful API error details:', error.response.data);
     }
-    throw error;
+    // Don't throw - let the caller handle gracefully
+    return null;
   }
 }
 

@@ -18,7 +18,9 @@ import {
   fetchContentfulPosts, 
   fetchContentfulPostBySlug, 
   convertContentfulPostToDbFormat,
-  syncContentfulPosts 
+  syncContentfulPosts,
+  upsertContentfulPost,
+  deleteContentfulPost
 } from "./contentful.js";
 import { 
   generateResumeRequestSchema, 
