@@ -597,6 +597,113 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Admin forgot password
+  // Admin password reset - generates Supabase recovery link
+  app.post('/api/admin/generate-reset-link', async (req, res) => {
+    try {
+      // Require admin token for security (prevents abuse)
+      const adminToken = req.headers['x-admin-token'];
+      const expectedToken = process.env.ADMIN_RESET_TOKEN;
+      
+      if (!expectedToken || adminToken !== expectedToken) {
+        return res.status(401).json({ 
+          error: 'Unauthorized',
+          message: 'Admin token required. Set ADMIN_RESET_TOKEN environment variable.'
+        });
+      }
+
+      const { email } = z.object({ email: z.string().email() }).parse(req.body);
+
+      // Check if user exists and is admin
+      const user = await storage.getUserByEmail(email);
+      
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      // Check if user is admin
+      const adminEmails = process.env.ADMIN_EMAILS?.split(",").map(e => e.trim()) || [];
+      const adminPattern = process.env.ADMIN_EMAIL_PATTERN;
+      let isAdmin = false;
+
+      if (user.role === "admin") {
+        isAdmin = true;
+      } else if (user.email && adminEmails.includes(user.email)) {
+        isAdmin = true;
+      } else if (adminPattern && user.email) {
+        try {
+          const regex = new RegExp(adminPattern);
+          if (regex.test(user.email)) {
+            isAdmin = true;
+          }
+        } catch (regexError) {
+          console.error("Invalid ADMIN_EMAIL_PATTERN regex:", regexError);
+        }
+      }
+      
+      if (!isAdmin) {
+        return res.status(403).json({ error: "User is not an admin" });
+      }
+
+      // Get Supabase user by email to find their Supabase Auth ID
+      const { getSupabaseAdmin } = await import('./supabase.js');
+      const supabaseAdmin = getSupabaseAdmin();
+      
+      // Find user in Supabase Auth by email
+      const { data: { users: supabaseUsers }, error: listError } = await supabaseAdmin.auth.admin.listUsers();
+      
+      if (listError) {
+        console.error("Error listing Supabase users:", listError);
+        return res.status(500).json({ error: "Failed to find user in Supabase Auth" });
+      }
+
+      const supabaseUser = supabaseUsers.find(u => u.email === email);
+      
+      if (!supabaseUser) {
+        return res.status(404).json({ 
+          error: "User not found in Supabase Auth",
+          message: "User exists in database but not in Supabase Auth. They may need to sign up via Supabase first."
+        });
+      }
+
+      // Generate recovery link using Supabase Admin API
+      const redirectTo = process.env.SITE_URL 
+        ? `${process.env.SITE_URL}/admin/login`
+        : 'https://thejobbridge-inc.com/admin/login';
+
+      const { data: recoveryData, error: recoveryError } = await supabaseAdmin.auth.admin.generateLink({
+        type: 'recovery',
+        email: email,
+        options: {
+          redirectTo: redirectTo,
+        },
+      });
+
+      if (recoveryError || !recoveryData) {
+        console.error("Error generating recovery link:", recoveryError);
+        return res.status(500).json({ 
+          error: "Failed to generate recovery link",
+          details: recoveryError?.message 
+        });
+      }
+
+      // Return the recovery link
+      res.json({
+        success: true,
+        email: email,
+        link: recoveryData.properties?.action_link || recoveryData.properties?.hashed_token || null,
+        expiresAt: recoveryData.properties?.expires_at || null,
+        message: "Recovery link generated successfully. Send this link to the admin user.",
+      });
+    } catch (error) {
+      console.error("Error generating admin reset link:", error);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Invalid email address", details: error.errors });
+      }
+      res.status(500).json({ error: "Failed to generate reset link", details: error instanceof Error ? error.message : 'Unknown error' });
+    }
+  });
+
+  // Legacy admin forgot password endpoint (kept for backward compatibility)
   app.post('/api/admin/forgot-password', async (req, res) => {
     try {
       const { email } = z.object({ email: z.string().email() }).parse(req.body);
