@@ -676,7 +676,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       try {
         const getUserPromise = storage.getUser(supabaseUser.id);
         const timeoutPromise = new Promise((_, reject) => {
-          setTimeout(() => reject(new Error('Database query timeout')), 3000); // 3 second timeout
+          setTimeout(() => reject(new Error('Database query timeout')), 5000); // 5 second timeout (increased from 3s)
         });
         
         user = await Promise.race([getUserPromise, timeoutPromise]) as any;
@@ -686,12 +686,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return res.json(user);
         }
       } catch (timeoutError: any) {
-        if (timeoutError.message === 'Database query timeout') {
-          console.error('Database getUser timed out for user:', supabaseUser.id);
-          return res.status(500).json({ 
-            error: 'Database timeout',
-            message: 'Database query took too long. Please try again.'
-          });
+        if (timeoutError.message === 'Database query timeout' || 
+            timeoutError.message?.includes('Connection terminated') ||
+            timeoutError.message?.includes('timeout exceeded')) {
+          console.warn('Database getUser timed out for user:', supabaseUser.id);
+          // Don't return 500 - instead, continue to try creating user or return JWT fallback
+          // This allows the app to continue working even if database is slow
         }
         // If it's not a timeout, continue to create user
       }
