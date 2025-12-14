@@ -36,16 +36,22 @@ async function checkSupabaseAuth(req: any): Promise<string | null> {
   try {
     const authHeader = req.headers.authorization;
     if (authHeader?.startsWith('Bearer ')) {
-      const { getSupabaseAdmin } = await import('./supabase.js');
-      const supabaseAdmin = getSupabaseAdmin();
-      const token = authHeader.replace('Bearer ', '');
-      const { data: { user }, error } = await supabaseAdmin.auth.getUser(token);
-      if (!error && user) {
-        return user.id;
+      try {
+        const { getSupabaseAdmin } = await import('./supabase.js');
+        const supabaseAdmin = getSupabaseAdmin();
+        const token = authHeader.replace('Bearer ', '');
+        const { data: { user }, error } = await supabaseAdmin.auth.getUser(token);
+        if (!error && user) {
+          return user.id;
+        }
+      } catch (supabaseError: any) {
+        // Log but don't throw - this is expected for invalid tokens
+        console.warn('Supabase auth check failed (expected for unauthenticated users):', supabaseError?.message);
       }
     }
-  } catch (error) {
-    console.error('Supabase auth check error:', error);
+  } catch (error: any) {
+    // Log but don't throw - authentication failures are expected
+    console.warn('Supabase auth check error (non-fatal):', error?.message);
   }
   return null;
 }
@@ -70,11 +76,12 @@ export const isAuthenticated: RequestHandler = async (req, res, next) => {
       return next();
     }
     
-    // No authentication found
+    // No authentication found - return 401, not 500
     return res.status(401).json({ message: "Unauthorized" });
   } catch (error: any) {
-    console.error("Error in isAuthenticated middleware:", error);
-    return res.status(500).json({ message: "Authentication error" });
+    // Only log, don't return 500 - treat as unauthenticated
+    console.warn("Error in isAuthenticated middleware (treating as unauthenticated):", error?.message);
+    return res.status(401).json({ message: "Unauthorized" });
   }
 };
 
@@ -97,6 +104,7 @@ export const isAdmin: RequestHandler = async (req: any, res, next) => {
   }
   
   if (!userId) {
+    // User not authenticated - return 401, not 500
     return res.status(401).json({ message: "Unauthorized" });
   }
   
@@ -186,11 +194,15 @@ export const isAdmin: RequestHandler = async (req: any, res, next) => {
 
     return res.status(403).json({ message: "Admin access required" });
   } catch (error: any) {
+    // Log error but return 403 instead of 500 to prevent information leakage
     console.error("Error checking admin access:", error);
-    // Provide more detailed error in development
-    const errorMessage = process.env.NODE_ENV === 'development' 
-      ? error.message || "Internal server error"
-      : "Internal server error";
-    return res.status(500).json({ message: errorMessage });
+    // If it's a database error and user might be authenticated, return 403
+    // Otherwise return 401 (though this shouldn't happen if isAuthenticated worked)
+    if (error?.code === '42P01' || error?.message?.includes('does not exist')) {
+      // Tables don't exist - user might still be admin via fallback, but return 403
+      return res.status(403).json({ message: "Admin access required" });
+    }
+    // For other errors, return 403 (not 500) to be safe
+    return res.status(403).json({ message: "Admin access required" });
   }
 };
