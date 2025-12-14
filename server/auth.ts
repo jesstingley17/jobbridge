@@ -72,7 +72,7 @@ export const isAuthenticated: RequestHandler = async (req, res, next) => {
   return res.status(401).json({ message: "Unauthorized" });
 };
 
-// Admin middleware - checks if user is admin
+// Admin middleware - checks if user is admin using role-based system
 export const isAdmin: RequestHandler = async (req: any, res, next) => {
   let userId: string | null = null;
   
@@ -85,42 +85,73 @@ export const isAdmin: RequestHandler = async (req: any, res, next) => {
   else if (req.session && (req.session as any).userId) {
     userId = (req.session as any).userId;
   }
+  // Also check req.user.claims.sub (set by isAuthenticated or requireSupabaseAuth)
+  else if (req.user?.claims?.sub) {
+    userId = req.user.claims.sub;
+  }
   
   if (!userId) {
     return res.status(401).json({ message: "Unauthorized" });
   }
   
   try {
-    const user = await storage.getUser(userId);
-    if (!user) {
-      return res.status(401).json({ message: "Unauthorized" });
-    }
-
-    // Check if user has admin role
-    if (user.role === "admin") {
-      req.user = {
-        claims: { sub: userId }
-      };
-      return next();
-    }
-
-    // Check admin emails from env
-    const adminEmails = process.env.ADMIN_EMAILS?.split(",").map(e => e.trim()) || [];
-    if (user.email && adminEmails.includes(user.email)) {
-      req.user = {
-        claims: { sub: userId }
-      };
-      return next();
-    }
-
-    // Check admin email pattern
-    const adminPattern = process.env.ADMIN_EMAIL_PATTERN;
-    if (adminPattern && user.email) {
-      const regex = new RegExp(adminPattern);
-      if (regex.test(user.email)) {
+    // Use role-based system: check user_roles table
+    const { db } = await import("./db.js");
+    const { sql } = await import("drizzle-orm");
+    
+    const result = await db.execute(sql`
+      SELECT EXISTS (
+        SELECT 1
+        FROM public.user_roles ur
+        JOIN public.roles r ON r.id = ur.role_id
+        WHERE ur.user_id = ${userId} AND r.name = 'admin'
+      ) AS is_admin
+    `);
+    
+    const isAdmin = result.rows[0]?.is_admin === true;
+    
+    if (isAdmin) {
+      // Ensure req.user is set for downstream middleware
+      if (!req.user) {
         req.user = {
           claims: { sub: userId }
         };
+      }
+      return next();
+    }
+    
+    // Fallback: Check legacy user.role field (for backward compatibility)
+    const user = await storage.getUser(userId);
+    if (user?.role === "admin") {
+      if (!req.user) {
+        req.user = {
+          claims: { sub: userId }
+        };
+      }
+      return next();
+    }
+    
+    // Fallback: Check admin emails from env (for backward compatibility)
+    const adminEmails = process.env.ADMIN_EMAILS?.split(",").map(e => e.trim()) || [];
+    if (user?.email && adminEmails.includes(user.email)) {
+      if (!req.user) {
+        req.user = {
+          claims: { sub: userId }
+        };
+      }
+      return next();
+    }
+    
+    // Fallback: Check admin email pattern (for backward compatibility)
+    const adminPattern = process.env.ADMIN_EMAIL_PATTERN;
+    if (adminPattern && user?.email) {
+      const regex = new RegExp(adminPattern);
+      if (regex.test(user.email)) {
+        if (!req.user) {
+          req.user = {
+            claims: { sub: userId }
+          };
+        }
         return next();
       }
     }
