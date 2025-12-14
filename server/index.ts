@@ -18,39 +18,44 @@ declare module "http" {
   }
 }
 
-// Initialize Stripe schema and sync data on startup
-async function initStripe() {
+// Initialize Stripe schema and sync data in background (non-blocking)
+// This runs asynchronously so it doesn't block server startup
+function initStripe() {
   const databaseUrl = process.env.DATABASE_URL;
   if (!databaseUrl) {
     console.log('DATABASE_URL not set, skipping Stripe initialization');
     return;
   }
 
-  try {
-    console.log('Initializing Stripe schema...');
-    await runMigrations({ databaseUrl });
-    console.log('Stripe schema ready');
+  // Run in background - don't await, don't block server startup
+  (async () => {
+    try {
+      console.log('Initializing Stripe schema in background...');
+      await runMigrations({ databaseUrl });
+      console.log('Stripe schema ready');
 
-    const stripeSync = await getStripeSync();
+      const stripeSync = await getStripeSync();
 
-    console.log('Setting up managed webhook...');
-    const webhookBaseUrl = `https://${process.env.REPLIT_DOMAINS?.split(',')[0]}`;
-    const { webhook, uuid } = await stripeSync.findOrCreateManagedWebhook(
-      `${webhookBaseUrl}/api/stripe/webhook`,
-      { enabled_events: ['*'], description: 'Managed webhook for Stripe sync' }
-    );
-    console.log(`Webhook configured: ${webhook.url} (UUID: ${uuid})`);
+      console.log('Setting up managed webhook in background...');
+      const webhookBaseUrl = `https://${process.env.REPLIT_DOMAINS?.split(',')[0]}`;
+      const { webhook, uuid } = await stripeSync.findOrCreateManagedWebhook(
+        `${webhookBaseUrl}/api/stripe/webhook`,
+        { enabled_events: ['*'], description: 'Managed webhook for Stripe sync' }
+      );
+      console.log(`Webhook configured: ${webhook.url} (UUID: ${uuid})`);
 
-    console.log('Syncing Stripe data in background...');
-    stripeSync.syncBackfill()
-      .then(() => console.log('Stripe data synced'))
-      .catch((err: Error) => console.error('Error syncing Stripe data:', err));
-  } catch (error) {
-    console.error('Failed to initialize Stripe:', error);
-  }
+      console.log('Syncing Stripe data in background...');
+      stripeSync.syncBackfill()
+        .then(() => console.log('Stripe data synced'))
+        .catch((err: Error) => console.error('Error syncing Stripe data:', err));
+    } catch (error) {
+      console.error('Failed to initialize Stripe (non-blocking):', error);
+      // Don't throw - this is background initialization
+    }
+  })();
 }
 
-// Initialize Stripe on startup
+// Initialize Stripe in background (non-blocking)
 initStripe();
 
 // Register Stripe webhook route BEFORE express.json()

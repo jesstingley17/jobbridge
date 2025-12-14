@@ -24,9 +24,11 @@ const connectionConfig: any = {
   // Optimize for serverless: keep connections alive but don't keep too many
   max: 2,  // Reduced from default 10 for serverless
   idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 5000,
+  connectionTimeoutMillis: 2000, // Reduced from 5000ms for faster failures
   // Always allow self-signed certs for now (pooler connections use them)
   ssl: { rejectUnauthorized: false },
+  // Enable statement timeout to prevent long-running queries
+  statement_timeout: 10000, // 10 seconds max per query
 };
 
 // Handle SSL for databases that require it (keep ssl: false from above since we set it directly)
