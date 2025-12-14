@@ -96,9 +96,6 @@ export const isAdmin: RequestHandler = async (req: any, res, next) => {
   
   try {
     // Use role-based system: check user_roles table
-    const { db } = await import("./db.js");
-    const { sql } = await import("drizzle-orm");
-    
     const result = await db.execute(sql`
       SELECT EXISTS (
         SELECT 1
