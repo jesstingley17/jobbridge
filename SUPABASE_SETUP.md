@@ -75,25 +75,36 @@ USING (true);
 
 ## 3. Get Your Supabase Credentials
 
-✅ **Already configured!** Your Supabase credentials are:
-- **Project URL**: `https://mkkmfocbujeeayenvxtl.supabase.co`
-- **Project ID**: `mkkmfocbujeeayenvxtl`
-- **Anon Key**: `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...`
-- **Service Role Key**: `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...` (for server-side operations)
+⚠️ **SECURITY**: Get your Supabase credentials from the dashboard:
+- **Project URL**: Found in Settings > API
+- **Project ID**: Found in Settings > General
+- **Anon Key**: Found in Settings > API (safe to expose in frontend)
+- **Service Role Key**: Found in Settings > API (⚠️ NEVER expose this - it bypasses all security!)
 
 ## 4. Set Environment Variables
 
 ### For Local Development
 
-✅ **Already added to `.env.local`!** Your configuration:
+⚠️ **SECURITY WARNING**: Never commit secrets to version control!
+
+Create a `.env.local` file (it's already in `.gitignore`) with your actual credentials:
 
 ```bash
-VITE_SUPABASE_URL=https://mkkmfocbujeeayenvxtl.supabase.co
-VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1ra21mb2NidWplZWF5ZW52eHRsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjUzOTIyMzYsImV4cCI6MjA4MDk2ODIzNn0._zCxN0ISokh-NuSqRN0Np17jk8gZCv8fUf01-FC2P6E
-VITE_SUPABASE_PROJECT_ID=mkkmfocbujeeayenvxtl
-SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1ra21mb2NidWplZWF5ZW52eHRsIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2NTM5MjIzNiwiZXhwIjoyMDgwOTY4MjM2fQ.RM0PEUe8h6yGqoL3CDiMRFiBeIBOlLlGBCEPq0FNMbc
-DATABASE_URL=postgres://postgres.mkkmfocbujeeayenvxtl:Phouu3tgsqIWM5Bb@aws-1-us-east-1.pooler.supabase.com:5432/postgres?sslmode=require
+# ⚠️ Replace these with your actual Supabase credentials from the dashboard
+VITE_SUPABASE_URL=https://your-project-id.supabase.co
+VITE_SUPABASE_ANON_KEY=your-anon-key-here
+VITE_SUPABASE_PROJECT_ID=your-project-id
+SUPABASE_SERVICE_ROLE_KEY=your-service-role-key-here
+DATABASE_URL=postgres://postgres.your-project-id:your-password@aws-1-us-east-1.pooler.supabase.com:5432/postgres?sslmode=require
 ```
+
+**How to get these values:**
+1. Go to https://supabase.com/dashboard
+2. Select your project
+3. Go to Settings > API
+4. Copy the URL and anon key
+5. Copy the service_role key (keep this secret - it bypasses all security!)
+6. Go to Settings > Database > Connection string (URI mode) for DATABASE_URL
 
 ### For Vercel Deployment
 
