@@ -2521,6 +2521,49 @@ Return JSON with:
     }
   });
 
+  // Test Contentful connection endpoint (admin only)
+  app.get("/api/contentful/test", isAuthenticated, isAdmin, async (req: any, res) => {
+    try {
+      const { fetchContentfulPosts, getContentfulClient } = await import("./contentful.js");
+      const client = getContentfulClient();
+      
+      if (!client) {
+        return res.status(400).json({
+          error: "Contentful not configured",
+          message: "Set CONTENTFUL_SPACE_ID and CONTENTFUL_ACCESS_TOKEN environment variables"
+        });
+      }
+
+      // Try to fetch entries to test connection
+      try {
+        const entries = await client.getEntries({ limit: 1 });
+        const posts = await fetchContentfulPosts();
+        
+        res.json({
+          success: true,
+          message: "Contentful connection successful",
+          spaceId: process.env.CONTENTFUL_SPACE_ID,
+          environment: process.env.CONTENTFUL_ENVIRONMENT || 'master',
+          totalEntries: entries.total,
+          blogPostsFound: posts.length,
+          contentTypes: entries.items.map((item: any) => item.sys.contentType.sys.id).filter((v: any, i: number, a: any[]) => a.indexOf(v) === i)
+        });
+      } catch (apiError: any) {
+        res.status(500).json({
+          error: "Contentful API error",
+          message: apiError.message,
+          details: process.env.NODE_ENV === 'development' ? apiError.stack : undefined
+        });
+      }
+    } catch (error: any) {
+      console.error("Error testing Contentful connection:", error);
+      res.status(500).json({
+        error: "Failed to test Contentful connection",
+        message: error.message
+      });
+    }
+  });
+
   // Manual sync endpoint (admin only)
   app.post("/api/contentful/sync", isAuthenticated, isAdmin, async (req: any, res) => {
     try {
