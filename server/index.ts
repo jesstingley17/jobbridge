@@ -6,6 +6,7 @@ import { createServer } from "http";
 import { runMigrations } from 'stripe-replit-sync';
 import { getStripeSync } from './stripeClient.js';
 import { WebhookHandlers } from './webhookHandlers.js';
+import { botIDMiddleware } from "./botid.js";
 
 const app = express();
 const httpServer = createServer(app);
@@ -182,6 +183,10 @@ app.use(
 );
 
 app.use(express.urlencoded({ extended: false }));
+
+// BotID middleware - adds bot detection to all requests
+// On Vercel, BotID is automatically enabled via the platform
+app.use(botIDMiddleware);
 
 export function log(message: string, source = "express") {
   const formattedTime = new Date().toLocaleTimeString("en-US", {
