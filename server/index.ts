@@ -244,6 +244,10 @@ app.use((req, res, next) => {
 });
 
 (async () => {
+  // Initialize session middleware (must be before routes that use sessions)
+  const { getSession } = await import("./auth.js");
+  app.use(getSession());
+  
   const server = await registerRoutes(app);
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {

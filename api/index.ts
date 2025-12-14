@@ -7,7 +7,6 @@ import compression from 'compression';
 import { registerRoutes } from '../server/routes.js';
 import { serveStatic } from '../server/static.js';
 // Don't import setupAuth - we handle auth differently on Vercel
-import { ensureEnvWarn, ensureEnvOrThrow } from '../server/env.js';
 
 // Ensure shared schema is accessible - Vercel needs this at runtime
 // The build script copies shared/ to api/shared/, but we need to ensure
@@ -110,12 +109,15 @@ async function initializeApp() {
         console.warn('⚠️  DATABASE_URL not set; ensure your db.ts uses a Supabase pooler connection or set DATABASE_URL explicitly.');
       }
       // Setup session middleware (Supabase handles authentication)
+      // This must be done BEFORE registerRoutes, which also tries to set it up
       try {
         const { getSession } = await import('../server/auth.js');
         app.set("trust proxy", 1);
         app.use(getSession());
+        console.log('✅ Session middleware configured');
       } catch (sessionError: any) {
         console.error('⚠️  Failed to setup session middleware:', sessionError.message);
+        console.error('⚠️  Session error stack:', sessionError.stack);
         // Continue without session middleware - some features won't work but app won't crash
       }
 

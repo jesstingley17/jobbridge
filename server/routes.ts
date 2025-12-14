@@ -137,18 +137,9 @@ const updateApplicationSchema = z.object({
 import { registerSitemapRoute } from "./routes/sitemap.js";
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  // Initialize session middleware (must be before routes that use sessions)
-  // Only set up if not already configured (for Vercel serverless functions)
-  try {
-    const { getSession } = await import("./auth.js");
-    // Check if session middleware is already set up
-    if (!app._router || !app._router.stack.some((layer: any) => layer.name === 'session')) {
-      app.use(getSession());
-    }
-  } catch (sessionError: any) {
-    console.warn('⚠️  Could not set up session middleware in registerRoutes:', sessionError.message);
-    // Continue - session might already be set up in api/index.ts
-  }
+  // Note: Session middleware should be set up BEFORE calling registerRoutes
+  // (e.g., in api/index.ts for Vercel or server/index.ts for regular server)
+  // We don't set it up here to avoid duplicate middleware in serverless functions
   
   // Register sitemap and robots.txt routes (before auth)
   registerSitemapRoute(app);
