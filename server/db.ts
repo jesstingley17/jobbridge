@@ -36,16 +36,15 @@ const connectionConfig: any = {
 // CRITICAL: Always allow self-signed certs for Supabase pooler connections
 // This is required for Supabase's connection pooler to work
 // node-postgres requires explicit SSL config even if connection string has sslmode
-if (isSupabase || databaseUrl.includes('sslmode=require') || databaseUrl.includes('sslmode=prefer')) {
-  connectionConfig.ssl = {
-    rejectUnauthorized: false, // Allow self-signed certificates (required for Supabase pooler)
-  };
-  console.log('[DB Init] SSL configured for Supabase/database connection (rejectUnauthorized: false)');
+// Set SSL config unconditionally to ensure it's always applied
+connectionConfig.ssl = {
+  rejectUnauthorized: false, // Allow self-signed certificates (required for Supabase pooler)
+};
+
+if (isSupabase) {
+  console.log('[DB Init] SSL configured for Supabase pooler connection (rejectUnauthorized: false)');
 } else {
-  // For other databases, use SSL if connection string requires it
-  connectionConfig.ssl = {
-    rejectUnauthorized: false, // Default to allowing self-signed certs for compatibility
-  };
+  console.log('[DB Init] SSL configured for database connection (rejectUnauthorized: false)');
 }
 
 // Handle SSL for databases that require it (keep ssl: false from above since we set it directly)
