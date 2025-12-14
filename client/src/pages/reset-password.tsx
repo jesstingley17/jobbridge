@@ -8,6 +8,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Lock, Loader2, AlertCircle, CheckCircle, Eye, EyeOff } from "lucide-react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { supabase } from "@/utils/supabase/client";
 
 export default function ResetPassword() {
   const [, setLocation] = useLocation();
@@ -44,13 +45,35 @@ export default function ResetPassword() {
     },
   });
 
+  // Check if user has a valid session from Supabase password reset link
+  const [hasResetSession, setHasResetSession] = useState(false);
+  
+  useEffect(() => {
+    const checkResetSession = async () => {
+      // If user arrived from Supabase reset email, they'll have a session
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        setHasResetSession(true);
+      }
+    };
+    checkResetSession();
+  }, []);
+
   const resetPasswordMutation = useMutation({
-    mutationFn: async (data: { token: string; newPassword: string }) => {
-      const response = await apiRequest("POST", "/api/auth/reset-password", data);
-      return response.json();
+    mutationFn: async (newPassword: string) => {
+      // Use Supabase's native password update (user is authenticated from reset link)
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        throw new Error("No active session. Please use the link from your email.");
+      }
+      
+      const { data, error } = await supabase.auth.updateUser({ password: newPassword });
+      if (error) throw error;
+      return data;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+      await queryClient.refetchQueries({ queryKey: ["/api/auth/user"] });
       setLocation("/dashboard");
     },
     onError: (err: any) => {
@@ -78,19 +101,20 @@ export default function ResetPassword() {
       return;
     }
 
-    if (token) {
-      resetPasswordMutation.mutate({ token, newPassword });
-    }
+    // Use Supabase native password reset (no token needed - session from email link)
+    resetPasswordMutation.mutate(newPassword);
   };
 
-  if (!token) {
+  // For Supabase password reset, check if user has session from reset email
+  // If no session and no token, show invalid link message
+  if (!hasResetSession && !token) {
     return (
       <div className="min-h-screen flex items-center justify-center p-4 bg-muted/30">
         <Card className="w-full max-w-md">
           <CardHeader className="text-center">
             <CardTitle className="text-2xl">Invalid Link</CardTitle>
             <CardDescription>
-              This link is invalid or has expired.
+              This link is invalid or has expired. Please request a new password reset link.
             </CardDescription>
           </CardHeader>
           <CardContent>

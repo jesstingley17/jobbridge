@@ -165,13 +165,44 @@ export default function Auth() {
     },
   });
 
+  // Magic link (passwordless) authentication
+  const [showMagicLink, setShowMagicLink] = useState(false);
+  const [magicLinkEmail, setMagicLinkEmail] = useState("");
+  const [magicLinkSent, setMagicLinkSent] = useState(false);
+
+  const magicLinkMutation = useMutation({
+    mutationFn: async (email: string) => {
+      const { data, error } = await supabase.auth.signInWithOtp({
+        email,
+        options: {
+          emailRedirectTo: `${window.location.origin}/auth/callback`,
+        },
+      });
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      setMagicLinkSent(true);
+    },
+    onError: (error: any) => {
+      setLoginError(error.message || "Failed to send magic link. Please try again.");
+    },
+  });
+
   const forgotPasswordMutation = useMutation({
     mutationFn: async (email: string) => {
-      const response = await apiRequest("POST", "/api/auth/magic-link", { email, type: "reset" });
-      return response.json();
+      // Use Supabase's built-in password reset
+      const { data, error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/auth/reset-password`,
+      });
+      if (error) throw error;
+      return data;
     },
     onSuccess: () => {
       setForgotPasswordSent(true);
+    },
+    onError: (error: any) => {
+      setLoginError(error.message || "Failed to send password reset link. Please try again.");
     },
   });
 
@@ -220,6 +251,94 @@ export default function Auth() {
     forgotPasswordMutation.mutate(forgotEmail);
   };
 
+  // Magic link (passwordless) view
+  if (showMagicLink) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-4 bg-muted/30">
+        <Card className="w-full max-w-md">
+          <CardHeader className="text-center">
+            <CardTitle className="text-2xl">Sign in with Magic Link</CardTitle>
+            <CardDescription>
+              Enter your email address and we'll send you a passwordless sign-in link.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {magicLinkSent ? (
+              <div className="space-y-4">
+                <Alert>
+                  <CheckCircle className="h-4 w-4" />
+                  <AlertDescription>
+                    Check your email! We've sent you a magic link to sign in. Click the link in the email to complete sign-in.
+                  </AlertDescription>
+                </Alert>
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => {
+                    setShowMagicLink(false);
+                    setMagicLinkSent(false);
+                    setMagicLinkEmail("");
+                  }}
+                  data-testid="button-back-to-login"
+                >
+                  Back to Login
+                </Button>
+              </div>
+            ) : (
+              <form onSubmit={(e) => { e.preventDefault(); magicLinkMutation.mutate(magicLinkEmail); }} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="magic-link-email">Email</Label>
+                  <div className="relative">
+                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      id="magic-link-email"
+                      name="email"
+                      type="email"
+                      placeholder="you@example.com"
+                      value={magicLinkEmail}
+                      onChange={(e) => setMagicLinkEmail(e.target.value)}
+                      className="pl-10"
+                      required
+                      autoComplete="email"
+                      data-testid="input-magic-link-email"
+                    />
+                  </div>
+                </div>
+
+                <Button
+                  type="submit"
+                  className="w-full"
+                  disabled={magicLinkMutation.isPending}
+                  data-testid="button-send-magic-link"
+                >
+                  {magicLinkMutation.isPending ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Sending...
+                    </>
+                  ) : (
+                    "Send Magic Link"
+                  )}
+                </Button>
+
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="w-full"
+                  onClick={() => setShowMagicLink(false)}
+                  data-testid="button-cancel-magic-link"
+                >
+                  Back to Login
+                </Button>
+              </form>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // Forgot password view
   if (showForgotPassword) {
     return (
       <div className="min-h-screen flex items-center justify-center p-4 bg-muted/30">
@@ -236,7 +355,7 @@ export default function Auth() {
                 <Alert>
                   <CheckCircle className="h-4 w-4" />
                   <AlertDescription>
-                    If an account exists with that email, you will receive a password reset link shortly.
+                    If an account exists with that email, you will receive a password reset link shortly. Check your email and click the link to reset your password.
                   </AlertDescription>
                 </Alert>
                 <Button
@@ -245,6 +364,7 @@ export default function Auth() {
                   onClick={() => {
                     setShowForgotPassword(false);
                     setForgotPasswordSent(false);
+                    setForgotEmail("");
                   }}
                   data-testid="button-back-to-login"
                 >
@@ -437,15 +557,26 @@ export default function Auth() {
                     </Button>
                   </form>
 
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    className="px-0 text-sm h-auto w-full text-center"
-                    onClick={() => setShowForgotPassword(true)}
-                    data-testid="button-forgot-password"
-                  >
-                    Forgot your password?
-                  </Button>
+                  <div className="flex flex-col gap-2">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      className="px-0 text-sm h-auto w-full text-center"
+                      onClick={() => setShowMagicLink(true)}
+                      data-testid="button-magic-link"
+                    >
+                      Sign in with magic link (passwordless)
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      className="px-0 text-sm h-auto w-full text-center"
+                      onClick={() => setShowForgotPassword(true)}
+                      data-testid="button-forgot-password"
+                    >
+                      Forgot your password?
+                    </Button>
+                  </div>
                   
                   <div className="mt-6 text-center">
                     <p className="text-sm text-muted-foreground">
