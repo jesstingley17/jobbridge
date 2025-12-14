@@ -170,13 +170,26 @@ export const isAdmin: RequestHandler = async (req: any, res, next) => {
     }
     
     // First, try to get user info (needed for fallback checks)
+    // Add timeout to prevent hanging
     let user;
+    let userEmail: string | null = null;
     try {
-      user = await storage.getUser(userId);
-      console.log(`[isAdmin] User from DB: ${user?.email || 'not found'}, role: ${user?.role || 'none'}`);
-    } catch (userError) {
-      console.error("Error fetching user in isAdmin:", userError);
-      // Continue with role-based check even if getUser fails
+      const getUserPromise = storage.getUser(userId);
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('getUser timeout')), 3000); // 3 second timeout
+      });
+      user = await Promise.race([getUserPromise, timeoutPromise]) as any;
+      userEmail = user?.email || null;
+      console.log(`[isAdmin] User from DB: ${userEmail || 'not found'}, role: ${user?.role || 'none'}`);
+    } catch (userError: any) {
+      if (userError.message === 'getUser timeout') {
+        console.warn("[isAdmin] getUser timed out, using email from req.supabaseUser for fallback checks");
+      } else {
+        console.error("Error fetching user in isAdmin:", userError);
+      }
+      // Use email from req.supabaseUser as fallback if database lookup fails
+      userEmail = req.supabaseUser?.email || null;
+      console.log(`[isAdmin] Using email from req.supabaseUser: ${userEmail || 'none'}`);
     }
 
     // Try role-based system: check user_roles table (if it exists)
