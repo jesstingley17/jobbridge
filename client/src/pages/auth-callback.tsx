@@ -15,7 +15,8 @@ export default function AuthCallback() {
   useEffect(() => {
     const handleAuthCallback = async () => {
       try {
-        // Get the session from the URL hash/fragment
+        // Handle Supabase auth callback (OAuth, magic link, etc.)
+        // Supabase automatically processes the URL hash and creates a session
         const { data: { session }, error: sessionError } = await supabase.auth.getSession();
         
         if (sessionError) {
@@ -23,7 +24,36 @@ export default function AuthCallback() {
         }
 
         if (!session?.user) {
-          throw new Error("No user session found");
+          // If no session, wait a moment for Supabase to process the callback
+          await new Promise(resolve => setTimeout(resolve, 500));
+          const { data: { session: retrySession }, error: retryError } = await supabase.auth.getSession();
+          if (retryError || !retrySession?.user) {
+            throw new Error("No user session found. The authentication link may have expired.");
+          }
+          // Use retrySession if found
+          const user = retrySession.user;
+          const userMetadata = user.user_metadata || {};
+
+          // Sync user to database
+          try {
+            await apiRequest("POST", "/api/auth/sync-supabase-user", {
+              supabaseUserId: user.id,
+              email: user.email,
+              firstName: userMetadata.first_name || userMetadata.full_name?.split(' ')[0] || null,
+              lastName: userMetadata.last_name || userMetadata.full_name?.split(' ').slice(1).join(' ') || null,
+              emailVerified: user.email_confirmed_at ? true : false,
+              termsAccepted: true,
+              marketingConsent: false,
+            });
+          } catch (syncError) {
+            console.error("Failed to sync user to database:", syncError);
+          }
+
+          await new Promise(resolve => setTimeout(resolve, 300));
+          await queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+          await queryClient.refetchQueries({ queryKey: ["/api/auth/user"] });
+          setLocation("/early-access");
+          return;
         }
 
         const user = session.user;
