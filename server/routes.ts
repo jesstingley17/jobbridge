@@ -672,6 +672,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Check Supabase Auth metadata and user_roles table for admin status
       let isAdmin = false;
+      let adminCheckSource = 'none';
       
       // Check Supabase Auth metadata
       try {
@@ -680,10 +681,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const { data: { user: fullUser }, error: getUserError } = await supabaseAdmin.auth.admin.getUserById(supabaseUser.id);
         if (!getUserError && fullUser) {
           // Check app_metadata or user_metadata for admin status
-          isAdmin = fullUser.app_metadata?.role === 'admin' || 
-                    fullUser.app_metadata?.is_admin === true ||
-                    fullUser.user_metadata?.role === 'admin' ||
-                    fullUser.user_metadata?.is_admin === true;
+          const metadataAdmin = fullUser.app_metadata?.role === 'admin' || 
+                                fullUser.app_metadata?.is_admin === true ||
+                                fullUser.user_metadata?.role === 'admin' ||
+                                fullUser.user_metadata?.is_admin === true;
+          if (metadataAdmin) {
+            isAdmin = true;
+            adminCheckSource = 'supabase_metadata';
+            console.log(`[Auth] Admin role found in Supabase metadata for ${supabaseUser.email}`);
+            console.log(`[Auth] app_metadata:`, fullUser.app_metadata);
+            console.log(`[Auth] user_metadata:`, fullUser.user_metadata);
+          }
         }
       } catch (metadataError: any) {
         // If we can't check metadata, continue with database check
@@ -702,12 +710,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
               AND r.name = 'admin'
             ) as is_admin;
           `);
-          isAdmin = rows[0]?.is_admin === true;
+          if (rows[0]?.is_admin === true) {
+            isAdmin = true;
+            adminCheckSource = 'user_roles_table';
+            console.log(`[Auth] Admin role found in user_roles table for ${supabaseUser.email}`);
+          }
         } catch (rolesError: any) {
           // If user_roles table doesn't exist or query fails, continue
           console.warn('Could not check user_roles table for admin status:', rolesError.message);
         }
       }
+      
+      // Fallback: Check ADMIN_EMAILS env var (temporary workaround)
+      if (!isAdmin && supabaseUser.email) {
+        const adminEmails = process.env.ADMIN_EMAILS?.split(",").map(e => e.trim()) || [];
+        if (adminEmails.includes(supabaseUser.email)) {
+          isAdmin = true;
+          adminCheckSource = 'admin_emails_env';
+          console.log(`[Auth] Admin role found via ADMIN_EMAILS env var for ${supabaseUser.email}`);
+        }
+      }
+      
+      console.log(`[Auth] Final admin check result for ${supabaseUser.email}: isAdmin=${isAdmin}, source=${adminCheckSource}`);
 
       // Fast path: Try to get user from database first (most common case)
       // Add timeout to prevent hanging
@@ -787,7 +811,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             // If database is timing out, return a minimal user object from JWT data
             // This allows the app to continue working even if database is slow
             console.warn('Database timeout - returning user from JWT data only');
-            return res.json({
+            const jwtUser = {
               id: supabaseUser.id,
               email: supabaseUser.email,
               firstName: null,
@@ -801,7 +825,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
               createdAt: new Date().toISOString(),
               updatedAt: new Date().toISOString(),
               _fromJWT: true, // Flag to indicate this is from JWT, not database
-            });
+            };
+            console.log(`[Auth] Returning JWT fallback user: ${jwtUser.email}, role: ${jwtUser.role}, isAdmin check: ${isAdmin}`);
+            return res.json(jwtUser);
           }
           
           // Check for database errors
@@ -828,7 +854,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           
           // If all else fails, return user from JWT to allow app to continue
           console.warn('Database error - returning user from JWT data only');
-          return res.json({
+          const jwtFallbackUser = {
             id: supabaseUser.id,
             email: supabaseUser.email,
             firstName: null,
@@ -842,7 +868,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),
             _fromJWT: true,
-          });
+          };
+          console.log(`[Auth] Returning JWT fallback user (error case): ${jwtFallbackUser.email}, role: ${jwtFallbackUser.role}, isAdmin check: ${isAdmin}`);
+          return res.json(jwtFallbackUser);
         }
       }
       
