@@ -96,7 +96,7 @@ export default function AdminLogin() {
                 <Alert>
                   <CheckCircle className="h-4 w-4" />
                   <AlertDescription>
-                    If an admin account exists with that email, you will receive a password reset link shortly.
+                    If an admin account exists with that email, you will receive a password reset link shortly. Check your email and click the link to reset your password.
                   </AlertDescription>
                 </Alert>
                 <Button
