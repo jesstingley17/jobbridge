@@ -137,6 +137,10 @@ const updateApplicationSchema = z.object({
 import { registerSitemapRoute } from "./routes/sitemap.js";
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Initialize session middleware (must be before routes that use sessions)
+  const { getSession } = await import("./auth.js");
+  app.use(getSession());
+  
   // Register sitemap and robots.txt routes (before auth)
   registerSitemapRoute(app);
   
