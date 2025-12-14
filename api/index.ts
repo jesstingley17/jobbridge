@@ -129,8 +129,12 @@ async function initializeApp() {
         console.error('❌ Error registering routes:', routesError.message);
         console.error('❌ Error name:', routesError.name);
         console.error('❌ Error stack:', routesError.stack);
+        // Log the full error details for debugging
+        if (routesError.cause) {
+          console.error('❌ Error cause:', routesError.cause);
+        }
         // Re-throw to see the actual error in Vercel logs
-        throw new Error(`Route registration failed: ${routesError.message}`, { cause: routesError });
+        throw routesError;
       }
 
       // Serve static files in production
@@ -155,12 +159,27 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     await initializeApp();
   } catch (initError: any) {
-    // Log and return a clearer 500 error so Vercel doesn't surface a vague FUNCTION_INVOCATION_FAILED
-    console.error('Failed to initialize Express app in Vercel handler:', initError);
+    // Log full error details for debugging
+    console.error('❌ Failed to initialize Express app in Vercel handler');
+    console.error('❌ Error message:', initError?.message);
+    console.error('❌ Error name:', initError?.name);
+    console.error('❌ Error stack:', initError?.stack);
+    if (initError?.cause) {
+      console.error('❌ Error cause:', initError.cause);
+    }
+    
+    // Return a clearer 500 error with details
     const message = initError?.message || 'Failed to initialize application';
-    // Include stack/message in development for easier debugging
     if (!res.headersSent) {
-      return res.status(500).json({ error: 'App initialization failed', message: process.env.NODE_ENV === 'development' ? message : undefined });
+      return res.status(500).json({ 
+        error: 'App initialization failed', 
+        message: message,
+        // Include more details in response for debugging (Vercel logs will have full stack)
+        details: process.env.NODE_ENV === 'development' ? {
+          name: initError?.name,
+          stack: initError?.stack?.split('\n').slice(0, 10).join('\n')
+        } : undefined
+      });
     }
     return;
   }
