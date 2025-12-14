@@ -786,7 +786,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               emailVerified: supabaseUser.email_confirmed_at ? true : false,
               termsAccepted: false,
               marketingConsent: false,
-              role: isAdminFromSupabase ? 'admin' : null, // Include admin role from Supabase if available
+              role: isAdmin ? 'admin' : null, // Include admin role from Supabase/user_roles if available
               subscriptionTier: 'free',
               monthlyApplicationCount: 0,
               createdAt: new Date().toISOString(),
@@ -827,7 +827,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             emailVerified: supabaseUser.email_confirmed_at ? true : false,
             termsAccepted: false,
             marketingConsent: false,
-            role: isAdminFromSupabase ? 'admin' : null, // Include admin role from Supabase if available
+            role: isAdmin ? 'admin' : null, // Include admin role from Supabase/user_roles if available
             subscriptionTier: 'free',
             monthlyApplicationCount: 0,
             createdAt: new Date().toISOString(),
