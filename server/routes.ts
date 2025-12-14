@@ -1192,6 +1192,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           user: {
             id: user.id,
             email: user.email,
+            marketingConsent: user.marketingConsent,
           }
         });
       } catch (createError: any) {
