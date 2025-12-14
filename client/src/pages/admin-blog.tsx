@@ -52,11 +52,6 @@ export default function AdminBlog() {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [postToDelete, setPostToDelete] = useState<BlogPost | null>(null);
 
-  // Redirect to login if there's an auth error
-  if (error && (error as any)?.message?.includes("Admin access required") || (error as any)?.message?.includes("Unauthorized")) {
-    // This will be handled by the query error, but we can also redirect here
-  }
-
   const { data: postsData, isLoading, error } = useQuery<{ posts: BlogPost[] }>({
     queryKey: ["/api/admin/blog/posts"],
     queryFn: async () => {
