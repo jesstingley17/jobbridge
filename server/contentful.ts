@@ -402,28 +402,18 @@ export async function deleteContentfulPost(contentfulId: string): Promise<boolea
   }
 
   try {
-    // Get entry first to check if published
-    const entry = await client.entry.get({
-      spaceId: space,
-      environmentId: environment,
-      entryId: contentfulId,
-    });
+    // Use the traditional API: getSpace -> getEnvironment -> entry operations
+    const spaceClient = await client.getSpace(space);
+    const env = await spaceClient.getEnvironment(environment);
+    const entry = await env.getEntry(contentfulId);
 
     // Unpublish first if published
-    if (entry.sys.publishedVersion || entry.sys.publishedAt) {
-      await client.entry.unpublish({
-        spaceId: space,
-        environmentId: environment,
-        entryId: contentfulId,
-      }, entry);
+    if (entry.sys.publishedVersion) {
+      await entry.unpublish();
     }
 
     // Delete the entry
-    await client.entry.delete({
-      spaceId: space,
-      environmentId: environment,
-      entryId: contentfulId,
-    });
+    await entry.delete();
 
     return true;
   } catch (error: any) {

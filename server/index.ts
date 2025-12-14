@@ -6,7 +6,8 @@ import { createServer } from "http";
 import { runMigrations } from 'stripe-replit-sync';
 import { getStripeSync } from './stripeClient.js';
 import { WebhookHandlers } from './webhookHandlers.js';
-import { botIDMiddleware } from "./botid.js";
+// BotID is now handled per-route via blockBots middleware
+// No global middleware needed - client-side initBotId() handles initialization
 
 const app = express();
 const httpServer = createServer(app);
@@ -184,9 +185,8 @@ app.use(
 
 app.use(express.urlencoded({ extended: false }));
 
-// BotID middleware - adds bot detection to all requests
-// On Vercel, BotID is automatically enabled via the platform
-app.use(botIDMiddleware);
+// BotID is now handled per-route via blockBots middleware in routes.ts
+// Client-side initBotId() in App.tsx handles initialization
 
 export function log(message: string, source = "express") {
   const formattedTime = new Date().toLocaleTimeString("en-US", {

@@ -1,83 +1,95 @@
-// BotID integration for bot detection
-// BotID is automatically enabled on Vercel deployments
-// This file provides optional server-side bot detection
+// BotID integration for bot detection using official botid package
+// https://vercel.com/docs/botid/get-started
+
+import { checkBotId } from 'botid/server';
+import type { Request, Response, NextFunction } from 'express';
 
 /**
- * BotID middleware for Express
+ * Express middleware to check for bots using official BotID
  * 
- * Note: On Vercel, BotID is automatically enabled via the platform.
- * This middleware provides additional server-side bot detection if needed.
+ * This uses the official checkBotId() function which reads BotID headers
+ * that are automatically added by Vercel when the client-side protection
+ * is configured.
  * 
- * For client-side integration, see: https://vercel.com/docs/botid/get-started
+ * Important: The protected route must be configured in the client-side
+ * initBotId() call for checkBotId() to work properly.
  */
+export async function blockBots(
+  req: Request,
+  res: Response,
+  next: NextFunction
+) {
+  try {
+    // Use official BotID check
+    // In local development, this will return isBot: false unless configured
+    const verification = await checkBotId({
+      // Optional: Enable bot detection in development for testing
+      developmentOptions: process.env.NODE_ENV === 'development' && process.env.ENABLE_BOTID_DEV === 'true'
+        ? { isBot: false } // Allow all in dev unless explicitly testing
+        : undefined,
+    });
 
-export interface BotIDResult {
-  isBot: boolean;
-  verified: boolean;
-  score?: number;
-}
+    if (verification.isBot) {
+      console.log(`[BotID] Blocked bot request: ${req.method} ${req.path} from ${req.ip}`);
+      return res.status(403).json({
+        error: 'Bot access denied',
+        message: 'This endpoint is not available for automated requests',
+      });
+    }
 
-/**
- * Check if a request is from a bot using BotID
- * This reads the BotID header that Vercel automatically adds
- */
-export function checkBotID(req: any): BotIDResult {
-  // Vercel automatically adds BotID headers to requests
-  // Check for the BotID verification header
-  const botidHeader = req.headers['x-vercel-botid'] || req.headers['x-botid'];
-  const botidVerified = req.headers['x-vercel-botid-verified'];
-  
-  // If BotID header exists and is verified, trust it
-  if (botidVerified === 'true') {
-    return {
-      isBot: botidHeader === '1' || botidHeader === 'true',
+    // Add bot verification info to request for logging
+    (req as any).botid = {
+      isBot: verification.isBot,
       verified: true,
     };
+
+    next();
+  } catch (error: any) {
+    // If BotID check fails, log but don't block (fail open)
+    console.warn('[BotID] Error checking bot status:', error.message);
+    (req as any).botid = {
+      isBot: false,
+      verified: false,
+      error: error.message,
+    };
+    next();
   }
-  
-  // Fallback: Check user agent for common bot patterns
-  const userAgent = req.headers['user-agent'] || '';
-  const isBotUA = /bot|crawler|spider|crawling|facebookexternalhit|twitterbot|linkedinbot|slackbot|whatsapp|telegram|discord/i.test(userAgent);
-  
-  return {
-    isBot: isBotUA,
-    verified: false,
-  };
 }
 
 /**
- * Express middleware to add bot detection to requests
+ * Express middleware to log bot detection without blocking
+ * Useful for monitoring bot activity
  */
-export function botIDMiddleware(req: any, res: any, next: any) {
-  const botResult = checkBotID(req);
-  req.botid = botResult;
-  
-  // Log bot detection for monitoring (only in production or when explicitly enabled)
-  if (process.env.NODE_ENV === 'production' || process.env.LOG_BOTID === 'true') {
-    if (botResult.isBot && botResult.verified) {
-      console.log(`[BotID] Bot detected: ${req.method} ${req.path} - Verified: ${botResult.verified}`);
-    }
-  }
-  
-  next();
-}
-
-/**
- * Optional: Block bots from certain routes
- * Only blocks verified bots to avoid false positives
- */
-export function blockBots(req: any, res: any, next: any) {
-  const botResult = checkBotID(req);
-  
-  // Only block if BotID has verified it's a bot (to avoid blocking legitimate traffic)
-  if (botResult.isBot && botResult.verified) {
-    console.log(`[BotID] Blocked bot request: ${req.method} ${req.path} from ${req.ip}`);
-    return res.status(403).json({
-      error: 'Bot access denied',
-      message: 'This endpoint is not available for automated requests',
+export async function logBots(
+  req: Request,
+  res: Response,
+  next: NextFunction
+) {
+  try {
+    const verification = await checkBotId({
+      developmentOptions: process.env.NODE_ENV === 'development' && process.env.ENABLE_BOTID_DEV === 'true'
+        ? { isBot: false }
+        : undefined,
     });
+
+    (req as any).botid = {
+      isBot: verification.isBot,
+      verified: true,
+    };
+
+    // Log bot detection for monitoring
+    if (verification.isBot && (process.env.NODE_ENV === 'production' || process.env.LOG_BOTID === 'true')) {
+      console.log(`[BotID] Bot detected: ${req.method} ${req.path} - IP: ${req.ip}`);
+    }
+
+    next();
+  } catch (error: any) {
+    console.warn('[BotID] Error checking bot status:', error.message);
+    (req as any).botid = {
+      isBot: false,
+      verified: false,
+      error: error.message,
+    };
+    next();
   }
-  
-  // Allow through if not verified as bot (includes legitimate search engine bots)
-  next();
 }

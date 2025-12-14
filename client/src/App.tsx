@@ -12,6 +12,7 @@ import { AuthInitializer } from "@/components/auth-initializer";
 import { SubscriptionProvider } from "@/contexts/subscription-context";
 import { builder } from "@builder.io/react";
 import { registerBuilderComponents } from "@/lib/builder-registry";
+import { initBotId } from "botid/client/core";
 import Home from "@/pages/home";
 import Features from "@/pages/features";
 import Jobs from "@/pages/jobs";
@@ -50,6 +51,81 @@ if (BUILDER_API_KEY) {
   // Register custom components for Builder.io
   registerBuilderComponents();
 }
+
+// Initialize BotID client-side protection
+// Define protected routes that need bot detection
+initBotId({
+  protect: [
+    {
+      path: '/api/admin/login',
+      method: 'POST',
+    },
+    {
+      path: '/api/admin/blog/posts',
+      method: 'GET',
+    },
+    {
+      path: '/api/admin/blog/posts',
+      method: 'POST',
+    },
+    {
+      path: '/api/admin/blog/posts/*',
+      method: 'PUT',
+    },
+    {
+      path: '/api/admin/blog/posts/*',
+      method: 'DELETE',
+    },
+    {
+      path: '/api/contentful/test',
+      method: 'GET',
+    },
+    {
+      path: '/api/contentful/sync',
+      method: 'POST',
+    },
+    {
+      path: '/api/subscription/status',
+      method: 'GET',
+    },
+    {
+      path: '/api/stripe/checkout',
+      method: 'POST',
+    },
+    {
+      path: '/api/stripe/portal',
+      method: 'POST',
+    },
+    {
+      path: '/api/applications',
+      method: 'POST',
+    },
+    {
+      path: '/api/applications/bulk',
+      method: 'POST',
+    },
+    {
+      path: '/api/resume/generate',
+      method: 'POST',
+    },
+    {
+      path: '/api/cover-letter/generate',
+      method: 'POST',
+    },
+    {
+      path: '/api/interview/questions',
+      method: 'POST',
+    },
+    {
+      path: '/api/interview/analyze',
+      method: 'POST',
+    },
+    {
+      path: '/api/ai/*',
+      method: 'POST',
+    },
+  ],
+});
 
 function CatchAllRoute() {
   const [location] = useLocation();
