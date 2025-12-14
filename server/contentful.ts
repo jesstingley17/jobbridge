@@ -1,6 +1,6 @@
 // Contentful integration for automated blog posts
 import { createClient, type Entry, type EntryCollection } from 'contentful';
-import { createClient as createManagementClient } from 'contentful-management';
+import * as contentfulManagement from 'contentful-management';
 
 interface ContentfulConfig {
   space: string;
@@ -48,8 +48,16 @@ export function getContentfulManagementClient() {
     return null;
   }
 
-  contentfulManagementClient = createManagementClient({
+  // Create management client with space ID
+  // The new API requires space ID at client creation
+  contentfulManagementClient = contentfulManagement.createClient({
     accessToken: managementToken,
+  }, {
+    type: 'plain',
+    defaults: {
+      spaceId: space,
+      environmentId: environment,
+    }
   });
 
   return contentfulManagementClient;
