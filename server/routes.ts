@@ -2914,7 +2914,7 @@ Return JSON with:
     }
   });
 
-  app.get("/api/admin/blog/posts/:id", isAuthenticated, isAdmin, async (req, res) => {
+  app.get("/api/admin/blog/posts/:id", requireSupabaseAuth(), isAdmin, async (req, res) => {
     try {
       const { id } = req.params;
       const post = await storage.getBlogPostById(id);
