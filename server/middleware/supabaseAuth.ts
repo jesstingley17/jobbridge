@@ -144,22 +144,23 @@ export function requireSupabaseAuth() {
         });
         
         // Use getUser with JWT token - this verifies the token and returns user info
+        // Note: getUser() on admin client accepts a JWT token to verify
         const verifyPromise = supabaseAdmin.auth.getUser(token);
         const result = await Promise.race([
           verifyPromise,
           timeoutPromise
         ]) as any;
         
+        // Handle timeout case
+        if (result && result.message === 'Token verification timeout') {
+          throw result; // Will be caught below
+        }
+        
         // Handle both timeout and actual result
-        // The result structure is: { data: { user }, error }
-        if (result) {
-          // Check if it's an error (timeout or other)
-          if (result.error || result.message === 'Token verification timeout') {
-            throw result; // Will be caught below
-          }
-          
-          // Check if result has data property
-          if (result.data) {
+        // The result structure from getUser is: { data: { user }, error }
+        if (result && typeof result === 'object') {
+          // Check if result has data property (successful response)
+          if (result.data && result.data.user) {
             const { data: { user }, error: verifyError } = result;
             
             if (verifyError || !user) {
@@ -180,6 +181,12 @@ export function requireSupabaseAuth() {
 
             next();
             return;
+          }
+          
+          // Check if result has error property (failed response)
+          if (result.error) {
+            console.error("JWT verification error:", result.error?.message || "Verification failed");
+            throw result.error; // Will be caught below
           }
         }
       } catch (adminError: any) {
