@@ -1,5 +1,6 @@
 // Contentful integration for automated blog posts
 import { createClient, type Entry, type EntryCollection } from 'contentful';
+import { createClient as createManagementClient } from 'contentful-management';
 
 interface ContentfulConfig {
   space: string;
@@ -8,6 +9,7 @@ interface ContentfulConfig {
 }
 
 let contentfulClient: ReturnType<typeof createClient> | null = null;
+let contentfulManagementClient: ReturnType<typeof createManagementClient> | null = null;
 
 export function getContentfulClient() {
   if (contentfulClient) {
@@ -30,6 +32,27 @@ export function getContentfulClient() {
   });
 
   return contentfulClient;
+}
+
+export function getContentfulManagementClient() {
+  if (contentfulManagementClient) {
+    return contentfulManagementClient;
+  }
+
+  const space = process.env.CONTENTFUL_SPACE_ID;
+  const managementToken = process.env.CONTENTFUL_MANAGEMENT_TOKEN;
+  const environment = process.env.CONTENTFUL_ENVIRONMENT || 'master';
+
+  if (!space || !managementToken) {
+    console.warn('Contentful Management API not configured. Set CONTENTFUL_SPACE_ID and CONTENTFUL_MANAGEMENT_TOKEN');
+    return null;
+  }
+
+  contentfulManagementClient = createManagementClient({
+    accessToken: managementToken,
+  });
+
+  return contentfulManagementClient;
 }
 
 export interface ContentfulBlogPost {
@@ -184,5 +207,167 @@ export async function syncContentfulPosts(
   }
 
   return { synced, errors };
+}
+
+/**
+ * Convert database post format to Contentful format
+ */
+export function convertDbPostToContentfulFormat(post: {
+  title: string;
+  slug: string;
+  excerpt?: string;
+  content: string;
+  featuredImage?: string;
+  published: boolean;
+  tags?: string[];
+  authorName?: string;
+  publishedAt?: Date;
+}): Record<string, any> {
+  const fields: Record<string, any> = {
+    title: { 'en-US': post.title },
+    slug: { 'en-US': post.slug },
+    content: { 'en-US': post.content },
+  };
+
+  if (post.excerpt) {
+    fields.excerpt = { 'en-US': post.excerpt };
+  }
+
+  if (post.authorName) {
+    fields.authorName = { 'en-US': post.authorName };
+  }
+
+  if (post.tags && post.tags.length > 0) {
+    fields.tags = { 'en-US': post.tags };
+  }
+
+  if (post.published !== undefined) {
+    fields.published = { 'en-US': post.published };
+  }
+
+  if (post.publishedAt) {
+    fields.publishedDate = { 'en-US': post.publishedAt.toISOString() };
+  }
+
+  // Note: Featured image would need to be uploaded to Contentful first
+  // For now, we'll skip it or you can implement image upload separately
+
+  return fields;
+}
+
+/**
+ * Create or update a blog post in Contentful
+ */
+export async function upsertContentfulPost(
+  post: {
+    contentfulId?: string;
+    title: string;
+    slug: string;
+    excerpt?: string;
+    content: string;
+    featuredImage?: string;
+    published: boolean;
+    tags?: string[];
+    authorName?: string;
+    publishedAt?: Date;
+  },
+  publish: boolean = true
+): Promise<{ id: string; published: boolean } | null> {
+  const client = getContentfulManagementClient();
+  if (!client) {
+    return null;
+  }
+
+  const space = process.env.CONTENTFUL_SPACE_ID;
+  const environment = process.env.CONTENTFUL_ENVIRONMENT || 'master';
+
+  if (!space) {
+    console.error('CONTENTFUL_SPACE_ID not set');
+    return null;
+  }
+
+  try {
+    const spaceClient = await client.getSpace(space);
+    const env = await spaceClient.getEnvironment(environment);
+    const fields = convertDbPostToContentfulFormat(post);
+
+    let entry;
+
+    // If contentfulId exists, update existing entry
+    if (post.contentfulId) {
+      try {
+        entry = await env.getEntry(post.contentfulId);
+        entry.fields = fields;
+        entry = await entry.update();
+      } catch (error: any) {
+        if (error.response?.status === 404) {
+          // Entry doesn't exist, create new one
+          entry = await env.createEntry('blogPost', { fields });
+        } else {
+          throw error;
+        }
+      }
+    } else {
+      // Create new entry
+      entry = await env.createEntry('blogPost', { fields });
+    }
+
+    // Publish if requested
+    if (publish && post.published) {
+      entry = await entry.publish();
+    }
+
+    return {
+      id: entry.sys.id,
+      published: entry.sys.publishedVersion !== undefined,
+    };
+  } catch (error: any) {
+    console.error('Error upserting Contentful post:', error);
+    if (error.response?.data) {
+      console.error('Contentful API error details:', error.response.data);
+    }
+    throw error;
+  }
+}
+
+/**
+ * Delete a blog post from Contentful
+ */
+export async function deleteContentfulPost(contentfulId: string): Promise<boolean> {
+  const client = getContentfulManagementClient();
+  if (!client) {
+    return false;
+  }
+
+  const space = process.env.CONTENTFUL_SPACE_ID;
+  const environment = process.env.CONTENTFUL_ENVIRONMENT || 'master';
+
+  if (!space) {
+    console.error('CONTENTFUL_SPACE_ID not set');
+    return false;
+  }
+
+  try {
+    const spaceClient = await client.getSpace(space);
+    const env = await spaceClient.getEnvironment(environment);
+    const entry = await env.getEntry(contentfulId);
+
+    // Unpublish first if published
+    if (entry.sys.publishedVersion) {
+      await entry.unpublish();
+    }
+
+    // Delete the entry
+    await entry.delete();
+
+    return true;
+  } catch (error: any) {
+    if (error.response?.status === 404) {
+      // Already deleted or doesn't exist
+      return true;
+    }
+    console.error('Error deleting Contentful post:', error);
+    return false;
+  }
 }
 

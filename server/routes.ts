@@ -2549,7 +2549,7 @@ Return JSON with:
 
   app.post("/api/admin/blog/posts", isAuthenticated, isAdmin, async (req, res) => {
     try {
-      const { title, slug, excerpt, content, authorName, featuredImage, published, tags, publishedAt } = req.body;
+      const { title, slug, excerpt, content, authorName, featuredImage, published, tags, publishedAt, syncToContentful } = req.body;
       
       if (!title || !slug || !content) {
         return res.status(400).json({ error: "Title, slug, and content are required" });
@@ -2567,6 +2567,34 @@ Return JSON with:
         publishedAt: publishedAt ? new Date(publishedAt) : new Date(),
       });
 
+      // Optionally sync to Contentful if requested and CMA is configured
+      if (syncToContentful) {
+        try {
+          const contentfulResult = await upsertContentfulPost({
+            title: post.title,
+            slug: post.slug,
+            excerpt: post.excerpt,
+            content: post.content,
+            featuredImage: post.featuredImage,
+            published: post.published,
+            tags: post.tags,
+            authorName: post.authorName,
+            publishedAt: post.publishedAt,
+          }, post.published);
+
+          if (contentfulResult) {
+            // Update post with contentfulId if it was created
+            if (contentfulResult.id && !post.contentfulId) {
+              await storage.updateBlogPost(post.id, { contentfulId: contentfulResult.id });
+              post.contentfulId = contentfulResult.id;
+            }
+          }
+        } catch (contentfulError: any) {
+          console.error("Error syncing to Contentful (post still saved to database):", contentfulError);
+          // Don't fail the request if Contentful sync fails - post is still saved
+        }
+      }
+
       res.status(201).json({ post });
     } catch (error: any) {
       console.error("Error creating blog post:", error);
@@ -2580,7 +2608,7 @@ Return JSON with:
   app.put("/api/admin/blog/posts/:id", isAuthenticated, isAdmin, async (req, res) => {
     try {
       const { id } = req.params;
-      const { title, slug, excerpt, content, authorName, featuredImage, published, tags, publishedAt } = req.body;
+      const { title, slug, excerpt, content, authorName, featuredImage, published, tags, publishedAt, syncToContentful } = req.body;
 
       const existingPost = await storage.getBlogPostById(id);
       if (!existingPost) {
@@ -2603,6 +2631,27 @@ Return JSON with:
         return res.status(404).json({ error: "Post not found" });
       }
 
+      // Optionally sync to Contentful if requested and CMA is configured
+      if (syncToContentful && existingPost.contentfulId) {
+        try {
+          await upsertContentfulPost({
+            contentfulId: existingPost.contentfulId,
+            title: updated.title,
+            slug: updated.slug,
+            excerpt: updated.excerpt,
+            content: updated.content,
+            featuredImage: updated.featuredImage,
+            published: updated.published,
+            tags: updated.tags,
+            authorName: updated.authorName,
+            publishedAt: updated.publishedAt,
+          }, updated.published);
+        } catch (contentfulError: any) {
+          console.error("Error syncing to Contentful (post still updated in database):", contentfulError);
+          // Don't fail the request if Contentful sync fails - post is still updated
+        }
+      }
+
       res.json({ post: updated });
     } catch (error: any) {
       console.error("Error updating blog post:", error);
@@ -2616,6 +2665,20 @@ Return JSON with:
   app.delete("/api/admin/blog/posts/:id", isAuthenticated, isAdmin, async (req, res) => {
     try {
       const { id } = req.params;
+      const { syncToContentful } = req.body;
+
+      const existingPost = await storage.getBlogPostById(id);
+      
+      // Optionally delete from Contentful if requested and CMA is configured
+      if (syncToContentful && existingPost?.contentfulId) {
+        try {
+          await deleteContentfulPost(existingPost.contentfulId);
+        } catch (contentfulError: any) {
+          console.error("Error deleting from Contentful (post still deleted from database):", contentfulError);
+          // Don't fail the request if Contentful delete fails - post is still deleted from DB
+        }
+      }
+
       await storage.deleteBlogPost(id);
       res.status(204).send();
     } catch (error) {

@@ -72,6 +72,7 @@
     "compression": "^1.8.1",
     "connect-pg-simple": "^10.0.0",
     "contentful": "^11.10.0",
+    "contentful-management": "^11.66.0",
     "date-fns": "^3.6.0",
     "drizzle-orm": "^0.39.3",
     "drizzle-zod": "^0.7.0",

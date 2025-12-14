@@ -50,6 +50,7 @@ export default function AdminBlog() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [postToDelete, setPostToDelete] = useState<BlogPost | null>(null);
+  const [deleteSyncToContentful, setDeleteSyncToContentful] = useState(false);
 
   const { data: postsData, isLoading } = useQuery<{ posts: BlogPost[] }>({
     queryKey: ["/api/admin/blog/posts"],
@@ -124,8 +125,11 @@ export default function AdminBlog() {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: async (id: string) => {
-      const response = await apiRequest("DELETE", `/api/admin/blog/posts/${id}`);
+    mutationFn: async ({ id, syncToContentful }: { id: string; syncToContentful?: boolean }) => {
+      const response = await apiRequest("DELETE", `/api/admin/blog/posts/${id}`, {
+        method: "DELETE",
+        body: JSON.stringify({ syncToContentful }),
+      });
       if (!response.ok) {
         throw new Error("Failed to delete post");
       }
@@ -406,6 +410,7 @@ function BlogPostForm({
   const [featuredImage, setFeaturedImage] = useState(post?.featuredImage || "");
   const [published, setPublished] = useState(post?.published ?? true);
   const [tags, setTags] = useState(post?.tags?.join(", ") || "");
+  const [syncToContentful, setSyncToContentful] = useState(false);
   const [publishedAt, setPublishedAt] = useState(
     post?.publishedAt ? new Date(post.publishedAt).toISOString().split("T")[0] : new Date().toISOString().split("T")[0]
   );
@@ -526,13 +531,31 @@ function BlogPostForm({
         />
       </div>
 
-      <div className="flex items-center space-x-2">
-        <Switch
-          id="published"
-          checked={published}
-          onCheckedChange={setPublished}
-        />
-        <Label htmlFor="published">Published</Label>
+      <div className="space-y-3">
+        <div className="flex items-center space-x-2">
+          <Switch
+            id="published"
+            checked={published}
+            onCheckedChange={setPublished}
+          />
+          <Label htmlFor="published">Published</Label>
+        </div>
+        
+        <div className="flex items-center space-x-2">
+          <Switch
+            id="syncToContentful"
+            checked={syncToContentful}
+            onCheckedChange={setSyncToContentful}
+          />
+          <Label htmlFor="syncToContentful" className="text-sm">
+            Sync to Contentful {post?.contentfulId && "(will update existing)"}
+          </Label>
+        </div>
+        {syncToContentful && (
+          <p className="text-xs text-muted-foreground ml-6">
+            This will create/update the post in Contentful. Requires CONTENTFUL_MANAGEMENT_TOKEN to be configured.
+          </p>
+        )}
       </div>
 
       <div className="flex justify-end gap-2 pt-4">
