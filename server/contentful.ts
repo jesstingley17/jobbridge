@@ -9,7 +9,7 @@ interface ContentfulConfig {
 }
 
 let contentfulClient: ReturnType<typeof createClient> | null = null;
-let contentfulManagementClient: ReturnType<typeof createManagementClient> | null = null;
+let contentfulManagementClient: any | null = null;
 
 export function getContentfulClient() {
   if (contentfulClient) {

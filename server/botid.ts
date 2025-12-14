@@ -66,11 +66,11 @@ export async function logBots(
   next: NextFunction
 ) {
   try {
-    const verification = await checkBotId({
-      ...(process.env.NODE_ENV === 'development' && process.env.ENABLE_BOTID_DEV === 'true'
-        ? { developmentOptions: { isDevelopment: true } }
-        : {}),
-    });
+    const config: Parameters<typeof checkBotId>[0] = {};
+    if (process.env.NODE_ENV === 'development' && process.env.ENABLE_BOTID_DEV === 'true') {
+      config.developmentOptions = { isDevelopment: true };
+    }
+    const verification = await checkBotId(config);
 
     (req as any).botid = {
       isBot: verification.isBot,

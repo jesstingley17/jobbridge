@@ -1723,7 +1723,7 @@ Return ONLY valid JSON, no markdown or explanation.`;
   });
 
   // Bulk apply to multiple jobs (Pro+ feature)
-  app.post("/api/applications/bulk", isAuthenticated, requireFeature('bulkApply'), async (req: any, res) => {
+  app.post("/api/applications/bulk", blockBots, isAuthenticated, requireFeature('bulkApply'), async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const parsed = bulkApplyRequestSchema.safeParse(req.body);
@@ -1770,7 +1770,7 @@ Return ONLY valid JSON, no markdown or explanation.`;
   });
 
   // AI-powered Cover Letter Generation (Pro+ feature)
-  app.post("/api/cover-letter/generate", isAuthenticated, requireFeature('aiCoverLetter'), async (req: any, res) => {
+  app.post("/api/cover-letter/generate", blockBots, isAuthenticated, requireFeature('aiCoverLetter'), async (req: any, res) => {
     try {
       const parsed = generateCoverLetterRequestSchema.safeParse(req.body);
       if (!parsed.success) {
@@ -1884,7 +1884,7 @@ Format as a JSON array with objects containing: question, reason, tips`;
   });
 
   // AI-powered Answer Analysis (Pro+ feature)
-  app.post("/api/interview/analyze", isAuthenticated, requireFeature('aiInterviewPrep'), async (req: any, res) => {
+  app.post("/api/interview/analyze", blockBots, isAuthenticated, requireFeature('aiInterviewPrep'), async (req: any, res) => {
     try {
       const parsed = analyzeAnswerRequestSchema.safeParse(req.body);
       if (!parsed.success) {
@@ -2015,7 +2015,7 @@ Return a JSON array with objects containing:
   });
 
   // AI Job Description Simplifier
-  app.post("/api/ai/simplify-job", async (req, res) => {
+  app.post("/api/ai/simplify-job", blockBots, async (req, res) => {
     try {
       const parsed = simplifyJobRequestSchema.safeParse(req.body);
       if (!parsed.success) {
@@ -2406,7 +2406,7 @@ Return JSON with:
     }
   });
 
-  app.post("/api/stripe/portal", isAuthenticated, async (req: any, res) => {
+  app.post("/api/stripe/portal", blockBots, isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const user = await storage.getUser(userId);
@@ -2633,7 +2633,7 @@ Return JSON with:
   });
 
   // Manual sync endpoint (admin only)
-  app.post("/api/contentful/sync", isAuthenticated, isAdmin, async (req: any, res) => {
+  app.post("/api/contentful/sync", blockBots, isAuthenticated, isAdmin, async (req: any, res) => {
     try {
       const result = await syncContentfulPosts(storage.upsertBlogPost.bind(storage));
       res.json({ 
@@ -2763,7 +2763,7 @@ Return JSON with:
     }
   });
 
-  app.put("/api/admin/blog/posts/:id", isAuthenticated, isAdmin, async (req, res) => {
+  app.put("/api/admin/blog/posts/:id", blockBots, isAuthenticated, isAdmin, async (req, res) => {
     try {
       const { id } = req.params;
       const { title, slug, excerpt, content, authorName, featuredImage, published, tags, publishedAt, syncToContentful } = req.body;
