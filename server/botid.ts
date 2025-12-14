@@ -67,9 +67,9 @@ export async function logBots(
 ) {
   try {
     const verification = await checkBotId({
-      developmentOptions: process.env.NODE_ENV === 'development' && process.env.ENABLE_BOTID_DEV === 'true'
-        ? { isBot: false }
-        : undefined,
+      ...(process.env.NODE_ENV === 'development' && process.env.ENABLE_BOTID_DEV === 'true'
+        ? { developmentOptions: { isDevelopment: true } }
+        : {}),
     });
 
     (req as any).botid = {
