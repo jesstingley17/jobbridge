@@ -133,5 +133,5 @@ Based on your codebase:
 
 ---
 
-**Last Updated:** After Supabase updateUser implementation - Redeploy
+**Last Updated:** After admin access update - Redeploy and sync
 **Status:** Manual database connection (Supabase) - no Vercel integration needed
