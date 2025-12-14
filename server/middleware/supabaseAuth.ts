@@ -136,92 +136,86 @@ export function requireSupabaseAuth() {
       // Log token info for debugging (first 20 chars only for security)
       console.log(`[Auth] Verifying token for ${req.path}, token prefix: ${token.substring(0, 20)}...`);
 
-      // Use Supabase Admin API to verify token instead of JWKS (more reliable)
-      // Add timeout to prevent hanging
+      // Use Supabase Admin API to verify token - simpler approach
       try {
         const { getSupabaseAdmin } = await import('../supabase.js');
         const supabaseAdmin = getSupabaseAdmin();
         
         // Add timeout to prevent hanging requests
         const timeoutPromise = new Promise((_, reject) => {
-          setTimeout(() => reject(new Error('Token verification timeout')), 3000); // 3 second timeout (reduced from 5s)
+          setTimeout(() => reject(new Error('Token verification timeout')), 5000); // 5 second timeout
         });
         
         // Use getUser with JWT token - this verifies the token and returns user info
-        // Note: getUser() on admin client accepts a JWT token to verify
+        // The result structure is: { data: { user }, error }
         const verifyPromise = supabaseAdmin.auth.getUser(token);
         const result = await Promise.race([
           verifyPromise,
           timeoutPromise
         ]) as any;
         
-        // Handle timeout case
+        // Handle timeout
         if (result && result.message === 'Token verification timeout') {
-          throw result; // Will be caught below
+          throw new Error('Token verification timeout');
         }
         
-        // Handle both timeout and actual result
-        // The result structure from getUser is: { data: { user }, error }
-        if (result && typeof result === 'object') {
-          // Check if result has data property (successful response)
-          if (result.data && result.data.user) {
-            const { data: { user }, error: verifyError } = result;
-            
-            if (verifyError || !user) {
-              console.error("JWT verification error:", verifyError?.message || "User not found");
-              console.error("Verification error details:", verifyError);
-              return res.status(401).json({ 
-                error: verifyError?.message || "Unauthorized",
-                details: process.env.NODE_ENV === "development" ? verifyError : undefined
-              });
-            }
-
-            console.log(`[Auth] Token verified successfully for user: ${user.email || user.id}`);
-            
-            // Attach user info to request
-            (req as any).supabaseUser = {
-              id: user.id,
-              role: user.role || "authenticated",
-              email: user.email,
-              email_confirmed_at: user.email_confirmed_at,
-            };
-
-            next();
-            return;
-          }
-          
-          // Check if result has error property (failed response)
-          if (result.error) {
-            console.error("JWT verification error in result:", result.error?.message || "Verification failed");
-            console.error("Full error object:", result.error);
-            throw result.error; // Will be caught below
-          }
-          
-          // If we get here, the result structure is unexpected
-          console.error("Unexpected result structure from getUser:", {
-            hasData: !!result.data,
-            hasError: !!result.error,
-            resultKeys: Object.keys(result),
-            resultType: typeof result
+        // Check for error in result
+        if (result?.error) {
+          console.error("[Auth] JWT verification error:", result.error?.message || "Verification failed");
+          return res.status(401).json({ 
+            error: result.error?.message || "Unauthorized",
+            details: process.env.NODE_ENV === "development" ? result.error : undefined
           });
         }
+        
+        // Check for user in result
+        if (result?.data?.user) {
+          const user = result.data.user;
+          console.log(`[Auth] Token verified successfully for user: ${user.email || user.id}`);
+          
+          // Attach user info to request
+          (req as any).supabaseUser = {
+            id: user.id,
+            role: user.role || "authenticated",
+            email: user.email,
+            email_confirmed_at: user.email_confirmed_at,
+          };
+
+          next();
+          return;
+        }
+        
+        // If we get here, something unexpected happened
+        console.error("[Auth] Unexpected result structure:", {
+          hasData: !!result?.data,
+          hasError: !!result?.error,
+          resultKeys: result ? Object.keys(result) : 'null',
+          resultType: typeof result
+        });
+        return res.status(401).json({ 
+          error: "Token verification failed",
+          message: "Unexpected response from authentication service"
+        });
+        
       } catch (adminError: any) {
-        // If timeout or other error, skip JWKS fallback for now (it's also failing with 401)
-        // Just return 401 - the client can retry
+        // Handle timeout or other errors
         if (adminError.message === 'Token verification timeout') {
-          console.warn("Supabase Admin API verification timed out");
+          console.warn("[Auth] Token verification timed out");
           return res.status(401).json({ 
             error: "Authentication timeout",
             message: "Token verification took too long. Please try again."
           });
-        } else {
-          console.warn("Supabase Admin API verification failed:", adminError.message);
-          // Don't fall back to JWKS if it's also failing - just return error
-          return res.status(401).json({ 
-            error: adminError?.message || "Unauthorized",
-            details: process.env.NODE_ENV === "development" ? adminError : undefined
-          });
         }
+        
+        console.error("[Auth] Token verification error:", adminError.message);
+        console.error("[Auth] Error stack:", adminError.stack);
+        return res.status(401).json({ 
+          error: adminError?.message || "Unauthorized",
+          details: process.env.NODE_ENV === "development" ? {
+            message: adminError?.message,
+            stack: adminError?.stack?.split('\n').slice(0, 5).join('\n')
+          } : undefined
+        });
       }
 
       // Fallback: Use JWKS verification
