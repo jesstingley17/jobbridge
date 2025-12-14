@@ -2539,13 +2539,17 @@ Return JSON with:
   });
 
   // Admin blog management routes
-  app.get("/api/admin/blog/posts", isAuthenticated, isAdmin, async (req, res) => {
+  app.get("/api/admin/blog/posts", isAuthenticated, isAdmin, async (req: any, res) => {
     try {
       const posts = await storage.getAllBlogPosts();
       res.json({ posts });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching all blog posts:", error);
-      res.status(500).json({ error: "Failed to fetch blog posts" });
+      console.error("Error stack:", error?.stack);
+      res.status(500).json({ 
+        error: "Failed to fetch blog posts",
+        message: process.env.NODE_ENV === 'development' ? error?.message : undefined
+      });
     }
   });
 

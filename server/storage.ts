@@ -753,10 +753,15 @@ export class DatabaseStorage implements IStorage {
 
   // Admin blog post operations
   async getAllBlogPosts(): Promise<BlogPost[]> {
-    return db
-      .select()
-      .from(blogPosts)
-      .orderBy(desc(blogPosts.createdAt));
+    try {
+      return await db
+        .select()
+        .from(blogPosts)
+        .orderBy(desc(blogPosts.createdAt));
+    } catch (error: any) {
+      console.error("Error in getAllBlogPosts:", error);
+      throw error;
+    }
   }
 
   async getBlogPostById(id: string): Promise<BlogPost | undefined> {

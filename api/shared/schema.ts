@@ -643,6 +643,7 @@ export const blogPosts = pgTable("blog_posts", {
   content: text("content").notNull(),
   authorName: varchar("author_name").default("The JobBridge Team"),
   featuredImage: text("featured_image"),
+  featuredImageAltText: text("featured_image_alt_text"), // Alt text for accessibility
   published: boolean("published").default(true),
   publishedAt: timestamp("published_at").defaultNow(),
   tags: text("tags").array(),

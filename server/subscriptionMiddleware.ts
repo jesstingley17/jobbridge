@@ -141,10 +141,11 @@ export function requireApplicationQuota() {
 }
 
 export async function getUserSubscriptionStatus(userId: string) {
-  const user = await storage.getUser(userId);
-  if (!user) {
-    throw new Error('User not found');
-  }
+  try {
+    const user = await storage.getUser(userId);
+    if (!user) {
+      throw new Error('User not found');
+    }
 
   const tier = user.subscriptionTier || 'free';
   const limits = getTierLimits(tier);
