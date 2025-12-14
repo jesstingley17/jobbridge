@@ -203,6 +203,7 @@ export default function AdminLogin() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   className="pl-10 pr-10"
+                  autoComplete="current-password"
                   required
                 />
                 <Button
