@@ -96,33 +96,51 @@ export const isAdmin: RequestHandler = async (req: any, res, next) => {
   }
   
   try {
-    // Use role-based system: check user_roles table
-    const result = await pool.query(
-      `
-        SELECT EXISTS (
-          SELECT 1
-          FROM public.user_roles ur
-          JOIN public.roles r ON r.id = ur.role_id
-          WHERE ur.user_id = $1 AND r.name = 'admin'
-        ) AS is_admin
-      `,
-      [userId]
-    );
-    
-    const isAdmin = result.rows[0]?.is_admin === true;
-    
-    if (isAdmin) {
-      // Ensure req.user is set for downstream middleware
-      if (!req.user) {
-        req.user = {
-          claims: { sub: userId }
-        };
+    // First, try to get user info (needed for fallback checks)
+    let user;
+    try {
+      user = await storage.getUser(userId);
+    } catch (userError) {
+      console.error("Error fetching user in isAdmin:", userError);
+      // Continue with role-based check even if getUser fails
+    }
+
+    // Try role-based system: check user_roles table (if it exists)
+    try {
+      const result = await pool.query(
+        `
+          SELECT EXISTS (
+            SELECT 1
+            FROM public.user_roles ur
+            JOIN public.roles r ON r.id = ur.role_id
+            WHERE ur.user_id = $1 AND r.name = 'admin'
+          ) AS is_admin
+        `,
+        [userId]
+      );
+      
+      const isAdmin = result.rows[0]?.is_admin === true;
+      
+      if (isAdmin) {
+        // Ensure req.user is set for downstream middleware
+        if (!req.user) {
+          req.user = {
+            claims: { sub: userId }
+          };
+        }
+        return next();
       }
-      return next();
+    } catch (roleError: any) {
+      // If tables don't exist (e.g., migration not run), log and continue to fallback checks
+      if (roleError?.code === '42P01' || roleError?.message?.includes('does not exist')) {
+        console.warn("Role-based tables not found, using fallback admin checks:", roleError.message);
+      } else {
+        console.error("Error checking role-based admin access:", roleError);
+        // Continue to fallback checks instead of failing
+      }
     }
     
     // Fallback: Check legacy user.role field (for backward compatibility)
-    const user = await storage.getUser(userId);
     if (user?.role === "admin") {
       if (!req.user) {
         req.user = {
@@ -146,20 +164,28 @@ export const isAdmin: RequestHandler = async (req: any, res, next) => {
     // Fallback: Check admin email pattern (for backward compatibility)
     const adminPattern = process.env.ADMIN_EMAIL_PATTERN;
     if (adminPattern && user?.email) {
-      const regex = new RegExp(adminPattern);
-      if (regex.test(user.email)) {
-        if (!req.user) {
-          req.user = {
-            claims: { sub: userId }
-          };
+      try {
+        const regex = new RegExp(adminPattern);
+        if (regex.test(user.email)) {
+          if (!req.user) {
+            req.user = {
+              claims: { sub: userId }
+            };
+          }
+          return next();
         }
-        return next();
+      } catch (regexError) {
+        console.error("Invalid ADMIN_EMAIL_PATTERN regex:", regexError);
       }
     }
 
     return res.status(403).json({ message: "Admin access required" });
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error checking admin access:", error);
-    return res.status(500).json({ message: "Internal server error" });
+    // Provide more detailed error in development
+    const errorMessage = process.env.NODE_ENV === 'development' 
+      ? error.message || "Internal server error"
+      : "Internal server error";
+    return res.status(500).json({ message: errorMessage });
   }
 };

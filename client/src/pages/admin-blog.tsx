@@ -446,6 +446,7 @@ function BlogPostForm({
   const [content, setContent] = useState(post?.content || "");
   const [authorName, setAuthorName] = useState(post?.authorName || "The JobBridge Team");
   const [featuredImage, setFeaturedImage] = useState(post?.featuredImage || "");
+  const [featuredImageAltText, setFeaturedImageAltText] = useState(post?.featuredImageAltText || "");
   const [published, setPublished] = useState(post?.published ?? true);
   const [tags, setTags] = useState(post?.tags?.join(", ") || "");
   const [syncToContentful, setSyncToContentful] = useState(false);
