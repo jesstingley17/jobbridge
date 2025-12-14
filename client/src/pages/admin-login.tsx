@@ -39,14 +39,21 @@ export default function AdminLogin() {
       
       const user = await response.json();
       
+      console.log("[Admin Login] User object from /api/auth/user:", user);
+      console.log("[Admin Login] User role:", user.role);
+      console.log("[Admin Login] User email:", user.email);
+      
       // Check if user is admin (role check is done server-side, but verify here too)
       const isAdmin = user.role === "admin";
       
       if (!isAdmin) {
+        console.error("[Admin Login] User is not admin. User object:", JSON.stringify(user, null, 2));
         // Sign out if not admin
         await supabase.auth.signOut();
         throw new Error("Access denied. Admin privileges required.");
       }
+      
+      console.log("[Admin Login] Admin access granted!");
       
       return authData;
     },

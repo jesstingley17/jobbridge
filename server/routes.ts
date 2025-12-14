@@ -753,6 +753,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
           });
           
           user = await Promise.race([upsertPromise, upsertTimeout]);
+          // If user is admin, set the role even for newly created users
+          if (isAdmin && user.role !== 'admin') {
+            console.log(`[Auth] Newly created user ${user.email || user.id} is admin. Setting role.`);
+            user.role = 'admin';
+            storage.updateUserRole(supabaseUser.id, 'admin').catch(err => {
+              console.warn('Failed to sync admin role to database:', err.message);
+            });
+          }
+          console.log(`[Auth] Returning newly created user: ${user.email || user.id}, role: ${user.role}, isAdmin check: ${isAdmin}`);
           return res.json(user);
         } catch (upsertError: any) {
           console.error('Error creating user:', upsertError);
