@@ -155,6 +155,20 @@ export class DatabaseStorage implements IStorage {
     return user;
   }
 
+  // Update user fields (Supabase-compatible: updates app-specific fields in public.users table)
+  // For Supabase Auth fields (email, phone, metadata), use admin.auth.admin.updateUserById instead
+  async updateUser(userId: string, updates: Partial<Omit<UpsertUser, 'id'>>): Promise<User | undefined> {
+    const [updated] = await db
+      .update(users)
+      .set({
+        ...updates,
+        updatedAt: new Date(),
+      })
+      .where(eq(users.id, userId))
+      .returning();
+    return updated;
+  }
+
   async updateUserRole(id: string, role: string): Promise<User | undefined> {
     const [user] = await db
       .update(users)
