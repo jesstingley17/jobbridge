@@ -22,12 +22,34 @@ export default function AdminLogin() {
 
   const loginMutation = useMutation({
     mutationFn: async (data: { email: string; password: string }) => {
-      const response = await apiRequest("POST", "/api/admin/login", data);
+      // Use Supabase Auth for admin login (same as regular login)
+      const { supabase } = await import("@/utils/supabase/client");
+      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+        email: data.email,
+        password: data.password,
+      });
+      
+      if (authError) throw authError;
+      
+      // Verify user is admin after successful login
+      const response = await apiRequest("GET", "/api/auth/user");
       if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || "Login failed");
+        throw new Error("Failed to verify admin access");
       }
-      return response.json();
+      
+      const user = await response.json();
+      
+      // Check if user is admin
+      const adminEmails = process.env.ADMIN_EMAILS?.split(",").map((e: string) => e.trim()) || [];
+      const isAdmin = user.role === "admin" || (user.email && adminEmails.includes(user.email));
+      
+      if (!isAdmin) {
+        // Sign out if not admin
+        await supabase.auth.signOut();
+        throw new Error("Access denied. Admin privileges required.");
+      }
+      
+      return authData;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
