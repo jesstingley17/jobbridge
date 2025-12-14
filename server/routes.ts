@@ -2,6 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage.js";
 import { isAuthenticated, isAdmin } from "./auth.js";
+import { blockBots } from "./botid.js";
 import { requireSupabaseAuth } from "./middleware/supabaseAuth.js";
 import OpenAI from "openai";
 import { z } from "zod";
@@ -2536,8 +2537,8 @@ Return JSON with:
     }
   });
 
-  // Test Contentful connection endpoint (admin only)
-  app.get("/api/contentful/test", isAuthenticated, isAdmin, async (req: any, res) => {
+  // Test Contentful connection endpoint (admin only) - block bots
+  app.get("/api/contentful/test", blockBots, isAuthenticated, isAdmin, async (req: any, res) => {
     try {
       const { fetchContentfulPosts, getContentfulClient } = await import("./contentful.js");
       const client = getContentfulClient();

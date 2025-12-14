@@ -203,6 +203,18 @@ app.use((req, res, next) => {
   const start = Date.now();
   const path = req.path;
   let capturedJsonResponse: Record<string, any> | undefined = undefined;
+  
+  // Log BotID detection for monitoring
+  if (req.botid) {
+    const botInfo = {
+      isBot: req.botid.isBot,
+      verified: req.botid.verified,
+      userAgent: req.headers['user-agent']?.substring(0, 50),
+    };
+    if (req.botid.isBot) {
+      log(`Bot detected: ${JSON.stringify(botInfo)}`, 'botid');
+    }
+  }
 
   const originalResJson = res.json;
   res.json = function (bodyJson, ...args) {

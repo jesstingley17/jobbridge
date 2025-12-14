@@ -51,21 +51,33 @@ export function checkBotID(req: any): BotIDResult {
 export function botIDMiddleware(req: any, res: any, next: any) {
   const botResult = checkBotID(req);
   req.botid = botResult;
+  
+  // Log bot detection for monitoring (only in production or when explicitly enabled)
+  if (process.env.NODE_ENV === 'production' || process.env.LOG_BOTID === 'true') {
+    if (botResult.isBot && botResult.verified) {
+      console.log(`[BotID] Bot detected: ${req.method} ${req.path} - Verified: ${botResult.verified}`);
+    }
+  }
+  
   next();
 }
 
 /**
  * Optional: Block bots from certain routes
+ * Only blocks verified bots to avoid false positives
  */
 export function blockBots(req: any, res: any, next: any) {
   const botResult = checkBotID(req);
   
+  // Only block if BotID has verified it's a bot (to avoid blocking legitimate traffic)
   if (botResult.isBot && botResult.verified) {
+    console.log(`[BotID] Blocked bot request: ${req.method} ${req.path} from ${req.ip}`);
     return res.status(403).json({
       error: 'Bot access denied',
       message: 'This endpoint is not available for automated requests',
     });
   }
   
+  // Allow through if not verified as bot (includes legitimate search engine bots)
   next();
 }
