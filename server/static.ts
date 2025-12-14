@@ -8,10 +8,48 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 export function serveStatic(app: Express) {
-  const distPath = path.resolve(__dirname, "public");
+  // Try multiple possible paths for the build directory
+  // This handles both development and production environments
+  let distPath: string;
+  
+  // First, try to get the path relative to the current file
+  try {
+    const __filename = fileURLToPath(import.meta.url);
+    const __dirname = path.dirname(__filename);
+    distPath = path.resolve(__dirname, "public");
+  } catch {
+    // Fallback: try process.cwd() if import.meta.url doesn't work
+    distPath = path.resolve(process.cwd(), "dist", "public");
+  }
+  
+  // Also try common Vercel/build paths
+  const possiblePaths = [
+    distPath,
+    path.resolve(process.cwd(), "dist", "public"),
+    path.resolve(process.cwd(), "public"),
+    path.resolve(process.cwd(), "client", "dist"),
+  ];
+  
+  // Find the first path that exists
+  for (const possiblePath of possiblePaths) {
+    if (fs.existsSync(possiblePath)) {
+      distPath = possiblePath;
+      break;
+    }
+  }
+  
+  // Only throw error if we're in a context where static files are expected
+  // (e.g., self-hosted server, not Vercel serverless)
   if (!fs.existsSync(distPath)) {
+    // In Vercel, static files are handled by the platform, so this is OK
+    if (process.env.VERCEL) {
+      console.log('⚠️  Static files directory not found, but this is OK in Vercel (static files are served by platform)');
+      return; // Don't throw, just return - Vercel handles static files
+    }
+    
+    // For self-hosted servers, throw error
     throw new Error(
-      `Could not find the build directory: ${distPath}, make sure to build the client first`,
+      `Could not find the build directory. Tried: ${possiblePaths.join(', ')}. Make sure to build the client first.`,
     );
   }
 
