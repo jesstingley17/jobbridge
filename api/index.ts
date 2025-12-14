@@ -122,11 +122,13 @@ async function initializeApp() {
       // Register all routes (this may fail if critical imports are missing)
       try {
         await registerRoutes(app);
+        console.log('✅ Routes registered successfully');
       } catch (routesError: any) {
-        console.error('⚠️  Error registering routes:', routesError.message);
-        console.error('⚠️  Stack:', routesError.stack);
-        // Don't throw - let the app continue and handle errors at route level
-        // This prevents deployment failures from blocking the entire app
+        console.error('❌ Error registering routes:', routesError.message);
+        console.error('❌ Error name:', routesError.name);
+        console.error('❌ Error stack:', routesError.stack);
+        // Re-throw to see the actual error in Vercel logs
+        throw new Error(`Route registration failed: ${routesError.message}`, { cause: routesError });
       }
 
       // Serve static files in production

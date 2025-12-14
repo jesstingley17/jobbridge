@@ -138,8 +138,17 @@ import { registerSitemapRoute } from "./routes/sitemap.js";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Initialize session middleware (must be before routes that use sessions)
-  const { getSession } = await import("./auth.js");
-  app.use(getSession());
+  // Only set up if not already configured (for Vercel serverless functions)
+  try {
+    const { getSession } = await import("./auth.js");
+    // Check if session middleware is already set up
+    if (!app._router || !app._router.stack.some((layer: any) => layer.name === 'session')) {
+      app.use(getSession());
+    }
+  } catch (sessionError: any) {
+    console.warn('⚠️  Could not set up session middleware in registerRoutes:', sessionError.message);
+    // Continue - session might already be set up in api/index.ts
+  }
   
   // Register sitemap and robots.txt routes (before auth)
   registerSitemapRoute(app);
