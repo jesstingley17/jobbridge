@@ -2886,11 +2886,12 @@ Return JSON with:
   });
 
 
-  // Admin blog management routes - block bots
-  app.get("/api/admin/blog/posts", blockBots, isAuthenticated, isAdmin, async (req: any, res) => {
+  // Admin blog management routes
+  app.get("/api/admin/blog/posts", requireSupabaseAuth(), isAdmin, async (req: any, res) => {
     try {
-      // Double-check authentication
-      if (!req.user?.claims?.sub) {
+      // Double-check authentication - use supabaseUser instead of req.user
+      const userId = req.supabaseUser?.id || req.user?.claims?.sub;
+      if (!userId) {
         return res.status(401).json({ error: "Unauthorized" });
       }
       
@@ -2928,7 +2929,7 @@ Return JSON with:
     }
   });
 
-  app.post("/api/admin/blog/posts", blockBots, isAuthenticated, isAdmin, async (req, res) => {
+  app.post("/api/admin/blog/posts", requireSupabaseAuth(), isAdmin, async (req, res) => {
     try {
       const { title, slug, excerpt, content, authorName, featuredImage, featuredImageAltText, published, tags, publishedAt, syncToContentful } = req.body;
       
@@ -3045,7 +3046,7 @@ Return JSON with:
     }
   });
 
-  app.delete("/api/admin/blog/posts/:id", blockBots, isAuthenticated, isAdmin, async (req, res) => {
+  app.delete("/api/admin/blog/posts/:id", requireSupabaseAuth(), isAdmin, async (req, res) => {
     try {
       const { id } = req.params;
       // For DELETE requests, body might be empty, so we check both body and query

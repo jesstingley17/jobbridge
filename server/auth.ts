@@ -89,30 +89,44 @@ export const isAuthenticated: RequestHandler = async (req, res, next) => {
 export const isAdmin: RequestHandler = async (req: any, res, next) => {
   let userId: string | null = null;
   
-  // Check Supabase auth first
-  const supabaseUserId = await checkSupabaseAuth(req);
-  if (supabaseUserId) {
-    userId = supabaseUserId;
+  // Check Supabase auth first (from requireSupabaseAuth middleware)
+  if (req.supabaseUser?.id) {
+    userId = req.supabaseUser.id;
+    console.log(`[isAdmin] Found userId from req.supabaseUser: ${userId}`);
+  }
+  // Check Supabase auth via checkSupabaseAuth function
+  else {
+    const supabaseUserId = await checkSupabaseAuth(req);
+    if (supabaseUserId) {
+      userId = supabaseUserId;
+      console.log(`[isAdmin] Found userId from checkSupabaseAuth: ${userId}`);
+    }
   }
   // Fallback to session-based auth (for admin login)
-  else if (req.session && (req.session as any).userId) {
+  if (!userId && req.session && (req.session as any).userId) {
     userId = (req.session as any).userId;
+    console.log(`[isAdmin] Found userId from session: ${userId}`);
   }
   // Also check req.user.claims.sub (set by isAuthenticated or requireSupabaseAuth)
-  else if (req.user?.claims?.sub) {
+  if (!userId && req.user?.claims?.sub) {
     userId = req.user.claims.sub;
+    console.log(`[isAdmin] Found userId from req.user.claims.sub: ${userId}`);
   }
   
   if (!userId) {
     // User not authenticated - return 401, not 500
+    console.warn(`[isAdmin] No userId found. req.supabaseUser: ${!!req.supabaseUser}, req.user: ${!!req.user}, req.session: ${!!req.session}`);
     return res.status(401).json({ message: "Unauthorized" });
   }
+  
+  console.log(`[isAdmin] Checking admin access for userId: ${userId}`);
   
   try {
     // First, try to get user info (needed for fallback checks)
     let user;
     try {
       user = await storage.getUser(userId);
+      console.log(`[isAdmin] User from DB: ${user?.email || 'not found'}, role: ${user?.role || 'none'}`);
     } catch (userError) {
       console.error("Error fetching user in isAdmin:", userError);
       // Continue with role-based check even if getUser fails
