@@ -2516,11 +2516,25 @@ Return JSON with:
       res.json({ 
         success: true, 
         synced: result.synced, 
-        errors: result.errors 
+        errors: result.errors,
+        message: result.errors > 0 
+          ? `Synced ${result.synced} posts with ${result.errors} errors. Check server logs for details.`
+          : `Successfully synced ${result.synced} posts from Contentful.`
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error syncing Contentful posts:", error);
-      res.status(500).json({ error: "Failed to sync posts" });
+      // Provide more helpful error message
+      const errorMessage = error.message || "Failed to sync posts";
+      const isConfigError = errorMessage.includes('not configured') || errorMessage.includes('CONTENTFUL');
+      
+      res.status(500).json({ 
+        error: "Failed to sync posts",
+        details: isConfigError 
+          ? "Contentful may not be configured. Check CONTENTFUL_SPACE_ID and CONTENTFUL_ACCESS_TOKEN environment variables."
+          : errorMessage,
+        synced: 0,
+        errors: 1
+      });
     }
   });
 

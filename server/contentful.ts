@@ -97,11 +97,33 @@ export async function fetchContentfulPosts(): Promise<ContentfulBlogPost[]> {
   }
 
   try {
-    const entries: EntryCollection<any> = await client.getEntries({
-      content_type: 'blogPost', // Adjust this to match your Contentful content type
-      order: ['-fields.publishedDate', '-sys.createdAt'] as any,
-      limit: 100, // Adjust limit as needed
-    });
+    // Try multiple content type names (case-insensitive matching)
+    const contentTypes = ['blogPost', 'blog_post', 'Blog page', 'blogPage'];
+    let entries: EntryCollection<any> | null = null;
+    let lastError: any = null;
+
+    for (const contentType of contentTypes) {
+      try {
+        entries = await client.getEntries({
+          content_type: contentType,
+          order: ['-fields.publishedDate', '-sys.createdAt'] as any,
+          limit: 100,
+        });
+        if (entries.items.length > 0 || contentType === contentTypes[0]) {
+          // Use first match or default to 'blogPost'
+          break;
+        }
+      } catch (err: any) {
+        lastError = err;
+        // Continue to next content type
+        continue;
+      }
+    }
+
+    if (!entries) {
+      console.warn('No Contentful entries found. Check content type name. Tried:', contentTypes);
+      return [];
+    }
 
     // Filter published posts (if published field exists)
     const publishedPosts = entries.items.filter((item: any) => {
@@ -110,8 +132,9 @@ export async function fetchContentfulPosts(): Promise<ContentfulBlogPost[]> {
     });
 
     return publishedPosts as any[];
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error fetching Contentful posts:', error);
+    // Don't throw - return empty array so app continues to work
     return [];
   }
 }
@@ -190,23 +213,50 @@ export function convertContentfulPostToDbFormat(
  */
 export async function syncContentfulPosts(
   upsertBlogPost: (post: any) => Promise<any>
-): Promise<{ synced: number; errors: number }> {
-  const posts = await fetchContentfulPosts();
-  let synced = 0;
-  let errors = 0;
-
-  for (const contentfulPost of posts) {
-    try {
-      const dbPost = convertContentfulPostToDbFormat(contentfulPost);
-      await upsertBlogPost(dbPost);
-      synced++;
-    } catch (error) {
-      console.error(`Error syncing post ${contentfulPost.sys.id}:`, error);
-      errors++;
-    }
+): Promise<{ synced: number; errors: number; message?: string }> {
+  const client = getContentfulClient();
+  if (!client) {
+    return { 
+      synced: 0, 
+      errors: 0,
+      message: "Contentful not configured. Set CONTENTFUL_SPACE_ID and CONTENTFUL_ACCESS_TOKEN to enable syncing."
+    };
   }
 
-  return { synced, errors };
+  try {
+    const posts = await fetchContentfulPosts();
+    
+    if (posts.length === 0) {
+      return { 
+        synced: 0, 
+        errors: 0,
+        message: "No posts found in Contentful. Make sure your content type exists and has published entries."
+      };
+    }
+
+    let synced = 0;
+    let errors = 0;
+
+    for (const contentfulPost of posts) {
+      try {
+        const dbPost = convertContentfulPostToDbFormat(contentfulPost);
+        await upsertBlogPost(dbPost);
+        synced++;
+      } catch (error: any) {
+        console.error(`Error syncing post ${contentfulPost.sys.id}:`, error);
+        errors++;
+      }
+    }
+
+    return { synced, errors };
+  } catch (error: any) {
+    console.error('Error in syncContentfulPosts:', error);
+    return { 
+      synced: 0, 
+      errors: 1,
+      message: error.message || "Failed to sync from Contentful"
+    };
+  }
 }
 
 /**

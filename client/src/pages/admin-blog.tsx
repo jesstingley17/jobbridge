@@ -177,14 +177,16 @@ export default function AdminBlog() {
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/blog/posts"] });
       toast({
-        title: "Sync Complete",
-        description: `Synced ${data.synced} posts from Contentful`,
+        title: data.errors > 0 ? "Sync Complete with Errors" : "Sync Complete",
+        description: data.message || `Synced ${data.synced} posts${data.errors > 0 ? ` with ${data.errors} errors` : ''} from Contentful`,
+        variant: data.errors > 0 ? "destructive" : "default",
       });
     },
-    onError: () => {
+    onError: (error: any) => {
+      const errorMessage = error?.response?.json?.()?.then?.((data: any) => data.details) || error.message || "Failed to sync posts from Contentful";
       toast({
         title: "Error",
-        description: "Failed to sync posts from Contentful",
+        description: typeof errorMessage === 'string' ? errorMessage : "Failed to sync posts from Contentful. Check Contentful configuration.",
         variant: "destructive",
       });
     },
