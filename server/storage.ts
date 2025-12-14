@@ -1588,5 +1588,14 @@ export async function hashPassword(password: string): Promise<string> {
 }
 
 export async function verifyPassword(password: string, hashedPassword: string): Promise<boolean> {
-  return bcrypt.compare(password, hashedPassword);
+  try {
+    if (!password || !hashedPassword) {
+      console.error("verifyPassword: Missing password or hash");
+      return false;
+    }
+    return await bcrypt.compare(password, hashedPassword);
+  } catch (error: any) {
+    console.error("Error in verifyPassword:", error);
+    throw error;
+  }
 }
