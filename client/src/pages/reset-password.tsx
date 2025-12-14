@@ -47,14 +47,26 @@ export default function ResetPassword() {
 
   // Check if user has a valid session from Supabase password reset link
   const [hasResetSession, setHasResetSession] = useState(false);
+  const [sessionChecked, setSessionChecked] = useState(false);
   
   useEffect(() => {
     const checkResetSession = async () => {
       // If user arrived from Supabase reset email, they'll have a session
-      const { data: { session } } = await supabase.auth.getSession();
+      const { data: { session }, error } = await supabase.auth.getSession();
+      if (error) {
+        console.error('Error checking session:', error);
+        setHasResetSession(false);
+        setSessionChecked(true);
+        return;
+      }
+      
       if (session) {
         setHasResetSession(true);
+      } else {
+        // No session - link may have expired or invalid
+        setHasResetSession(false);
       }
+      setSessionChecked(true);
     };
     checkResetSession();
   }, []);
@@ -64,7 +76,7 @@ export default function ResetPassword() {
       // Use Supabase's native password update (user is authenticated from reset link)
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
-        throw new Error("No active session. Please use the link from your email.");
+        throw new Error("No active session. The reset link may have expired. Please request a new password reset link.");
       }
       
       const { data, error } = await supabase.auth.updateUser({ password: newPassword });
@@ -105,25 +117,49 @@ export default function ResetPassword() {
     resetPasswordMutation.mutate(newPassword);
   };
 
+  // Wait for session check to complete
+  if (!sessionChecked) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-4 bg-muted/30">
+        <Card className="w-full max-w-md">
+          <CardContent className="pt-6">
+            <div className="flex flex-col items-center space-y-4">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              <p className="text-muted-foreground">Verifying reset link...</p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   // For Supabase password reset, check if user has session from reset email
-  // If no session and no token, show invalid link message
-  if (!hasResetSession && !token) {
+  // If no session, show expired/invalid link message with option to resend
+  if (!hasResetSession) {
     return (
       <div className="min-h-screen flex items-center justify-center p-4 bg-muted/30">
         <Card className="w-full max-w-md">
           <CardHeader className="text-center">
-            <CardTitle className="text-2xl">Invalid Link</CardTitle>
+            <CardTitle className="text-2xl">Link Expired or Invalid</CardTitle>
             <CardDescription>
-              This link is invalid or has expired. Please request a new password reset link.
+              This password reset link has expired or is invalid. Please request a new password reset link.
             </CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="space-y-4">
             <Button
               className="w-full"
               onClick={() => setLocation("/auth")}
               data-testid="button-back-to-auth"
             >
               Go to Login
+            </Button>
+            <Button
+              variant="outline"
+              className="w-full"
+              onClick={() => setLocation("/auth")}
+              data-testid="button-request-new-reset"
+            >
+              Request New Reset Link
             </Button>
           </CardContent>
         </Card>
