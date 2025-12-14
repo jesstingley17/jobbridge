@@ -20,28 +20,32 @@ console.log(`[DB Init] Using database URL: ${databaseUrl.substring(0, 50)}...`);
 
 // Parse connection string and add SSL config if needed
 // Supabase pooler connections use self-signed certificates, so we must allow them
+const isSupabase = databaseUrl.includes('pooler.supabase.com') || databaseUrl.includes('supabase.co');
+
+// Base connection config
 const connectionConfig: any = { 
   connectionString: databaseUrl,
   // Optimize for serverless: keep connections alive but don't keep too many
   max: 2,  // Reduced from default 10 for serverless
   idleTimeoutMillis: 30000,
   connectionTimeoutMillis: 2000, // Reduced from 5000ms for faster failures
-  // CRITICAL: Always allow self-signed certs for Supabase pooler connections
-  // This is required for Supabase's connection pooler to work
-  ssl: {
-    rejectUnauthorized: false, // Allow self-signed certificates
-  },
   // Enable statement timeout to prevent long-running queries
   statement_timeout: 10000, // 10 seconds max per query
 };
 
-// Ensure SSL is enabled for Supabase connections (pooler requires SSL)
-// If the connection string has sslmode=require, we need to ensure SSL config is set
-if (databaseUrl.includes('pooler.supabase.com') || databaseUrl.includes('supabase.co')) {
+// CRITICAL: Always allow self-signed certs for Supabase pooler connections
+// This is required for Supabase's connection pooler to work
+// node-postgres requires explicit SSL config even if connection string has sslmode
+if (isSupabase || databaseUrl.includes('sslmode=require') || databaseUrl.includes('sslmode=prefer')) {
   connectionConfig.ssl = {
-    rejectUnauthorized: false, // Supabase pooler uses self-signed certs
+    rejectUnauthorized: false, // Allow self-signed certificates (required for Supabase pooler)
   };
-  console.log('[DB Init] SSL configured for Supabase pooler connection');
+  console.log('[DB Init] SSL configured for Supabase/database connection (rejectUnauthorized: false)');
+} else {
+  // For other databases, use SSL if connection string requires it
+  connectionConfig.ssl = {
+    rejectUnauthorized: false, // Default to allowing self-signed certs for compatibility
+  };
 }
 
 // Handle SSL for databases that require it (keep ssl: false from above since we set it directly)
