@@ -574,19 +574,63 @@ function BlogPostForm({
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="content">Content *</Label>
-        <Textarea
-          id="content"
-          value={content}
-          onChange={(e) => setContent(e.target.value)}
-          rows={20}
-          required
-          placeholder="Blog post content (HTML supported: headings, tables, lists, blockquotes, etc.)"
-          className="font-mono text-sm"
-        />
-        <p className="text-xs text-muted-foreground">
-          HTML is fully supported. You can use headings (&lt;h1&gt; to &lt;h6&gt;), tables (&lt;table&gt;), lists (&lt;ul&gt;, &lt;ol&gt;), blockquotes (&lt;blockquote&gt;), images (&lt;img&gt;), and more. Paste your HTML directly here.
-        </p>
+        <div className="flex items-center justify-between">
+          <Label htmlFor="content">Content *</Label>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={() => setShowLivePreview(!showLivePreview)}
+            className="h-7 text-xs"
+          >
+            <Eye className="h-3 w-3 mr-1" />
+            {showLivePreview ? "Hide Live Preview" : "Show Live Preview"}
+          </Button>
+        </div>
+        {showLivePreview ? (
+          <div className="grid grid-cols-2 gap-4 border rounded-lg p-4">
+            <div className="space-y-2">
+              <Label className="text-xs text-muted-foreground">HTML Editor</Label>
+              <Textarea
+                id="content"
+                value={content}
+                onChange={(e) => setContent(e.target.value)}
+                rows={20}
+                required
+                placeholder="Blog post content (HTML supported: headings, tables, lists, blockquotes, etc.)"
+                className="font-mono text-sm"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label className="text-xs text-muted-foreground">Live Preview</Label>
+              <div className="border rounded-md p-4 bg-background overflow-y-auto" style={{ maxHeight: '500px' }}>
+                {content ? (
+                  <div 
+                    className="prose prose-sm max-w-none dark:prose-invert prose-headings:scroll-mt-20 prose-headings:tracking-tight prose-a:text-primary prose-a:no-underline hover:prose-a:underline prose-img:rounded-lg prose-pre:bg-muted prose-table:border prose-th:border prose-td:border prose-th:bg-muted prose-th:p-2 prose-td:p-2 prose-blockquote:border-l-4 prose-blockquote:border-primary prose-blockquote:pl-4 prose-blockquote:italic"
+                    dangerouslySetInnerHTML={{ __html: content }}
+                  />
+                ) : (
+                  <p className="text-muted-foreground italic text-sm">Start typing or paste HTML to see preview...</p>
+                )}
+              </div>
+            </div>
+          </div>
+        ) : (
+          <>
+            <Textarea
+              id="content"
+              value={content}
+              onChange={(e) => setContent(e.target.value)}
+              rows={20}
+              required
+              placeholder="Blog post content (HTML supported: headings, tables, lists, blockquotes, etc.)"
+              className="font-mono text-sm"
+            />
+            <p className="text-xs text-muted-foreground">
+              HTML is fully supported. You can use headings (&lt;h1&gt; to &lt;h6&gt;), tables (&lt;table&gt;), lists (&lt;ul&gt;, &lt;ol&gt;), blockquotes (&lt;blockquote&gt;), images (&lt;img&gt;), and more. Paste your HTML directly here. Click "Show Live Preview" to see formatted output as you type.
+            </p>
+          </>
+        )}
       </div>
 
       <div className="grid grid-cols-2 gap-4">
