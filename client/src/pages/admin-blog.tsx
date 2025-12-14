@@ -170,7 +170,8 @@ export default function AdminBlog() {
     mutationFn: async () => {
       const response = await apiRequest("POST", "/api/contentful/sync");
       if (!response.ok) {
-        throw new Error("Failed to sync posts");
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.details || errorData.error || "Failed to sync posts");
       }
       return response.json();
     },
@@ -183,10 +184,10 @@ export default function AdminBlog() {
       });
     },
     onError: (error: any) => {
-      const errorMessage = error?.response?.json?.()?.then?.((data: any) => data.details) || error.message || "Failed to sync posts from Contentful";
+      const errorMessage = error.message || "Failed to sync posts from Contentful. Check Contentful configuration.";
       toast({
         title: "Error",
-        description: typeof errorMessage === 'string' ? errorMessage : "Failed to sync posts from Contentful. Check Contentful configuration.",
+        description: errorMessage,
         variant: "destructive",
       });
     },
