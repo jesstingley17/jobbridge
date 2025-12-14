@@ -19,17 +19,30 @@ if (!databaseUrl) {
 console.log(`[DB Init] Using database URL: ${databaseUrl.substring(0, 50)}...`);
 
 // Parse connection string and add SSL config if needed
+// Supabase pooler connections use self-signed certificates, so we must allow them
 const connectionConfig: any = { 
   connectionString: databaseUrl,
   // Optimize for serverless: keep connections alive but don't keep too many
   max: 2,  // Reduced from default 10 for serverless
   idleTimeoutMillis: 30000,
   connectionTimeoutMillis: 2000, // Reduced from 5000ms for faster failures
-  // Always allow self-signed certs for now (pooler connections use them)
-  ssl: { rejectUnauthorized: false },
+  // CRITICAL: Always allow self-signed certs for Supabase pooler connections
+  // This is required for Supabase's connection pooler to work
+  ssl: {
+    rejectUnauthorized: false, // Allow self-signed certificates
+  },
   // Enable statement timeout to prevent long-running queries
   statement_timeout: 10000, // 10 seconds max per query
 };
+
+// Ensure SSL is enabled for Supabase connections (pooler requires SSL)
+// If the connection string has sslmode=require, we need to ensure SSL config is set
+if (databaseUrl.includes('pooler.supabase.com') || databaseUrl.includes('supabase.co')) {
+  connectionConfig.ssl = {
+    rejectUnauthorized: false, // Supabase pooler uses self-signed certs
+  };
+  console.log('[DB Init] SSL configured for Supabase pooler connection');
+}
 
 // Handle SSL for databases that require it (keep ssl: false from above since we set it directly)
 // Additional configuration can be added here if needed
