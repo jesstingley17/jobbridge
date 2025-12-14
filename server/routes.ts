@@ -139,6 +139,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Register sitemap and robots.txt routes (before auth)
   registerSitemapRoute(app);
   
+  // Site manifest route (must be before static file serving)
+  app.get("/site.webmanifest", (_req, res) => {
+    res.setHeader('Content-Type', 'application/manifest+json');
+    res.json({
+      name: "The JobBridge",
+      short_name: "JobBridge",
+      description: "AI-powered employment platform for people with disabilities",
+      start_url: "/",
+      display: "standalone",
+      background_color: "#ffffff",
+      theme_color: "#000000",
+      icons: []
+    });
+  });
+  
   // Supabase user sync endpoint - called after Supabase signup
   app.post('/api/auth/sync-supabase-user', async (req, res) => {
     try {
