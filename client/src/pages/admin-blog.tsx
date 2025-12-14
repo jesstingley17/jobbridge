@@ -505,6 +505,7 @@ function BlogPostForm({
   const [tags, setTags] = useState(post?.tags?.join(", ") || "");
   const [syncToContentful, setSyncToContentful] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
+  const [showLivePreview, setShowLivePreview] = useState(false);
   const [publishedAt, setPublishedAt] = useState(
     post?.publishedAt ? new Date(post.publishedAt).toISOString().split("T")[0] : new Date().toISOString().split("T")[0]
   );
@@ -738,6 +739,21 @@ function BlogPostForm({
         </div>
       </div>
     </form>
+    
+    {/* Preview Dialog - rendered outside form to avoid nesting */}
+    <BlogPostPreviewDialog
+      open={showPreview}
+      onOpenChange={setShowPreview}
+      title={title}
+      slug={slug}
+      excerpt={excerpt}
+      content={content}
+      authorName={authorName}
+      featuredImage={featuredImage}
+      featuredImageAltText={featuredImageAltText}
+      tags={tags}
+      publishedAt={publishedAt}
+    />
   );
 }
 
@@ -843,10 +859,9 @@ function BlogPostPreviewDialog({
                 </div>
               </div>
             </article>
-          </div>
-        </DialogContent>
-      </Dialog>
-    )}
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 
