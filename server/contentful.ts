@@ -48,16 +48,9 @@ export function getContentfulManagementClient() {
     return null;
   }
 
-  // Create management client with space ID
-  // The new API requires space ID at client creation
+  // Create management client
   contentfulManagementClient = contentfulManagement.createClient({
     accessToken: managementToken,
-  }, {
-    type: 'plain',
-    defaults: {
-      spaceId: space,
-      environmentId: environment,
-    }
   });
 
   return contentfulManagementClient;
@@ -346,6 +339,7 @@ export async function upsertContentfulPost(
   }
 
   try {
+    // Use the traditional API: getSpace -> getEnvironment -> entry operations
     const spaceClient = await client.getSpace(space);
     const env = await spaceClient.getEnvironment(environment);
     const fields = convertDbPostToContentfulFormat(post);
@@ -359,7 +353,7 @@ export async function upsertContentfulPost(
         entry.fields = fields;
         entry = await entry.update();
       } catch (error: any) {
-        if (error.response?.status === 404) {
+        if (error.response?.status === 404 || error.status === 404) {
           // Entry doesn't exist, create new one
           entry = await env.createEntry('blogPost', { fields });
         } else {
@@ -408,17 +402,28 @@ export async function deleteContentfulPost(contentfulId: string): Promise<boolea
   }
 
   try {
-    const spaceClient = await client.getSpace(space);
-    const env = await spaceClient.getEnvironment(environment);
-    const entry = await env.getEntry(contentfulId);
+    // Get entry first to check if published
+    const entry = await client.entry.get({
+      spaceId: space,
+      environmentId: environment,
+      entryId: contentfulId,
+    });
 
     // Unpublish first if published
-    if (entry.sys.publishedVersion) {
-      await entry.unpublish();
+    if (entry.sys.publishedVersion || entry.sys.publishedAt) {
+      await client.entry.unpublish({
+        spaceId: space,
+        environmentId: environment,
+        entryId: contentfulId,
+      }, entry);
     }
 
     // Delete the entry
-    await entry.delete();
+    await client.entry.delete({
+      spaceId: space,
+      environmentId: environment,
+      entryId: contentfulId,
+    });
 
     return true;
   } catch (error: any) {
