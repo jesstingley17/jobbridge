@@ -50,7 +50,6 @@ export default function AdminBlog() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [postToDelete, setPostToDelete] = useState<BlogPost | null>(null);
-  const [deleteSyncToContentful, setDeleteSyncToContentful] = useState(false);
 
   const { data: postsData, isLoading } = useQuery<{ posts: BlogPost[] }>({
     queryKey: ["/api/admin/blog/posts"],
@@ -126,12 +125,26 @@ export default function AdminBlog() {
 
   const deleteMutation = useMutation({
     mutationFn: async ({ id, syncToContentful }: { id: string; syncToContentful?: boolean }) => {
-      const response = await apiRequest("DELETE", `/api/admin/blog/posts/${id}`, {
+      // For DELETE requests with body, use fetch directly
+      const { supabase } = await import("@/utils/supabase/client");
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+      
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (token) {
+        headers["Authorization"] = `Bearer ${token}`;
+      }
+      
+      const response = await fetch(`/api/admin/blog/posts/${id}`, {
         method: "DELETE",
+        headers,
         body: JSON.stringify({ syncToContentful }),
+        credentials: "include",
       });
+      
       if (!response.ok) {
-        throw new Error("Failed to delete post");
+        const error = await response.json().catch(() => ({ error: "Failed to delete post" }));
+        throw new Error(error.error || "Failed to delete post");
       }
     },
     onSuccess: () => {
@@ -183,6 +196,7 @@ export default function AdminBlog() {
 
   const handleDelete = (post: BlogPost) => {
     setPostToDelete(post);
+    setDeleteSyncToContentful(false);
     setIsDeleteDialogOpen(true);
   };
 
@@ -363,12 +377,32 @@ export default function AdminBlog() {
           <p className="text-muted-foreground">
             Are you sure you want to delete "{postToDelete?.title}"? This action cannot be undone.
           </p>
+          
+          {postToDelete?.contentfulId && (
+            <div className="mt-4 space-y-2">
+              <div className="flex items-center space-x-2">
+                <Switch
+                  id="deleteSyncToContentful"
+                  checked={deleteSyncToContentful}
+                  onCheckedChange={setDeleteSyncToContentful}
+                />
+                <Label htmlFor="deleteSyncToContentful" className="text-sm">
+                  Also delete from Contentful
+                </Label>
+              </div>
+              <p className="text-xs text-muted-foreground ml-6">
+                This post exists in Contentful. Check this to delete it there too.
+              </p>
+            </div>
+          )}
+          
           <div className="flex justify-end gap-2 mt-4">
             <Button
               variant="outline"
               onClick={() => {
                 setIsDeleteDialogOpen(false);
                 setPostToDelete(null);
+                setDeleteSyncToContentful(false);
               }}
             >
               Cancel
@@ -377,12 +411,12 @@ export default function AdminBlog() {
               variant="destructive"
               onClick={() => {
                 if (postToDelete) {
-                  deleteMutation.mutate(postToDelete.id);
+                  deleteMutation.mutate({ id: postToDelete.id, syncToContentful: deleteSyncToContentful });
                 }
               }}
               disabled={deleteMutation.isPending}
             >
-              Delete
+              {deleteMutation.isPending ? "Deleting..." : "Delete"}
             </Button>
           </div>
         </DialogContent>

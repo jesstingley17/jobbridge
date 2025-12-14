@@ -94,6 +94,23 @@ CONTENTFUL_ACCESS_TOKEN=your_content_delivery_api_token_here
 
 **Note:** Use the **Content Delivery API - access token** (not the Preview API token). This token reads published content for your blog.
 
+### Optional: Content Management API (CMA) Token
+
+If you want to create/update/delete posts in Contentful from your admin panel:
+
+1. In Contentful, go to **Settings** → **API keys**
+2. Click **Content Management API tokens** tab
+3. Click **Generate personal token** (or use existing)
+4. Copy the token
+5. Add to Vercel:
+   ```
+   CONTENTFUL_MANAGEMENT_TOKEN=your_management_token_here
+   ```
+
+**Note:** The CMA token allows your admin panel to sync changes back to Contentful. Without it, you can still:
+- Read posts from Contentful (using Delivery API)
+- Create/edit posts in your database (won't sync to Contentful)
+
 ### Optional Variables:
 
 ```

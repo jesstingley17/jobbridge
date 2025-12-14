@@ -2665,7 +2665,8 @@ Return JSON with:
   app.delete("/api/admin/blog/posts/:id", isAuthenticated, isAdmin, async (req, res) => {
     try {
       const { id } = req.params;
-      const { syncToContentful } = req.body;
+      // For DELETE requests, body might be empty, so we check both body and query
+      const syncToContentful = req.body?.syncToContentful || req.query?.syncToContentful === 'true';
 
       const existingPost = await storage.getBlogPostById(id);
       
