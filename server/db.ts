@@ -33,13 +33,17 @@ const connectionConfig: any = {
   statement_timeout: 10000, // 10 seconds max per query
 };
 
-// CRITICAL: Always allow self-signed certs for Supabase pooler connections
-// This is required for Supabase's connection pooler to work
-// node-postgres requires explicit SSL config even if connection string has sslmode
-// Set SSL config unconditionally to ensure it's always applied
-connectionConfig.ssl = {
-  rejectUnauthorized: false, // Allow self-signed certificates (required for Supabase pooler)
-};
+      // CRITICAL: Always allow self-signed certs for Supabase pooler connections
+      // This is required for Supabase's connection pooler to work
+      // node-postgres requires explicit SSL config even if connection string has sslmode
+      // Set SSL config unconditionally to ensure it's always applied
+      connectionConfig.ssl = {
+        rejectUnauthorized: false, // Allow self-signed certificates (required for Supabase pooler)
+      };
+
+      // Additional optimizations for serverless environments
+      // Prevent connection leaks and improve reliability
+      connectionConfig.allowExitOnIdle = true; // Allow pool to close when idle
 
 if (isSupabase) {
   console.log('[DB Init] SSL configured for Supabase pooler connection (rejectUnauthorized: false)');
