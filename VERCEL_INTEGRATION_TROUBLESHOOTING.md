@@ -133,5 +133,5 @@ Based on your codebase:
 
 ---
 
-**Last Updated:** After SSL certificate fixes
+**Last Updated:** After SSL certificate fixes - Redeploy to main domain
 **Status:** Manual database connection (Supabase) - no Vercel integration needed
