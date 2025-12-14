@@ -2,29 +2,24 @@
 
 ## Quick Diagnostic Test
 
-### Method 1: Using Browser Console (Recommended)
-
-1. **Log in to your admin panel**: `https://thejobbridge-inc.com/admin/blog`
-2. **Open browser console** (F12 or Cmd+Option+I)
-3. **Run this in the console** (copy each line separately if needed):
-   ```javascript
-   fetch('/api/contentful/test', { credentials: 'include' })
-     .then(r => r.json())
-     .then(data => {
-       console.log('=== CONTENTFUL DIAGNOSTIC ===');
-       console.log(JSON.stringify(data, null, 2));
-       return data;
-     })
-     .catch(err => console.error('Error:', err));
-   ```
-
-**Note**: This works because you're already logged in - the session cookie will be sent automatically.
-
-### Method 2: Direct URL (Easier)
+### Method 1: Direct URL (EASIEST - Recommended)
 
 1. **Log in to your admin panel**: `https://thejobbridge-inc.com/admin/blog`
 2. **Open a new tab** and visit: `https://thejobbridge-inc.com/api/contentful/test`
 3. **View the JSON response** - it will show all diagnostic information
+4. **Copy the JSON** and check the `diagnostics` object for details
+
+### Method 2: Using Browser Console
+
+1. **Log in to your admin panel**: `https://thejobbridge-inc.com/admin/blog`
+2. **Open browser console** (F12 or Cmd+Option+I)
+3. **Copy and paste this command** (paste it all at once):
+   ```javascript
+   fetch('/api/contentful/test', { credentials: 'include' }).then(r => r.json()).then(data => { console.log('=== CONTENTFUL DIAGNOSTIC ==='); console.log(JSON.stringify(data, null, 2)); }).catch(err => console.error('Error:', err));
+   ```
+4. **Press Enter** and check the console output
+
+**Note**: The `credentials: 'include'` sends your session cookie automatically - no need to manually add headers.
 
 ### Method 3: Using Admin Panel Button
 
