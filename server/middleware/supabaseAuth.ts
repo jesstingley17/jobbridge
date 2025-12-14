@@ -244,20 +244,6 @@ export function requireSupabaseAuth() {
           });
         }
       }
-
-      // Fallback: Use JWKS verification
-      const payload = await verifyJwtWithJwks(token, supabaseUrl);
-
-      // Attach user info to request
-      (req as any).supabaseUser = {
-        id: payload.sub,
-        role: payload.role || "authenticated",
-        email: payload.email,
-        aud: payload.aud,
-        exp: payload.exp,
-      };
-
-      next();
     } catch (e: any) {
       console.error("JWT verification error:", e.message);
       return res.status(401).json({ 
