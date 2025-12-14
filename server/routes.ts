@@ -396,16 +396,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Admin login (separate from regular auth)
   app.post('/api/admin/login', async (req, res) => {
     try {
+      // Validate request body
+      if (!req.body || !req.body.email || !req.body.password) {
+        return res.status(400).json({ message: "Email and password are required" });
+      }
+
       const { email, password } = loginUserSchema.parse(req.body);
       
       // Find user by email
-      const user = await storage.getUserByEmail(email);
+      let user;
+      try {
+        user = await storage.getUserByEmail(email);
+      } catch (dbError: any) {
+        console.error("Database error in admin login:", dbError);
+        return res.status(500).json({ 
+          message: "Database error",
+          error: process.env.NODE_ENV === 'development' ? dbError.message : undefined
+        });
+      }
+      
       if (!user || !user.password) {
         return res.status(401).json({ message: "Invalid email or password" });
       }
       
       // Verify password
-      const isValid = await verifyPassword(password, user.password);
+      let isValid = false;
+      try {
+        isValid = await verifyPassword(password, user.password);
+      } catch (bcryptError: any) {
+        console.error("Password verification error:", bcryptError);
+        return res.status(500).json({ 
+          message: "Password verification failed",
+          error: process.env.NODE_ENV === 'development' ? bcryptError.message : undefined
+        });
+      }
+      
       if (!isValid) {
         return res.status(401).json({ message: "Invalid email or password" });
       }
@@ -420,9 +445,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       } else if (user.email && adminEmails.includes(user.email)) {
         isAdmin = true;
       } else if (adminPattern && user.email) {
-        const regex = new RegExp(adminPattern);
-        if (regex.test(user.email)) {
-          isAdmin = true;
+        try {
+          const regex = new RegExp(adminPattern);
+          if (regex.test(user.email)) {
+            isAdmin = true;
+          }
+        } catch (regexError) {
+          console.error("Invalid ADMIN_EMAIL_PATTERN regex:", regexError);
         }
       }
       
@@ -431,14 +460,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Create session (check if session exists)
-      if (req.session) {
-        (req.session as any).userId = user.id;
-        (req.session as any).user = {
-          claims: { sub: user.id }
-        };
-        (req.session as any).isAdmin = true;
-      } else {
-        console.warn('Session not available for admin login');
+      try {
+        if (req.session) {
+          (req.session as any).userId = user.id;
+          (req.session as any).user = {
+            claims: { sub: user.id }
+          };
+          (req.session as any).isAdmin = true;
+        } else {
+          console.warn('Session not available for admin login - session middleware may not be configured');
+          // Still allow login but warn about session
+        }
+      } catch (sessionError: any) {
+        console.error("Session creation error:", sessionError);
+        // Don't fail login if session fails - user can still authenticate via token
       }
       
       res.json({ 
@@ -453,13 +488,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } catch (error: any) {
       console.error("Admin login error:", error);
-      console.error("Admin login error stack:", error.stack);
+      console.error("Admin login error details:", {
+        name: error?.name,
+        message: error?.message,
+        stack: error?.stack
+      });
+      
       if (error.name === 'ZodError') {
-        return res.status(400).json({ message: error.errors[0].message });
+        return res.status(400).json({ 
+          message: "Invalid input",
+          errors: error.errors 
+        });
       }
+      
       res.status(500).json({ 
         message: "Login failed",
-        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined,
+        details: process.env.NODE_ENV === 'development' ? {
+          name: error?.name,
+          stack: error?.stack
+        } : undefined
       });
     }
   });
@@ -726,7 +774,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get subscription status
-  app.get('/api/subscription/status', isAuthenticated, async (req: any, res) => {
+  app.get('/api/subscription/status', blockBots, isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user?.claims?.sub;
       if (!userId) {
@@ -2610,8 +2658,8 @@ Return JSON with:
   });
 
 
-  // Admin blog management routes
-  app.get("/api/admin/blog/posts", isAuthenticated, isAdmin, async (req: any, res) => {
+  // Admin blog management routes - block bots
+  app.get("/api/admin/blog/posts", blockBots, isAuthenticated, isAdmin, async (req: any, res) => {
     try {
       // Double-check authentication
       if (!req.user?.claims?.sub) {
@@ -2652,7 +2700,7 @@ Return JSON with:
     }
   });
 
-  app.post("/api/admin/blog/posts", isAuthenticated, isAdmin, async (req, res) => {
+  app.post("/api/admin/blog/posts", blockBots, isAuthenticated, isAdmin, async (req, res) => {
     try {
       const { title, slug, excerpt, content, authorName, featuredImage, featuredImageAltText, published, tags, publishedAt, syncToContentful } = req.body;
       
@@ -2769,7 +2817,7 @@ Return JSON with:
     }
   });
 
-  app.delete("/api/admin/blog/posts/:id", isAuthenticated, isAdmin, async (req, res) => {
+  app.delete("/api/admin/blog/posts/:id", blockBots, isAuthenticated, isAdmin, async (req, res) => {
     try {
       const { id } = req.params;
       // For DELETE requests, body might be empty, so we check both body and query
