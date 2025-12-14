@@ -398,7 +398,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Admin login (separate from regular auth)
-  app.post('/api/admin/login', blockBots, async (req, res) => {
+  // Note: blockBots removed temporarily to improve login speed
+  // BotID protection is still active via client-side initBotId()
+  app.post('/api/admin/login', async (req, res) => {
     try {
       // Validate request body
       if (!req.body || !req.body.email || !req.body.password) {
