@@ -162,6 +162,7 @@ export function requireSupabaseAuth() {
         // Check for error in result
         if (result?.error) {
           console.error("[Auth] JWT verification error:", result.error?.message || "Verification failed");
+          console.error("[Auth] Full error:", JSON.stringify(result.error, null, 2));
           return res.status(401).json({ 
             error: result.error?.message || "Unauthorized",
             details: process.env.NODE_ENV === "development" ? result.error : undefined
@@ -190,7 +191,8 @@ export function requireSupabaseAuth() {
           hasData: !!result?.data,
           hasError: !!result?.error,
           resultKeys: result ? Object.keys(result) : 'null',
-          resultType: typeof result
+          resultType: typeof result,
+          fullResult: process.env.NODE_ENV === "development" ? JSON.stringify(result, null, 2) : "hidden"
         });
         return res.status(401).json({ 
           error: "Token verification failed",
@@ -208,12 +210,18 @@ export function requireSupabaseAuth() {
         }
         
         console.error("[Auth] Token verification error:", adminError.message);
+        console.error("[Auth] Error name:", adminError.name);
         console.error("[Auth] Error stack:", adminError.stack);
+        if (adminError.cause) {
+          console.error("[Auth] Error cause:", adminError.cause);
+        }
         return res.status(401).json({ 
           error: adminError?.message || "Unauthorized",
           details: process.env.NODE_ENV === "development" ? {
             message: adminError?.message,
-            stack: adminError?.stack?.split('\n').slice(0, 5).join('\n')
+            name: adminError?.name,
+            stack: adminError?.stack?.split('\n').slice(0, 5).join('\n'),
+            cause: adminError?.cause
           } : undefined
         });
       }
