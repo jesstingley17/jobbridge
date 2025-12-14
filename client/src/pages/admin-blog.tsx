@@ -20,7 +20,8 @@ import {
   Save,
   X,
   ExternalLink,
-  RefreshCw
+  RefreshCw,
+  EyeIcon
 } from "lucide-react";
 import { Link } from "wouter";
 import { useLocation } from "wouter";
@@ -521,7 +522,6 @@ function BlogPostForm({
       published,
       tags: tags.split(",").map((t) => t.trim()).filter(Boolean),
       publishedAt: new Date(publishedAt).toISOString(),
-      syncToContentful, // Include syncToContentful flag
     });
   };
 
@@ -717,17 +717,109 @@ function BlogPostForm({
         )}
       </div>
 
-      <div className="flex justify-end gap-2 pt-4">
-        <Button type="button" variant="outline" onClick={onCancel}>
-          <X className="h-4 w-4 mr-2" />
-          Cancel
+      <div className="flex justify-between items-center pt-4">
+        <Button 
+          type="button" 
+          variant="outline" 
+          onClick={() => setShowPreview(!showPreview)}
+        >
+          <EyeIcon className="h-4 w-4 mr-2" />
+          {showPreview ? "Hide Preview" : "Preview"}
         </Button>
-        <Button type="submit" disabled={isSubmitting}>
-          <Save className="h-4 w-4 mr-2" />
-          {isSubmitting ? "Saving..." : post ? "Update" : "Create"}
-        </Button>
+        <div className="flex gap-2">
+          <Button type="button" variant="outline" onClick={onCancel}>
+            <X className="h-4 w-4 mr-2" />
+            Cancel
+          </Button>
+          <Button type="submit" disabled={isSubmitting}>
+            <Save className="h-4 w-4 mr-2" />
+            {isSubmitting ? "Saving..." : post ? "Update" : "Create"}
+          </Button>
+        </div>
       </div>
     </form>
+    
+    {/* Preview Dialog */}
+    {showPreview && (
+      <Dialog open={showPreview} onOpenChange={setShowPreview}>
+        <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Blog Post Preview</DialogTitle>
+          </DialogHeader>
+          <div className="min-h-screen bg-background">
+            {/* Article Header */}
+            <article>
+              <header className="border-b bg-muted/30">
+                <div className="mx-auto max-w-4xl px-4 py-16 sm:px-6 lg:px-8">
+                  {tags && tags.trim() && (
+                    <div className="flex flex-wrap gap-2 mb-6">
+                      {tags.split(",").map((tag, idx) => (
+                        <Badge key={idx} variant="secondary">
+                          {tag.trim()}
+                        </Badge>
+                      ))}
+                    </div>
+                  )}
+
+                  <h1 className="text-4xl tracking-tight sm:text-5xl md:text-6xl mb-6">
+                    {title || "Untitled Post"}
+                  </h1>
+
+                  {excerpt && (
+                    <p className="text-xl text-muted-foreground mb-6 leading-relaxed">
+                      {excerpt}
+                    </p>
+                  )}
+
+                  <div className="flex flex-wrap items-center gap-6 text-muted-foreground">
+                    <div className="flex items-center gap-2">
+                      <span>{authorName || "The JobBridge Team"}</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <Calendar className="h-4 w-4" aria-hidden="true" />
+                      <span>{new Date(publishedAt).toLocaleDateString("en-US", {
+                        year: "numeric",
+                        month: "long",
+                        day: "numeric",
+                      })}</span>
+                    </div>
+                  </div>
+                </div>
+              </header>
+
+              {/* Featured Image */}
+              {featuredImage && (
+                <div className="border-b">
+                  <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
+                    <div className="aspect-video overflow-hidden rounded-lg bg-muted">
+                      <img
+                        src={featuredImage}
+                        alt={featuredImageAltText || ""}
+                        className="h-full w-full object-cover"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Article Content */}
+              <div className="py-16">
+                <div className="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8">
+                  {content ? (
+                    <div 
+                      className="prose prose-lg max-w-none dark:prose-invert prose-headings:scroll-mt-20 prose-headings:tracking-tight prose-a:text-primary prose-a:no-underline hover:prose-a:underline prose-img:rounded-lg prose-pre:bg-muted prose-table:border prose-th:border prose-td:border prose-th:bg-muted prose-th:p-2 prose-td:p-2 prose-blockquote:border-l-4 prose-blockquote:border-primary prose-blockquote:pl-4 prose-blockquote:italic"
+                      dangerouslySetInnerHTML={{ __html: content }}
+                    />
+                  ) : (
+                    <p className="text-muted-foreground italic">No content yet. Add content to see preview.</p>
+                  )}
+                </div>
+              </div>
+            </article>
+          </div>
+        </DialogContent>
+      </Dialog>
+    )}
   );
 }
 
