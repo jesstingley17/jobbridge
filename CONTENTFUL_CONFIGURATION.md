@@ -74,7 +74,9 @@ Click **Add field** for each of these:
 3. Name it: `The JobBridge Blog API Key`
 4. Copy these values:
    - **Space ID** (e.g., `abc123xyz`)
-   - **Content Delivery API - access token** (starts with something like `abc123...`)
+   - **Content Delivery API - access token** ⭐ **Use this one!** (for published content)
+   
+   **Important:** Use the **Content Delivery API** token, NOT the Content Preview API token. The Delivery API is for reading published content, which is what your blog displays.
 
 ## Step 4: Add Environment Variables to Vercel
 
@@ -87,8 +89,10 @@ Click **Add field** for each of these:
 
 ```
 CONTENTFUL_SPACE_ID=your_space_id_here
-CONTENTFUL_ACCESS_TOKEN=your_access_token_here
+CONTENTFUL_ACCESS_TOKEN=your_content_delivery_api_token_here
 ```
+
+**Note:** Use the **Content Delivery API - access token** (not the Preview API token). This token reads published content for your blog.
 
 ### Optional Variables:
 
