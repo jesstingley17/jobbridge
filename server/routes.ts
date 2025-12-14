@@ -670,6 +670,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ error: 'Not authenticated' });
       }
 
+      // Check Supabase Auth metadata and user_roles table for admin status
+      let isAdmin = false;
+      
+      // Check Supabase Auth metadata
+      try {
+        const { getSupabaseAdmin } = await import('./supabase.js');
+        const supabaseAdmin = getSupabaseAdmin();
+        const { data: { user: fullUser }, error: getUserError } = await supabaseAdmin.auth.admin.getUserById(supabaseUser.id);
+        if (!getUserError && fullUser) {
+          // Check app_metadata or user_metadata for admin status
+          isAdmin = fullUser.app_metadata?.role === 'admin' || 
+                    fullUser.app_metadata?.is_admin === true ||
+                    fullUser.user_metadata?.role === 'admin' ||
+                    fullUser.user_metadata?.is_admin === true;
+        }
+      } catch (metadataError: any) {
+        // If we can't check metadata, continue with database check
+        console.warn('Could not check Supabase metadata for admin status:', metadataError.message);
+      }
+      
+      // Check user_roles table for admin role (if not already found)
+      if (!isAdmin) {
+        try {
+          const { rows } = await db.query(sql`
+            SELECT EXISTS (
+              SELECT 1 
+              FROM public.user_roles ur 
+              JOIN public.roles r ON r.id = ur.role_id 
+              WHERE ur.user_id = ${supabaseUser.id} 
+              AND r.name = 'admin'
+            ) as is_admin;
+          `);
+          isAdmin = rows[0]?.is_admin === true;
+        } catch (rolesError: any) {
+          // If user_roles table doesn't exist or query fails, continue
+          console.warn('Could not check user_roles table for admin status:', rolesError.message);
+        }
+      }
+
       // Fast path: Try to get user from database first (most common case)
       // Add timeout to prevent hanging
       let user;
@@ -747,7 +786,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               emailVerified: supabaseUser.email_confirmed_at ? true : false,
               termsAccepted: false,
               marketingConsent: false,
-              role: isAdmin ? 'admin' : null, // Include admin role from Supabase/user_roles if available
+              role: isAdminFromSupabase ? 'admin' : null, // Include admin role from Supabase if available
               subscriptionTier: 'free',
               monthlyApplicationCount: 0,
               createdAt: new Date().toISOString(),
