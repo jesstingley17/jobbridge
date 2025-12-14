@@ -318,6 +318,34 @@ export function convertDbPostToContentfulFormat(post: {
 /**
  * Create or update a blog post in Contentful
  */
+// Helper to find the correct content type name in Contentful
+async function findContentTypeName(env: any): Promise<string | null> {
+  const contentTypes = ['blogPost', 'blog_post', 'Blog page', 'blogPage', 'blog'];
+  
+  try {
+    const contentTypeList = await env.getContentTypes();
+    const availableTypes = contentTypeList.items.map((ct: any) => ct.sys.id);
+    
+    // Try to find a matching content type
+    for (const candidate of contentTypes) {
+      if (availableTypes.includes(candidate)) {
+        console.log(`[Contentful] Found content type: ${candidate}`);
+        return candidate;
+      }
+    }
+    
+    // If no exact match, log available types for debugging
+    console.warn('[Contentful] Content type not found. Tried:', contentTypes);
+    console.warn('[Contentful] Available content types:', availableTypes);
+    
+    // Fallback to first candidate
+    return contentTypes[0];
+  } catch (error: any) {
+    console.error('[Contentful] Error finding content type:', error);
+    return 'blogPost'; // Default fallback
+  }
+}
+
 export async function upsertContentfulPost(
   post: {
     contentfulId?: string;
@@ -335,6 +363,7 @@ export async function upsertContentfulPost(
 ): Promise<{ id: string; published: boolean } | null> {
   const client = getContentfulManagementClient();
   if (!client) {
+    console.error('[Contentful] Management client not available. Check CONTENTFUL_MANAGEMENT_TOKEN.');
     return null;
   }
 
@@ -342,40 +371,58 @@ export async function upsertContentfulPost(
   const environment = process.env.CONTENTFUL_ENVIRONMENT || 'master';
 
   if (!space) {
-    console.error('CONTENTFUL_SPACE_ID not set');
+    console.error('[Contentful] CONTENTFUL_SPACE_ID not set');
     return null;
   }
 
   try {
+    console.log(`[Contentful] Upserting post: ${post.title} (slug: ${post.slug})`);
+    
     // Use the traditional API: getSpace -> getEnvironment -> entry operations
     const spaceClient = await client.getSpace(space);
     const env = await spaceClient.getEnvironment(environment);
     const fields = convertDbPostToContentfulFormat(post);
+
+    // Find the correct content type name
+    const contentTypeName = await findContentTypeName(env);
+    if (!contentTypeName) {
+      console.error('[Contentful] Could not determine content type name');
+      return null;
+    }
 
     let entry;
 
     // If contentfulId exists, update existing entry
     if (post.contentfulId) {
       try {
+        console.log(`[Contentful] Updating existing entry: ${post.contentfulId}`);
         entry = await env.getEntry(post.contentfulId);
         entry.fields = fields;
         entry = await entry.update();
+        console.log(`[Contentful] Entry updated successfully: ${entry.sys.id}`);
       } catch (error: any) {
         if (error.response?.status === 404 || error.status === 404) {
           // Entry doesn't exist, create new one
-          entry = await env.createEntry('blogPost', { fields });
+          console.log(`[Contentful] Entry ${post.contentfulId} not found, creating new entry`);
+          entry = await env.createEntry(contentTypeName, { fields });
+          console.log(`[Contentful] New entry created: ${entry.sys.id}`);
         } else {
+          console.error(`[Contentful] Error updating entry:`, error);
           throw error;
         }
       }
     } else {
       // Create new entry
-      entry = await env.createEntry('blogPost', { fields });
+      console.log(`[Contentful] Creating new entry with content type: ${contentTypeName}`);
+      entry = await env.createEntry(contentTypeName, { fields });
+      console.log(`[Contentful] Entry created successfully: ${entry.sys.id}`);
     }
 
     // Publish if requested
     if (publish && post.published) {
+      console.log(`[Contentful] Publishing entry: ${entry.sys.id}`);
       entry = await entry.publish();
+      console.log(`[Contentful] Entry published successfully`);
     }
 
     return {
@@ -383,9 +430,12 @@ export async function upsertContentfulPost(
       published: entry.sys.publishedVersion !== undefined,
     };
   } catch (error: any) {
-    console.error('Error upserting Contentful post:', error);
+    console.error('[Contentful] Error upserting post:', error);
     if (error.response?.data) {
-      console.error('Contentful API error details:', error.response.data);
+      console.error('[Contentful] API error details:', JSON.stringify(error.response.data, null, 2));
+    }
+    if (error.message) {
+      console.error('[Contentful] Error message:', error.message);
     }
     // Don't throw - let the caller handle gracefully
     return null;

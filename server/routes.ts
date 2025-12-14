@@ -2953,7 +2953,9 @@ Return JSON with:
       // Optionally sync to Contentful if requested and CMA is configured
       if (syncToContentful) {
         try {
+          console.log(`[Blog Post] Syncing to Contentful: ${post.title}`);
           const contentfulResult = await upsertContentfulPost({
+            contentfulId: post.contentfulId || undefined, // Include if exists
             title: post.title,
             slug: post.slug,
             excerpt: post.excerpt || undefined,
@@ -2966,14 +2968,22 @@ Return JSON with:
           }, post.published);
 
           if (contentfulResult) {
+            console.log(`[Blog Post] Contentful sync successful: ${contentfulResult.id}, published: ${contentfulResult.published}`);
             // Update post with contentfulId if it was created
             if (contentfulResult.id && !post.contentfulId) {
               await storage.updateBlogPost(post.id, { contentfulId: contentfulResult.id });
               post.contentfulId = contentfulResult.id;
             }
+          } else {
+            console.warn(`[Blog Post] Contentful sync returned null - check logs for errors`);
           }
         } catch (contentfulError: any) {
-          console.error("Error syncing to Contentful (post still saved to database):", contentfulError);
+          console.error("[Blog Post] Error syncing to Contentful (post still saved to database):", contentfulError);
+          console.error("[Blog Post] Error details:", {
+            message: contentfulError.message,
+            status: contentfulError.response?.status,
+            data: contentfulError.response?.data
+          });
           // Don't fail the request if Contentful sync fails - post is still saved
         }
       }
@@ -3016,10 +3026,12 @@ Return JSON with:
       }
 
       // Optionally sync to Contentful if requested and CMA is configured
-      if (syncToContentful && existingPost.contentfulId) {
+      // Allow syncing even if contentfulId doesn't exist (will create new entry)
+      if (syncToContentful) {
         try {
-          await upsertContentfulPost({
-            contentfulId: existingPost.contentfulId,
+          console.log(`[Blog Post] Syncing update to Contentful: ${updated.title}`);
+          const contentfulResult = await upsertContentfulPost({
+            contentfulId: existingPost.contentfulId || undefined,
             title: updated.title,
             slug: updated.slug,
             excerpt: updated.excerpt,
@@ -3030,8 +3042,24 @@ Return JSON with:
             authorName: updated.authorName,
             publishedAt: updated.publishedAt,
           }, updated.published);
+
+          if (contentfulResult && contentfulResult.id && !existingPost.contentfulId) {
+            // Update post with contentfulId if it was created
+            console.log(`[Blog Post] Updating post with new contentfulId: ${contentfulResult.id}`);
+            await storage.updateBlogPost(id, { contentfulId: contentfulResult.id });
+            updated.contentfulId = contentfulResult.id;
+          } else if (contentfulResult) {
+            console.log(`[Blog Post] Contentful sync successful: ${contentfulResult.id}`);
+          } else {
+            console.warn(`[Blog Post] Contentful sync returned null - check logs for errors`);
+          }
         } catch (contentfulError: any) {
-          console.error("Error syncing to Contentful (post still updated in database):", contentfulError);
+          console.error("[Blog Post] Error syncing to Contentful (post still updated in database):", contentfulError);
+          console.error("[Blog Post] Error details:", {
+            message: contentfulError.message,
+            status: contentfulError.response?.status,
+            data: contentfulError.response?.data
+          });
           // Don't fail the request if Contentful sync fails - post is still updated
         }
       }
