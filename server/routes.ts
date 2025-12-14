@@ -671,18 +671,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Fast path: Try to get user from database first (most common case)
-      let user = await storage.getUser(supabaseUser.id);
-      
-      // If user exists, return immediately (fast path)
-      if (user) {
-        return res.json(user);
+      // Add timeout to prevent hanging
+      let user;
+      try {
+        const getUserPromise = storage.getUser(supabaseUser.id);
+        const timeoutPromise = new Promise((_, reject) => {
+          setTimeout(() => reject(new Error('Database query timeout')), 3000); // 3 second timeout
+        });
+        
+        user = await Promise.race([getUserPromise, timeoutPromise]) as any;
+        
+        // If user exists, return immediately (fast path)
+        if (user) {
+          return res.json(user);
+        }
+      } catch (timeoutError: any) {
+        if (timeoutError.message === 'Database query timeout') {
+          console.error('Database getUser timed out for user:', supabaseUser.id);
+          return res.status(500).json({ 
+            error: 'Database timeout',
+            message: 'Database query took too long. Please try again.'
+          });
+        }
+        // If it's not a timeout, continue to create user
       }
       
       // User doesn't exist - create with minimal data from JWT (no external API calls)
       // This is much faster than calling Supabase admin API
       if (supabaseUser.email) {
         try {
-          user = await storage.upsertUser({
+          const upsertPromise = storage.upsertUser({
             id: supabaseUser.id,
             email: supabaseUser.email,
             firstName: null,
@@ -691,9 +709,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
             termsAccepted: false,
             marketingConsent: false,
           });
+          const upsertTimeout = new Promise((_, reject) => {
+            setTimeout(() => reject(new Error('Upsert timeout')), 3000);
+          });
+          
+          user = await Promise.race([upsertPromise, upsertTimeout]);
           return res.json(user);
         } catch (upsertError: any) {
           console.error('Error creating user:', upsertError);
+          
+          // Check for timeout
+          if (upsertError.message === 'Upsert timeout') {
+            // Try to get user one more time (might have been created by another request)
+            try {
+              const retryPromise = storage.getUser(supabaseUser.id);
+              const retryTimeout = new Promise((_, reject) => {
+                setTimeout(() => reject(new Error('Retry timeout')), 2000);
+              });
+              user = await Promise.race([retryPromise, retryTimeout]);
+              if (user) {
+                return res.json(user);
+              }
+            } catch (retryError) {
+              // Ignore retry errors
+            }
+            
+            return res.status(500).json({ 
+              error: 'Database operation timeout',
+              message: 'Database query took too long. Please try again.'
+            });
+          }
           
           // Check for database errors
           if (upsertError.code === '42P01' || upsertError.message?.includes('does not exist')) {
@@ -705,7 +750,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           
           // For other errors, try to get user one more time (might have been created by another request)
           try {
-            user = await storage.getUser(supabaseUser.id);
+            const retryPromise = storage.getUser(supabaseUser.id);
+            const retryTimeout = new Promise((_, reject) => {
+              setTimeout(() => reject(new Error('Retry timeout')), 2000);
+            });
+            user = await Promise.race([retryPromise, retryTimeout]);
             if (user) {
               return res.json(user);
             }
