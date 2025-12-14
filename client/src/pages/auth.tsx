@@ -788,34 +788,39 @@ export default function Auth() {
                       )}
                     </Button>
 
-                    <div className="relative">
-                      <div className="absolute inset-0 flex items-center">
-                        <Separator className="w-full" />
-                      </div>
-                      <div className="relative flex justify-center text-xs uppercase">
-                        <span className="bg-white dark:bg-slate-950 px-2 text-muted-foreground">Or sign up with</span>
-                      </div>
-                    </div>
+                    {/* OAuth (Google) - conditionally enabled via environment variable */}
+                    {import.meta.env.VITE_ENABLE_OAUTH === 'true' && (
+                      <>
+                        <div className="relative">
+                          <div className="absolute inset-0 flex items-center">
+                            <Separator className="w-full" />
+                          </div>
+                          <div className="relative flex justify-center text-xs uppercase">
+                            <span className="bg-white dark:bg-slate-950 px-2 text-muted-foreground">Or sign up with</span>
+                          </div>
+                        </div>
 
-                    <Button
-                      type="button"
-                      variant="outline"
-                      className="w-full rounded-md h-12 text-base font-medium"
-                      onClick={() => googleLoginMutation.mutate()}
-                      disabled={googleLoginMutation.isPending}
-                    >
-                      {googleLoginMutation.isPending ? (
-                        <>
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          Signing up with Google...
-                        </>
-                      ) : (
-                        <>
-                          <Chrome className="mr-2 h-4 w-4" />
-                          Google
-                        </>
-                      )}
-                    </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="w-full rounded-md h-12 text-base font-medium"
+                          onClick={() => googleLoginMutation.mutate()}
+                          disabled={googleLoginMutation.isPending}
+                        >
+                          {googleLoginMutation.isPending ? (
+                            <>
+                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              Signing up with Google...
+                            </>
+                          ) : (
+                            <>
+                              <Chrome className="mr-2 h-4 w-4" />
+                              Google
+                            </>
+                          )}
+                        </Button>
+                      </>
+                    )}
                   </form>
                   
                   <div className="mt-6 text-center">
