@@ -40,18 +40,24 @@ export default function AdminLogin() {
 
   const forgotPasswordMutation = useMutation({
     mutationFn: async (email: string) => {
-      const response = await apiRequest("POST", "/api/admin/forgot-password", { email });
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || "Failed to send reset email");
-      }
-      return response.json();
+      // Use Supabase's built-in password reset for admin users
+      // This will send a recovery email that redirects to /admin/login
+      const { supabase } = await import("@/utils/supabase/client");
+      const redirectTo = typeof window !== 'undefined' && window.location.hostname === 'localhost'
+        ? 'http://localhost:5000/admin/login'
+        : 'https://thejobbridge-inc.com/admin/login';
+      
+      const { data, error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: redirectTo,
+      });
+      if (error) throw error;
+      return data;
     },
     onSuccess: () => {
       setForgotPasswordSent(true);
     },
     onError: (error: any) => {
-      setError(error.message || "Failed to send reset email");
+      setError(error.message || "Failed to send password reset link. Please try again.");
     },
   });
 
