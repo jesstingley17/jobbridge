@@ -133,10 +133,21 @@ export function requireSupabaseAuth() {
       }
 
       // Use Supabase Admin API to verify token instead of JWKS (more reliable)
+      // Add timeout to prevent hanging
       try {
         const { getSupabaseAdmin } = await import('../supabase.js');
         const supabaseAdmin = getSupabaseAdmin();
-        const { data: { user }, error: verifyError } = await supabaseAdmin.auth.getUser(token);
+        
+        // Add timeout to prevent hanging requests
+        const timeoutPromise = new Promise((_, reject) => {
+          setTimeout(() => reject(new Error('Token verification timeout')), 5000); // 5 second timeout
+        });
+        
+        const verifyPromise = supabaseAdmin.auth.getUser(token);
+        const { data: { user }, error: verifyError } = await Promise.race([
+          verifyPromise,
+          timeoutPromise
+        ]) as any;
         
         if (verifyError || !user) {
           console.error("JWT verification error:", verifyError?.message || "User not found");
@@ -157,8 +168,12 @@ export function requireSupabaseAuth() {
         next();
         return;
       } catch (adminError: any) {
-        // Fallback to JWKS verification if admin API fails
-        console.warn("Supabase Admin API verification failed, falling back to JWKS:", adminError.message);
+        // Fallback to JWKS verification if admin API fails or times out
+        if (adminError.message === 'Token verification timeout') {
+          console.warn("Supabase Admin API verification timed out, falling back to JWKS");
+        } else {
+          console.warn("Supabase Admin API verification failed, falling back to JWKS:", adminError.message);
+        }
       }
 
       // Fallback: Use JWKS verification
