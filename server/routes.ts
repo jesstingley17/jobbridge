@@ -720,10 +720,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(status);
     } catch (error: any) {
       console.error("Error fetching subscription status:", error);
-      console.error("Error stack:", error.stack);
-      res.status(500).json({ 
-        error: "Failed to fetch subscription status",
-        message: process.env.NODE_ENV === 'development' ? error.message : undefined
+      console.error("Error stack:", error?.stack);
+      console.error("Error details:", {
+        message: error?.message,
+        code: error?.code,
+        name: error?.name
+      });
+      // Return default status instead of 500 to prevent UI breakage
+      res.json({
+        tier: 'free',
+        limits: { applications: 0, aiFeatures: false },
+        applicationQuota: {
+          used: 0,
+          remaining: 0,
+          limit: 0,
+          resetDate: new Date().toISOString(),
+        },
       });
     }
   });
@@ -2541,11 +2553,21 @@ Return JSON with:
   // Admin blog management routes
   app.get("/api/admin/blog/posts", isAuthenticated, isAdmin, async (req: any, res) => {
     try {
+      // Double-check authentication
+      if (!req.user?.claims?.sub) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+      
       const posts = await storage.getAllBlogPosts();
       res.json({ posts });
     } catch (error: any) {
       console.error("Error fetching all blog posts:", error);
       console.error("Error stack:", error?.stack);
+      console.error("Error details:", {
+        message: error?.message,
+        code: error?.code,
+        name: error?.name
+      });
       res.status(500).json({ 
         error: "Failed to fetch blog posts",
         message: process.env.NODE_ENV === 'development' ? error?.message : undefined

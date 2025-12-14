@@ -51,26 +51,31 @@ async function checkSupabaseAuth(req: any): Promise<string | null> {
 }
 
 export const isAuthenticated: RequestHandler = async (req, res, next) => {
-  // Check Supabase auth first
-  const supabaseUserId = await checkSupabaseAuth(req);
-  if (supabaseUserId) {
-    // Set req.user for compatibility with existing code
-    req.user = {
-      claims: { sub: supabaseUserId }
-    };
-    return next();
+  try {
+    // Check Supabase auth first
+    const supabaseUserId = await checkSupabaseAuth(req);
+    if (supabaseUserId) {
+      // Set req.user for compatibility with existing code
+      req.user = {
+        claims: { sub: supabaseUserId }
+      };
+      return next();
+    }
+    
+    // Fallback to session-based auth (for admin login)
+    if (req.session && (req.session as any).userId) {
+      req.user = {
+        claims: { sub: (req.session as any).userId }
+      };
+      return next();
+    }
+    
+    // No authentication found
+    return res.status(401).json({ message: "Unauthorized" });
+  } catch (error: any) {
+    console.error("Error in isAuthenticated middleware:", error);
+    return res.status(500).json({ message: "Authentication error" });
   }
-  
-  // Fallback to session-based auth (for admin login)
-  if (req.session && (req.session as any).userId) {
-    req.user = {
-      claims: { sub: (req.session as any).userId }
-    };
-    return next();
-  }
-  
-  // No authentication found
-  return res.status(401).json({ message: "Unauthorized" });
 };
 
 // Admin middleware - checks if user is admin using role-based system
