@@ -24,9 +24,9 @@ export async function blockBots(
     // In local development, this will return isBot: false unless configured
     const verification = await checkBotId({
       // Optional: Enable bot detection in development for testing
-      developmentOptions: process.env.NODE_ENV === 'development' && process.env.ENABLE_BOTID_DEV === 'true'
-        ? { isBot: false } // Allow all in dev unless explicitly testing
-        : undefined,
+      ...(process.env.NODE_ENV === 'development' && process.env.ENABLE_BOTID_DEV === 'true'
+        ? { developmentOptions: { isDevelopment: true } }
+        : {}),
     });
 
     if (verification.isBot) {
