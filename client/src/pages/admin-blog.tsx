@@ -521,6 +521,7 @@ function BlogPostForm({
       published,
       tags: tags.split(",").map((t) => t.trim()).filter(Boolean),
       publishedAt: new Date(publishedAt).toISOString(),
+      syncToContentful, // Include syncToContentful flag
     });
   };
 
