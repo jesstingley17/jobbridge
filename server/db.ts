@@ -62,6 +62,16 @@ let db: any;
 
 try {
   pool = new Pool(connectionConfig);
+  
+  // Add error handlers to prevent unhandled rejections
+  pool.on('error', (err: Error) => {
+    console.error('[DB Pool] Unexpected error on idle client:', err);
+  });
+  
+  pool.on('connect', (client) => {
+    console.log('[DB Pool] Client connected');
+  });
+  
   db = drizzle(pool, { schema });
   console.log('[DB Init] Pool and Drizzle initialized successfully');
 } catch (poolErr: any) {
