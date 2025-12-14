@@ -137,10 +137,10 @@ async function initializeApp() {
         throw routesError;
       }
 
-      // Serve static files in production
-      if (process.env.NODE_ENV === 'production') {
-        serveStatic(app);
-      }
+      // Note: In Vercel, static files are served automatically by the platform
+      // We don't need to call serveStatic() here - Vercel handles static assets
+      // via the public directory or build output
+      // serveStatic() is only used for self-hosted Express servers
 
       appInitialized = true;
       console.log('Express app initialized for Vercel');
