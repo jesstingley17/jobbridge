@@ -39,9 +39,8 @@ export default function AdminLogin() {
       
       const user = await response.json();
       
-      // Check if user is admin
-      const adminEmails = process.env.ADMIN_EMAILS?.split(",").map((e: string) => e.trim()) || [];
-      const isAdmin = user.role === "admin" || (user.email && adminEmails.includes(user.email));
+      // Check if user is admin (role check is done server-side, but verify here too)
+      const isAdmin = user.role === "admin";
       
       if (!isAdmin) {
         // Sign out if not admin
