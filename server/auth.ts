@@ -122,6 +122,38 @@ export const isAdmin: RequestHandler = async (req: any, res, next) => {
   console.log(`[isAdmin] Checking admin access for userId: ${userId}`);
   
   try {
+    // First, check Supabase Auth metadata (same as /api/auth/user does)
+    let isAdminFromMetadata = false;
+    try {
+      const { getSupabaseAdmin } = await import('./supabase.js');
+      const supabaseAdmin = getSupabaseAdmin();
+      const { data: { user: fullUser }, error: getUserError } = await supabaseAdmin.auth.admin.getUserById(userId);
+      if (!getUserError && fullUser) {
+        const metadataAdmin = fullUser.app_metadata?.role === 'admin' || 
+                            fullUser.app_metadata?.is_admin === true ||
+                            fullUser.user_metadata?.role === 'admin' ||
+                            fullUser.user_metadata?.is_admin === true;
+        if (metadataAdmin) {
+          isAdminFromMetadata = true;
+          console.log(`[isAdmin] Admin role found in Supabase metadata for ${fullUser.email || userId}`);
+          console.log(`[isAdmin] app_metadata:`, fullUser.app_metadata);
+          console.log(`[isAdmin] user_metadata:`, fullUser.user_metadata);
+        }
+      }
+    } catch (metadataError: any) {
+      console.warn('Could not check Supabase metadata for admin status:', metadataError.message);
+    }
+    
+    if (isAdminFromMetadata) {
+      if (!req.user) {
+        req.user = {
+          claims: { sub: userId }
+        };
+      }
+      console.log(`[isAdmin] Admin access granted via Supabase metadata for ${userId}`);
+      return next();
+    }
+    
     // First, try to get user info (needed for fallback checks)
     let user;
     try {
@@ -146,15 +178,17 @@ export const isAdmin: RequestHandler = async (req: any, res, next) => {
         [userId]
       );
       
-      const isAdmin = result.rows[0]?.is_admin === true;
+      const isAdminFromRoles = result.rows[0]?.is_admin === true;
+      console.log(`[isAdmin] user_roles table check: ${isAdminFromRoles}`);
       
-      if (isAdmin) {
+      if (isAdminFromRoles) {
         // Ensure req.user is set for downstream middleware
         if (!req.user) {
           req.user = {
             claims: { sub: userId }
           };
         }
+        console.log(`[isAdmin] Admin access granted via user_roles table for ${userId}`);
         return next();
       }
     } catch (roleError: any) {
@@ -174,6 +208,7 @@ export const isAdmin: RequestHandler = async (req: any, res, next) => {
           claims: { sub: userId }
         };
       }
+      console.log(`[isAdmin] Admin access granted via user.role field for ${user.email || userId}`);
       return next();
     }
     
@@ -185,6 +220,7 @@ export const isAdmin: RequestHandler = async (req: any, res, next) => {
           claims: { sub: userId }
         };
       }
+      console.log(`[isAdmin] Admin access granted via ADMIN_EMAILS env var for ${user.email}`);
       return next();
     }
     
@@ -199,6 +235,7 @@ export const isAdmin: RequestHandler = async (req: any, res, next) => {
               claims: { sub: userId }
             };
           }
+          console.log(`[isAdmin] Admin access granted via ADMIN_EMAIL_PATTERN for ${user.email}`);
           return next();
         }
       } catch (regexError) {
@@ -206,6 +243,7 @@ export const isAdmin: RequestHandler = async (req: any, res, next) => {
       }
     }
 
+    console.warn(`[isAdmin] Admin access DENIED for userId: ${userId}, email: ${user?.email || 'unknown'}, role: ${user?.role || 'none'}`);
     return res.status(403).json({ message: "Admin access required" });
   } catch (error: any) {
     // Log error but return 403 instead of 500 to prevent information leakage
