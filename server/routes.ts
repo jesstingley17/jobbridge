@@ -1057,9 +1057,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (existingUser) {
         // User exists - update their marketing consent
         try {
-          await storage.updateUser(existingUser.id, {
+          await storage.upsertUser({
+            id: existingUser.id,
+            email: existingUser.email,
+            firstName: existingUser.firstName,
+            lastName: existingUser.lastName,
             marketingConsent: true,
             marketingConsentAt: new Date(),
+            emailVerified: existingUser.emailVerified,
+            termsAccepted: existingUser.termsAccepted,
           });
           return res.json({ 
             success: true, 
@@ -2701,13 +2707,13 @@ Return JSON with:
           const contentfulResult = await upsertContentfulPost({
             title: post.title,
             slug: post.slug,
-            excerpt: post.excerpt,
+            excerpt: post.excerpt || undefined,
             content: post.content,
-            featuredImage: post.featuredImage,
-            published: post.published,
-            tags: post.tags,
-            authorName: post.authorName,
-            publishedAt: post.publishedAt,
+            featuredImage: post.featuredImage || undefined,
+            published: post.published ?? false,
+            tags: post.tags || undefined,
+            authorName: post.authorName || undefined,
+            publishedAt: post.publishedAt || undefined,
           }, post.published);
 
           if (contentfulResult) {
@@ -2746,14 +2752,14 @@ Return JSON with:
       const updates: any = {};
       if (title !== undefined) updates.title = title;
       if (slug !== undefined) updates.slug = slug;
-      if (excerpt !== undefined) updates.excerpt = excerpt;
+      if (excerpt !== undefined) updates.excerpt = excerpt || undefined;
       if (content !== undefined) updates.content = content;
-      if (authorName !== undefined) updates.authorName = authorName;
-      if (featuredImage !== undefined) updates.featuredImage = featuredImage;
-      if (featuredImageAltText !== undefined) updates.featuredImageAltText = featuredImageAltText;
-      if (published !== undefined) updates.published = published;
-      if (tags !== undefined) updates.tags = Array.isArray(tags) ? tags : tags ? [tags] : [];
-      if (publishedAt !== undefined) updates.publishedAt = new Date(publishedAt);
+      if (authorName !== undefined) updates.authorName = authorName || undefined;
+      if (featuredImage !== undefined) updates.featuredImage = featuredImage || undefined;
+      if (featuredImageAltText !== undefined) updates.featuredImageAltText = featuredImageAltText || undefined;
+      if (published !== undefined) updates.published = published ?? false;
+      if (tags !== undefined) updates.tags = Array.isArray(tags) ? tags : tags ? [tags] : undefined;
+      if (publishedAt !== undefined) updates.publishedAt = publishedAt ? new Date(publishedAt) : undefined;
 
       const updated = await storage.updateBlogPost(id, updates);
       if (!updated) {
