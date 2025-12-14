@@ -710,7 +710,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             marketingConsent: false,
           });
           const upsertTimeout = new Promise((_, reject) => {
-            setTimeout(() => reject(new Error('Upsert timeout')), 3000);
+            setTimeout(() => reject(new Error('Upsert timeout')), 5000); // Increased to 5s
           });
           
           user = await Promise.race([upsertPromise, upsertTimeout]);
@@ -718,13 +718,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         } catch (upsertError: any) {
           console.error('Error creating user:', upsertError);
           
-          // Check for timeout
-          if (upsertError.message === 'Upsert timeout') {
+          // Check for timeout or connection errors
+          if (upsertError.message === 'Upsert timeout' || 
+              upsertError.message?.includes('Connection terminated') ||
+              upsertError.message?.includes('timeout exceeded')) {
             // Try to get user one more time (might have been created by another request)
             try {
               const retryPromise = storage.getUser(supabaseUser.id);
               const retryTimeout = new Promise((_, reject) => {
-                setTimeout(() => reject(new Error('Retry timeout')), 2000);
+                setTimeout(() => reject(new Error('Retry timeout')), 3000); // Increased to 3s
               });
               user = await Promise.race([retryPromise, retryTimeout]);
               if (user) {
@@ -734,9 +736,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
               // Ignore retry errors
             }
             
-            return res.status(500).json({ 
-              error: 'Database operation timeout',
-              message: 'Database query took too long. Please try again.'
+            // If database is timing out, return a minimal user object from JWT data
+            // This allows the app to continue working even if database is slow
+            console.warn('Database timeout - returning user from JWT data only');
+            return res.json({
+              id: supabaseUser.id,
+              email: supabaseUser.email,
+              firstName: null,
+              lastName: null,
+              emailVerified: supabaseUser.email_confirmed_at ? true : false,
+              termsAccepted: false,
+              marketingConsent: false,
+              role: null,
+              subscriptionTier: 'free',
+              monthlyApplicationCount: 0,
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString(),
+              _fromJWT: true, // Flag to indicate this is from JWT, not database
             });
           }
           
@@ -752,7 +768,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           try {
             const retryPromise = storage.getUser(supabaseUser.id);
             const retryTimeout = new Promise((_, reject) => {
-              setTimeout(() => reject(new Error('Retry timeout')), 2000);
+              setTimeout(() => reject(new Error('Retry timeout')), 3000);
             });
             user = await Promise.race([retryPromise, retryTimeout]);
             if (user) {
@@ -762,9 +778,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
             // Ignore retry errors
           }
           
-          return res.status(500).json({ 
-            error: 'Failed to create user',
-            message: upsertError?.message || 'Database error'
+          // If all else fails, return user from JWT to allow app to continue
+          console.warn('Database error - returning user from JWT data only');
+          return res.json({
+            id: supabaseUser.id,
+            email: supabaseUser.email,
+            firstName: null,
+            lastName: null,
+            emailVerified: supabaseUser.email_confirmed_at ? true : false,
+            termsAccepted: false,
+            marketingConsent: false,
+            role: null,
+            subscriptionTier: 'free',
+            monthlyApplicationCount: 0,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+            _fromJWT: true,
           });
         }
       }
