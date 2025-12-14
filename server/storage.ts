@@ -37,6 +37,7 @@ export interface IStorage {
   // User operations (required for Replit Auth)
   getUser(id: string): Promise<User | undefined>;
   upsertUser(user: UpsertUser): Promise<User>;
+  updateUser(userId: string, updates: Partial<Omit<UpsertUser, 'id'>>): Promise<User | undefined>;
   updateUserRole(id: string, role: string): Promise<User | undefined>;
   updateUserCommunityUsername(id: string, username: string | null): Promise<User | undefined>;
   getCommunityMembers(): Promise<User[]>;

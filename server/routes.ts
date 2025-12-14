@@ -1056,16 +1056,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       if (existingUser) {
         // User exists - update their marketing consent
+        // Using updateUser for app-specific fields (Supabase best practice)
         try {
-          await storage.upsertUser({
-            id: existingUser.id,
-            email: existingUser.email,
-            firstName: existingUser.firstName,
-            lastName: existingUser.lastName,
+          await storage.updateUser(existingUser.id, {
             marketingConsent: true,
             marketingConsentAt: new Date(),
-            emailVerified: existingUser.emailVerified,
-            termsAccepted: existingUser.termsAccepted,
           });
           return res.json({ 
             success: true, 
