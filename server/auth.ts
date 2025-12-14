@@ -216,7 +216,7 @@ export const isAdmin: RequestHandler = async (req: any, res, next) => {
         if (!req.user) {
           req.user = { claims: { sub: userId } };
         }
-        console.log(`[isAdmin] Admin access granted via user.role field`);
+        console.log(`[isAdmin] ✅ Admin access granted via user.role field (${userResult.value?.email || userId})`);
         return next();
       }
       
@@ -225,7 +225,7 @@ export const isAdmin: RequestHandler = async (req: any, res, next) => {
         if (!req.user) {
           req.user = { claims: { sub: userId } };
         }
-        console.log(`[isAdmin] Admin access granted via user_roles table`);
+        console.log(`[isAdmin] ✅ Admin access granted via user_roles table`);
         return next();
       }
       
@@ -234,9 +234,18 @@ export const isAdmin: RequestHandler = async (req: any, res, next) => {
         if (!req.user) {
           req.user = { claims: { sub: userId } };
         }
-        console.log(`[isAdmin] Admin access granted via Supabase metadata`);
+        console.log(`[isAdmin] ✅ Admin access granted via Supabase metadata`);
         return next();
       }
+      
+      // Log what we found for debugging
+      console.log(`[isAdmin] Database check results:`, {
+        userRole: userResult?.status === 'fulfilled' ? userResult.value?.role : 'failed/timeout',
+        userRolesTable: rolesResult?.status === 'fulfilled' ? rolesResult.value : 'failed/timeout',
+        supabaseMetadata: metadataResult?.status === 'fulfilled' ? metadataResult.value : 'failed/timeout'
+      });
+    } else {
+      console.warn(`[isAdmin] Database checks timed out or failed - no results available`);
     }
 
     console.warn(`[isAdmin] Admin access DENIED for userId: ${userId}, email: ${userEmail || 'unknown'}`);

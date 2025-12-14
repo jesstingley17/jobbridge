@@ -2857,7 +2857,7 @@ Return JSON with:
   });
 
   // Manual sync endpoint (admin only)
-  app.post("/api/contentful/sync", blockBots, isAuthenticated, isAdmin, async (req: any, res) => {
+  app.post("/api/contentful/sync", requireSupabaseAuth(), isAdmin, async (req: any, res) => {
     try {
       const result = await syncContentfulPosts(storage.upsertBlogPost.bind(storage));
       res.json({ 
