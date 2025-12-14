@@ -2551,7 +2551,7 @@ Return JSON with:
 
   app.post("/api/admin/blog/posts", isAuthenticated, isAdmin, async (req, res) => {
     try {
-      const { title, slug, excerpt, content, authorName, featuredImage, published, tags, publishedAt, syncToContentful } = req.body;
+      const { title, slug, excerpt, content, authorName, featuredImage, featuredImageAltText, published, tags, publishedAt, syncToContentful } = req.body;
       
       if (!title || !slug || !content) {
         return res.status(400).json({ error: "Title, slug, and content are required" });
@@ -2564,6 +2564,7 @@ Return JSON with:
         content,
         authorName: authorName || "The JobBridge Team",
         featuredImage,
+        featuredImageAltText,
         published: published !== false,
         tags: Array.isArray(tags) ? tags : tags ? [tags] : [],
         publishedAt: publishedAt ? new Date(publishedAt) : new Date(),
@@ -2624,6 +2625,7 @@ Return JSON with:
       if (content !== undefined) updates.content = content;
       if (authorName !== undefined) updates.authorName = authorName;
       if (featuredImage !== undefined) updates.featuredImage = featuredImage;
+      if (featuredImageAltText !== undefined) updates.featuredImageAltText = featuredImageAltText;
       if (published !== undefined) updates.published = published;
       if (tags !== undefined) updates.tags = Array.isArray(tags) ? tags : tags ? [tags] : [];
       if (publishedAt !== undefined) updates.publishedAt = new Date(publishedAt);

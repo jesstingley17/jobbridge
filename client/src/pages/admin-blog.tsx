@@ -33,6 +33,7 @@ interface BlogPost {
   content: string;
   authorName?: string;
   featuredImage?: string;
+  featuredImageAltText?: string;
   published: boolean;
   publishedAt: string;
   views: number;
@@ -458,6 +459,7 @@ function BlogPostForm({
       content,
       authorName,
       featuredImage,
+      featuredImageAltText,
       published,
       tags: tags.split(",").map((t) => t.trim()).filter(Boolean),
       publishedAt: new Date(publishedAt).toISOString(),
@@ -545,14 +547,75 @@ function BlogPostForm({
         </div>
       </div>
 
-      <div className="space-y-2">
-        <Label htmlFor="featuredImage">Featured Image URL</Label>
-        <Input
-          id="featuredImage"
-          value={featuredImage}
-          onChange={(e) => setFeaturedImage(e.target.value)}
-          placeholder="https://example.com/image.jpg"
-        />
+      <div className="space-y-4">
+        <div className="space-y-2">
+          <Label htmlFor="featuredImage">Featured Image URL</Label>
+          <Input
+            id="featuredImage"
+            value={featuredImage}
+            onChange={(e) => setFeaturedImage(e.target.value)}
+            placeholder="https://example.com/image.jpg"
+          />
+          <p className="text-xs text-muted-foreground">
+            Enter a URL to an image, or upload an image file below
+          </p>
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="featuredImageFile">Upload Featured Image (Optional)</Label>
+          <Input
+            id="featuredImageFile"
+            type="file"
+            accept="image/*"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) {
+                // For now, we'll create a data URL for preview
+                // In production, you'd upload to a service like Cloudinary, S3, etc.
+                const reader = new FileReader();
+                reader.onloadend = () => {
+                  const result = reader.result as string;
+                  setFeaturedImage(result);
+                };
+                reader.readAsDataURL(file);
+              }
+            }}
+          />
+          <p className="text-xs text-muted-foreground">
+            Upload an image file. For production, configure an image hosting service (Cloudinary, S3, etc.)
+          </p>
+        </div>
+
+        {featuredImage && (
+          <div className="space-y-2">
+            <Label>Image Preview</Label>
+            <div className="border rounded-lg p-2 bg-muted/50">
+              <img
+                src={featuredImage}
+                alt={featuredImageAltText || "Featured image preview"}
+                className="max-w-full h-auto max-h-64 rounded"
+                onError={(e) => {
+                  (e.target as HTMLImageElement).style.display = 'none';
+                }}
+              />
+            </div>
+          </div>
+        )}
+
+        <div className="space-y-2">
+          <Label htmlFor="featuredImageAltText">
+            Image Alt Text <span className="text-muted-foreground">(for accessibility)</span>
+          </Label>
+          <Input
+            id="featuredImageAltText"
+            value={featuredImageAltText}
+            onChange={(e) => setFeaturedImageAltText(e.target.value)}
+            placeholder="Describe the image for screen readers (e.g., 'Team members working together at a desk')"
+          />
+          <p className="text-xs text-muted-foreground">
+            Alt text helps users with screen readers understand what the image shows. This is important for accessibility.
+          </p>
+        </div>
       </div>
 
       <div className="space-y-2">
