@@ -215,15 +215,34 @@ export function requireSupabaseAuth() {
         if (adminError.cause) {
           console.error("[Auth] Error cause:", adminError.cause);
         }
-        return res.status(401).json({ 
-          error: adminError?.message || "Unauthorized",
-          details: process.env.NODE_ENV === "development" ? {
-            message: adminError?.message,
-            name: adminError?.name,
-            stack: adminError?.stack?.split('\n').slice(0, 5).join('\n'),
-            cause: adminError?.cause
-          } : undefined
-        });
+        
+        // Fallback: Try JWKS verification if Admin API fails
+        console.log("[Auth] Falling back to JWKS verification...");
+        try {
+          const payload = await verifyJwtWithJwks(token, supabaseUrl);
+          
+          // Attach user info from JWT payload
+          (req as any).supabaseUser = {
+            id: payload.sub,
+            role: payload.role || "authenticated",
+            email: payload.email,
+            email_confirmed_at: payload.email_confirmed_at ? new Date(payload.email_confirmed_at * 1000).toISOString() : null,
+          };
+          
+          console.log(`[Auth] Token verified via JWKS fallback for user: ${payload.email || payload.sub}`);
+          next();
+          return;
+        } catch (jwksError: any) {
+          console.error("[Auth] JWKS fallback also failed:", jwksError.message);
+          return res.status(401).json({ 
+            error: adminError?.message || "Unauthorized",
+            details: process.env.NODE_ENV === "development" ? {
+              message: adminError?.message,
+              name: adminError?.name,
+              jwksError: jwksError?.message
+            } : undefined
+          });
+        }
       }
 
       // Fallback: Use JWKS verification
