@@ -48,9 +48,10 @@ export default function AdminLogin() {
       
       if (!isAdmin) {
         console.error("[Admin Login] User is not admin. User object:", JSON.stringify(user, null, 2));
-        // Sign out if not admin
-        await supabase.auth.signOut();
-        throw new Error("Access denied. Admin privileges required.");
+        console.error("[Admin Login] Checking if user should be admin...");
+        // Don't sign out - just throw error. Signing out causes auth state to flip
+        // The server should have checked admin status, so if it's not admin, there's a sync issue
+        throw new Error("Access denied. Admin privileges required. Please contact support if you believe this is an error.");
       }
       
       console.log("[Admin Login] Admin access granted!");

@@ -26,6 +26,7 @@ export const supabase = createClient(
       persistSession: true,
       autoRefreshToken: true,
       detectSessionInUrl: true, // Detect session from URL (for OAuth callbacks)
+      flowType: 'pkce', // Use PKCE flow for better security
       storage: typeof window !== 'undefined' ? window.localStorage : undefined, // Explicitly use localStorage
       storageKey: 'sb-auth-token', // Default storage key
     },
