@@ -123,6 +123,14 @@ export async function fetchContentfulPosts(): Promise<ContentfulBlogPost[]> {
 
     if (!entries) {
       console.warn('No Contentful entries found. Check content type name. Tried:', contentTypes);
+      // Try to get all content types to help with debugging
+      try {
+        const allEntries = await client.getEntries({ limit: 100 });
+        const availableTypes = [...new Set(allEntries.items.map((item: any) => item.sys.contentType.sys.id))];
+        console.warn('Available content types in Contentful:', availableTypes);
+      } catch (e) {
+        // Ignore errors when trying to get content types
+      }
       return [];
     }
 

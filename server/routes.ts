@@ -2473,33 +2473,118 @@ Return JSON with:
   // Test Contentful connection endpoint (admin only) - block bots
   app.get("/api/contentful/test", blockBots, isAuthenticated, isAdmin, async (req: any, res) => {
     try {
-      const { fetchContentfulPosts, getContentfulClient } = await import("./contentful.js");
-      const client = getContentfulClient();
+      const { fetchContentfulPosts, getContentfulClient, getContentfulManagementClient } = await import("./contentful.js");
       
-      if (!client) {
+      // Check configuration
+      const spaceId = process.env.CONTENTFUL_SPACE_ID;
+      const accessToken = process.env.CONTENTFUL_ACCESS_TOKEN;
+      const managementToken = process.env.CONTENTFUL_MANAGEMENT_TOKEN;
+      const environment = process.env.CONTENTFUL_ENVIRONMENT || 'master';
+
+      const diagnostics: any = {
+        configured: false,
+        spaceId: spaceId ? `${spaceId.substring(0, 8)}...` : 'NOT SET',
+        environment,
+        hasAccessToken: !!accessToken,
+        hasManagementToken: !!managementToken,
+        accessTokenLength: accessToken?.length || 0,
+        managementTokenLength: managementToken?.length || 0,
+        errors: [],
+        warnings: [],
+        contentTypes: [],
+        blogPosts: [],
+        testResults: {}
+      };
+
+      // Check if configured
+      if (!spaceId || !accessToken) {
+        diagnostics.errors.push("Missing required environment variables");
+        diagnostics.errors.push(`CONTENTFUL_SPACE_ID: ${spaceId ? 'SET' : 'MISSING'}`);
+        diagnostics.errors.push(`CONTENTFUL_ACCESS_TOKEN: ${accessToken ? 'SET' : 'MISSING'}`);
         return res.status(400).json({
           error: "Contentful not configured",
-          message: "Set CONTENTFUL_SPACE_ID and CONTENTFUL_ACCESS_TOKEN environment variables"
+          diagnostics,
+          message: "Set CONTENTFUL_SPACE_ID and CONTENTFUL_ACCESS_TOKEN environment variables in Vercel"
         });
       }
 
-      // Try to fetch entries to test connection
+      diagnostics.configured = true;
+
+      // Test Content Delivery API (CDA)
+      const client = getContentfulClient();
+      if (!client) {
+        diagnostics.errors.push("Failed to create Contentful client");
+        return res.status(500).json({
+          error: "Failed to initialize Contentful client",
+          diagnostics
+        });
+      }
+
       try {
-        const entries = await client.getEntries({ limit: 1 });
-        const posts = await fetchContentfulPosts();
+        // Test basic connection
+        const entries = await client.getEntries({ limit: 10 });
+        diagnostics.testResults.cdaConnection = "SUCCESS";
+        diagnostics.totalEntries = entries.total;
         
+        // Get all content types
+        const contentTypeIds = entries.items.map((item: any) => item.sys.contentType.sys.id);
+        diagnostics.contentTypes = [...new Set(contentTypeIds)];
+        
+        // Try to fetch blog posts
+        const posts = await fetchContentfulPosts();
+        diagnostics.testResults.fetchPosts = posts.length > 0 ? "SUCCESS" : "NO_POSTS_FOUND";
+        diagnostics.blogPosts = posts.map((p: any) => ({
+          id: p.sys.id,
+          title: p.fields?.title || 'No title',
+          slug: p.fields?.slug || 'No slug',
+          contentType: p.sys.contentType.sys.id
+        }));
+
+        if (posts.length === 0) {
+          diagnostics.warnings.push("No blog posts found. Check content type name matches: blogPost, blog_post, Blog page, or blogPage");
+          diagnostics.warnings.push(`Available content types: ${diagnostics.contentTypes.join(', ')}`);
+        }
+
+        // Test Management API if token is available
+        if (managementToken) {
+          try {
+            const mgmtClient = getContentfulManagementClient();
+            if (mgmtClient) {
+              const space = await mgmtClient.getSpace(spaceId);
+              const env = await space.getEnvironment(environment);
+              diagnostics.testResults.managementApi = "SUCCESS";
+              diagnostics.spaceName = space.name;
+              diagnostics.environmentName = env.name;
+            }
+          } catch (mgmtError: any) {
+            diagnostics.testResults.managementApi = "FAILED";
+            diagnostics.warnings.push(`Management API error: ${mgmtError.message}`);
+          }
+        } else {
+          diagnostics.warnings.push("CONTENTFUL_MANAGEMENT_TOKEN not set - cannot create/update posts from admin panel");
+        }
+
         res.json({
           success: true,
-          message: "Contentful connection successful",
-          spaceId: process.env.CONTENTFUL_SPACE_ID,
-          environment: process.env.CONTENTFUL_ENVIRONMENT || 'master',
-          totalEntries: entries.total,
-          blogPostsFound: posts.length,
-          contentTypes: entries.items.map((item: any) => item.sys.contentType.sys.id).filter((v: any, i: number, a: any[]) => a.indexOf(v) === i)
+          message: diagnostics.errors.length === 0 ? "Contentful connection successful" : "Contentful connected with warnings",
+          diagnostics
         });
       } catch (apiError: any) {
+        diagnostics.testResults.cdaConnection = "FAILED";
+        diagnostics.errors.push(`API Error: ${apiError.message}`);
+        
+        // Check for specific error types
+        if (apiError.message?.includes('401') || apiError.message?.includes('Unauthorized')) {
+          diagnostics.errors.push("Invalid access token - check CONTENTFUL_ACCESS_TOKEN");
+        } else if (apiError.message?.includes('404') || apiError.message?.includes('Not Found')) {
+          diagnostics.errors.push("Space not found - check CONTENTFUL_SPACE_ID");
+        } else if (apiError.message?.includes('Network')) {
+          diagnostics.errors.push("Network error - check internet connection");
+        }
+
         res.status(500).json({
           error: "Contentful API error",
+          diagnostics,
           message: apiError.message,
           details: process.env.NODE_ENV === 'development' ? apiError.stack : undefined
         });
@@ -2508,7 +2593,8 @@ Return JSON with:
       console.error("Error testing Contentful connection:", error);
       res.status(500).json({
         error: "Failed to test Contentful connection",
-        message: error.message
+        message: error.message,
+        stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
       });
     }
   });
