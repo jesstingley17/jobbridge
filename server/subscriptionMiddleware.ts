@@ -147,18 +147,32 @@ export async function getUserSubscriptionStatus(userId: string) {
       throw new Error('User not found');
     }
 
-  const tier = user.subscriptionTier || 'free';
-  const limits = getTierLimits(tier);
-  const quotaStatus = await checkApplicationLimit(userId);
+    const tier = user.subscriptionTier || 'free';
+    const limits = getTierLimits(tier);
+    const quotaStatus = await checkApplicationLimit(userId);
 
-  return {
-    tier,
-    limits,
-    applicationQuota: {
-      used: (user.monthlyApplicationCount || 0),
-      remaining: quotaStatus.remaining,
-      limit: quotaStatus.limit,
-      resetDate: quotaStatus.resetDate,
-    },
-  };
+    return {
+      tier,
+      limits,
+      applicationQuota: {
+        used: (user.monthlyApplicationCount || 0),
+        remaining: quotaStatus.remaining,
+        limit: quotaStatus.limit,
+        resetDate: quotaStatus.resetDate,
+      },
+    };
+  } catch (error: any) {
+    console.error("Error in getUserSubscriptionStatus:", error);
+    // Return default free tier status on error instead of throwing
+    return {
+      tier: 'free',
+      limits: getTierLimits('free'),
+      applicationQuota: {
+        used: 0,
+        remaining: 0,
+        limit: 0,
+        resetDate: new Date().toISOString(),
+      },
+    };
+  }
 }
