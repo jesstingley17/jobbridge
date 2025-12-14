@@ -398,7 +398,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Admin login (separate from regular auth)
-  app.post('/api/admin/login', async (req, res) => {
+  app.post('/api/admin/login', blockBots, async (req, res) => {
     try {
       // Validate request body
       if (!req.body || !req.body.email || !req.body.password) {
@@ -407,33 +407,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const { email, password } = loginUserSchema.parse(req.body);
       
-      // Find user by email
-      let user;
-      try {
-        user = await storage.getUserByEmail(email);
-      } catch (dbError: any) {
-        console.error("Database error in admin login:", dbError);
-        return res.status(500).json({ 
-          message: "Database error",
-          error: process.env.NODE_ENV === 'development' ? dbError.message : undefined
-        });
-      }
+      // Find user by email (optimized: single query)
+      const user = await storage.getUserByEmail(email);
       
       if (!user || !user.password) {
+        // Use same error message to prevent user enumeration
         return res.status(401).json({ message: "Invalid email or password" });
       }
       
-      // Verify password
-      let isValid = false;
-      try {
-        isValid = await verifyPassword(password, user.password);
-      } catch (bcryptError: any) {
-        console.error("Password verification error:", bcryptError);
-        return res.status(500).json({ 
-          message: "Password verification failed",
-          error: process.env.NODE_ENV === 'development' ? bcryptError.message : undefined
-        });
-      }
+      // Verify password (fast bcrypt comparison)
+      const isValid = await verifyPassword(password, user.password);
       
       if (!isValid) {
         return res.status(401).json({ message: "Invalid email or password" });
@@ -602,160 +585,60 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ error: 'Not authenticated' });
       }
 
-      // Get user from database using Supabase user ID
-      let user;
-      try {
-        user = await storage.getUser(supabaseUser.id);
-      } catch (getUserError: any) {
-        console.error('Error getting user from database:', getUserError);
-        // If it's a database connection error, return 500
-        if (getUserError.code === '42P01' || getUserError.message?.includes('does not exist')) {
-          console.error('Database tables not found');
-          return res.status(500).json({ 
-            error: 'Database not initialized',
-            message: 'Database tables do not exist. Please run migrations.'
-          });
-        }
-        // For other errors, try to continue
-      }
+      // Fast path: Try to get user from database first (most common case)
+      let user = await storage.getUser(supabaseUser.id);
       
-      // If user doesn't exist in our database yet, create it from Supabase data
-      if (!user && supabaseUser.email) {
-        console.log('User not found in database, creating from Supabase user:', supabaseUser.id);
-        
-        // Get full user data from Supabase to get metadata
-        try {
-          const { getSupabaseAdmin } = await import('./supabase.js');
-          const supabaseAdmin = getSupabaseAdmin();
-          
-          if (!supabaseAdmin) {
-            console.error('Failed to get Supabase admin client');
-            // Create user with minimal data from JWT payload
-            try {
-              user = await storage.upsertUser({
-                id: supabaseUser.id,
-                email: supabaseUser.email,
-                firstName: null,
-                lastName: null,
-                emailVerified: false,
-                termsAccepted: false,
-                marketingConsent: false,
-              });
-            } catch (minimalUpsertError: any) {
-              console.error('Error creating user with minimal data:', minimalUpsertError);
-              return res.status(500).json({ 
-                error: 'Failed to create user',
-                message: minimalUpsertError?.message || 'Database error'
-              });
-            }
-          } else {
-            const { data: { user: fullSupabaseUser }, error: getUserError } = await supabaseAdmin.auth.admin.getUserById(supabaseUser.id);
-          
-            if (getUserError) {
-              console.error('Error getting user from Supabase admin:', getUserError);
-              // Try to create user with minimal data
-              try {
-                user = await storage.upsertUser({
-                  id: supabaseUser.id,
-                  email: supabaseUser.email,
-                  firstName: null,
-                  lastName: null,
-                  emailVerified: false,
-                  termsAccepted: false,
-                  marketingConsent: false,
-                });
-              } catch (minimalUpsertError: any) {
-                console.error('Error creating user with minimal data:', minimalUpsertError);
-                return res.status(500).json({ 
-                  error: 'Failed to create user',
-                  message: minimalUpsertError?.message || 'Database error'
-                });
-              }
-            } else if (fullSupabaseUser) {
-              const userMetadata = fullSupabaseUser.user_metadata || {};
-              try {
-                user = await storage.upsertUser({
-                  id: supabaseUser.id,
-                  email: supabaseUser.email,
-                  firstName: userMetadata.first_name || userMetadata.full_name?.split(' ')[0] || null,
-                  lastName: userMetadata.last_name || userMetadata.full_name?.split(' ').slice(1).join(' ') || null,
-                  emailVerified: fullSupabaseUser.email_confirmed_at ? true : false,
-                  termsAccepted: userMetadata.terms_accepted || false,
-                  marketingConsent: userMetadata.marketing_consent || false,
-                });
-              } catch (upsertError: any) {
-                console.error('Error upserting user:', upsertError);
-                console.error('Upsert error stack:', upsertError.stack);
-                // If it's a database error, return 500
-                if (upsertError.code === '42P01' || upsertError.message?.includes('does not exist')) {
-                  return res.status(500).json({ 
-                    error: 'Database not initialized',
-                    message: 'Database tables do not exist. Please run migrations.'
-                  });
-                }
-                // Try to get user again as fallback
-                try {
-                  user = await storage.getUser(supabaseUser.id);
-                } catch (retryError) {
-                  console.error('Error retrying getUser:', retryError);
-                }
-              }
-            } else {
-              // No fullSupabaseUser returned, create with minimal data
-              try {
-                user = await storage.upsertUser({
-                  id: supabaseUser.id,
-                  email: supabaseUser.email,
-                  firstName: null,
-                  lastName: null,
-                  emailVerified: false,
-                  termsAccepted: false,
-                  marketingConsent: false,
-                });
-              } catch (minimalUpsertError: any) {
-                console.error('Error creating user with minimal data:', minimalUpsertError);
-                return res.status(500).json({ 
-                  error: 'Failed to create user',
-                  message: minimalUpsertError?.message || 'Database error'
-                });
-              }
-            }
-          }
-        } catch (supabaseError: any) {
-          console.error('Error accessing Supabase admin:', supabaseError);
-          // If we can't access Supabase admin, try to create user with minimal data
-          try {
-            user = await storage.upsertUser({
-              id: supabaseUser.id,
-              email: supabaseUser.email,
-              firstName: null,
-              lastName: null,
-              emailVerified: false,
-              termsAccepted: false,
-              marketingConsent: false,
-            });
-          } catch (minimalUpsertError: any) {
-            console.error('Error creating user with minimal data:', minimalUpsertError);
-            return res.status(500).json({ 
-              error: 'Failed to create user',
-              message: minimalUpsertError?.message || 'Database error'
-            });
-          }
-        }
-      }
-      
+      // If user exists, return immediately (fast path)
       if (user) {
         return res.json(user);
+      }
+      
+      // User doesn't exist - create with minimal data from JWT (no external API calls)
+      // This is much faster than calling Supabase admin API
+      if (supabaseUser.email) {
+        try {
+          user = await storage.upsertUser({
+            id: supabaseUser.id,
+            email: supabaseUser.email,
+            firstName: null,
+            lastName: null,
+            emailVerified: false,
+            termsAccepted: false,
+            marketingConsent: false,
+          });
+          return res.json(user);
+        } catch (upsertError: any) {
+          console.error('Error creating user:', upsertError);
+          
+          // Check for database errors
+          if (upsertError.code === '42P01' || upsertError.message?.includes('does not exist')) {
+            return res.status(500).json({ 
+              error: 'Database not initialized',
+              message: 'Database tables do not exist. Please run migrations.'
+            });
+          }
+          
+          // For other errors, try to get user one more time (might have been created by another request)
+          try {
+            user = await storage.getUser(supabaseUser.id);
+            if (user) {
+              return res.json(user);
+            }
+          } catch (retryError) {
+            // Ignore retry errors
+          }
+          
+          return res.status(500).json({ 
+            error: 'Failed to create user',
+            message: upsertError?.message || 'Database error'
+          });
+        }
       }
       
       // If we still don't have a user, return 401
       return res.status(401).json({ error: 'User not found' });
     } catch (error: any) {
       console.error("Unexpected error in /api/auth/user:", error);
-      console.error("Error name:", error.name);
-      console.error("Error message:", error.message);
-      console.error("Error stack:", error.stack);
-      console.error("Error code:", error.code);
       
       // Check if it's a known error type
       if (error.code === '42P01' || error.message?.includes('does not exist')) {
@@ -770,9 +653,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ 
         message: "Failed to fetch user", 
         error: error.message || 'Internal server error',
-        code: error.code,
-        // Include stack in development for debugging
-        stack: process.env.NODE_ENV === 'development' && error.stack ? error.stack.split('\n').slice(0, 5).join('\n') : undefined
+        code: error.code
       });
     }
   });
@@ -2074,7 +1955,7 @@ Use simple words and short sentences.`;
   });
 
   // AI Skills Gap Analysis (Pro+ feature)
-  app.post("/api/ai/skills-gap", isAuthenticated, requireFeature('aiSkillsGap'), async (req: any, res) => {
+  app.post("/api/ai/skills-gap", blockBots, isAuthenticated, requireFeature('aiSkillsGap'), async (req: any, res) => {
     try {
       const parsed = skillsGapRequestSchema.safeParse(req.body);
       if (!parsed.success) {
@@ -2186,7 +2067,7 @@ Be warm, supportive, and use clear, simple language. Keep responses concise but 
   });
 
   // AI Application Tips (Pro+ feature)
-  app.post("/api/ai/application-tips", isAuthenticated, requireFeature('aiApplicationTips'), async (req: any, res) => {
+  app.post("/api/ai/application-tips", blockBots, isAuthenticated, requireFeature('aiApplicationTips'), async (req: any, res) => {
     try {
       const parsed = applicationTipsRequestSchema.safeParse(req.body);
       if (!parsed.success) {
@@ -2241,7 +2122,7 @@ Return as JSON array with objects: { tip, importance, example }`;
   });
 
   // AI Job Match Score
-  app.post("/api/ai/match-score", async (req, res) => {
+  app.post("/api/ai/match-score", blockBots, async (req, res) => {
     try {
       const parsed = jobMatchScoreRequestSchema.safeParse(req.body);
       if (!parsed.success) {
