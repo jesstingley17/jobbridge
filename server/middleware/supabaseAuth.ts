@@ -10,12 +10,42 @@ async function getSupabaseJwks(projectUrl: string) {
     return jwksCache.keys;
   }
 
-  const res = await fetch(`${projectUrl}/auth/v1/keys`);
-  if (!res.ok) throw new Error(`Failed to fetch JWKs: ${res.status}`);
+  // Ensure URL doesn't have trailing slash and construct JWKS endpoint
+  const baseUrl = projectUrl.replace(/\/$/, '');
+  const jwksUrl = `${baseUrl}/auth/v1/.well-known/jwks.json`;
   
-  const { keys } = await res.json();
-  jwksCache = { keys, fetchedAt: now };
-  return keys;
+  try {
+    const res = await fetch(jwksUrl, {
+      headers: {
+        'Accept': 'application/json',
+      },
+    });
+    
+    if (!res.ok) {
+      // Try alternative endpoint format
+      const altUrl = `${baseUrl}/auth/v1/keys`;
+      const altRes = await fetch(altUrl, {
+        headers: {
+          'Accept': 'application/json',
+        },
+      });
+      
+      if (!altRes.ok) {
+        throw new Error(`Failed to fetch JWKs: ${res.status} (tried ${jwksUrl} and ${altUrl})`);
+      }
+      
+      const { keys } = await altRes.json();
+      jwksCache = { keys, fetchedAt: now };
+      return keys;
+    }
+    
+    const { keys } = await res.json();
+    jwksCache = { keys, fetchedAt: now };
+    return keys;
+  } catch (error: any) {
+    console.error('Error fetching JWKs:', error);
+    throw new Error(`Failed to fetch JWKs: ${error.message}`);
+  }
 }
 
 function base64urlToBuffer(b64url: string) {
@@ -102,6 +132,36 @@ export function requireSupabaseAuth() {
         return res.status(401).json({ error: "Missing Bearer token" });
       }
 
+      // Use Supabase Admin API to verify token instead of JWKS (more reliable)
+      try {
+        const { getSupabaseAdmin } = await import('../supabase.js');
+        const supabaseAdmin = getSupabaseAdmin();
+        const { data: { user }, error: verifyError } = await supabaseAdmin.auth.getUser(token);
+        
+        if (verifyError || !user) {
+          console.error("JWT verification error:", verifyError?.message || "User not found");
+          return res.status(401).json({ 
+            error: verifyError?.message || "Unauthorized",
+            details: process.env.NODE_ENV === "development" ? verifyError : undefined
+          });
+        }
+
+        // Attach user info to request
+        (req as any).supabaseUser = {
+          id: user.id,
+          role: user.role || "authenticated",
+          email: user.email,
+          email_confirmed_at: user.email_confirmed_at,
+        };
+
+        next();
+        return;
+      } catch (adminError: any) {
+        // Fallback to JWKS verification if admin API fails
+        console.warn("Supabase Admin API verification failed, falling back to JWKS:", adminError.message);
+      }
+
+      // Fallback: Use JWKS verification
       const payload = await verifyJwtWithJwks(token, supabaseUrl);
 
       // Attach user info to request
