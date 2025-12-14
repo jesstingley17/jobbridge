@@ -122,156 +122,104 @@ export const isAdmin: RequestHandler = async (req: any, res, next) => {
   console.log(`[isAdmin] Checking admin access for userId: ${userId}`);
   
   try {
-    // First, check Supabase Auth metadata (same as /api/auth/user does)
-    let isAdminFromMetadata = false;
-    try {
-      const { getSupabaseAdmin } = await import('./supabase.js');
-      const supabaseAdmin = getSupabaseAdmin();
-      
-      // Add timeout to prevent hanging during build/deploy
-      const metadataCheckPromise = supabaseAdmin.auth.admin.getUserById(userId);
-      const timeoutPromise = new Promise((_, reject) => {
-        setTimeout(() => reject(new Error('Metadata check timeout')), 3000); // 3 second timeout
-      });
-      
-      const { data: { user: fullUser }, error: getUserError } = await Promise.race([
-        metadataCheckPromise,
-        timeoutPromise
-      ]) as any;
-      
-      if (!getUserError && fullUser) {
-        const metadataAdmin = fullUser.app_metadata?.role === 'admin' || 
-                            fullUser.app_metadata?.is_admin === true ||
-                            fullUser.user_metadata?.role === 'admin' ||
-                            fullUser.user_metadata?.is_admin === true;
-        if (metadataAdmin) {
-          isAdminFromMetadata = true;
-          console.log(`[isAdmin] Admin role found in Supabase metadata for ${fullUser.email || userId}`);
-          console.log(`[isAdmin] app_metadata:`, fullUser.app_metadata);
-          console.log(`[isAdmin] user_metadata:`, fullUser.user_metadata);
-        }
-      }
-    } catch (metadataError: any) {
-      if (metadataError.message === 'Metadata check timeout') {
-        console.warn('[isAdmin] Supabase metadata check timed out, continuing with database checks');
-      } else {
-        console.warn('Could not check Supabase metadata for admin status:', metadataError.message);
-      }
-    }
+    // Get user email from req.supabaseUser first (fast, no DB query)
+    const userEmail = req.supabaseUser?.email || null;
     
-    if (isAdminFromMetadata) {
-      if (!req.user) {
-        req.user = {
-          claims: { sub: userId }
-        };
-      }
-      console.log(`[isAdmin] Admin access granted via Supabase metadata for ${userId}`);
-      return next();
-    }
-    
-    // First, try to get user info (needed for fallback checks)
-    // Add timeout to prevent hanging
-    let user;
-    let userEmail: string | null = null;
-    try {
-      const getUserPromise = storage.getUser(userId);
-      const timeoutPromise = new Promise((_, reject) => {
-        setTimeout(() => reject(new Error('getUser timeout')), 3000); // 3 second timeout
-      });
-      user = await Promise.race([getUserPromise, timeoutPromise]) as any;
-      userEmail = user?.email || null;
-      console.log(`[isAdmin] User from DB: ${userEmail || 'not found'}, role: ${user?.role || 'none'}`);
-    } catch (userError: any) {
-      if (userError.message === 'getUser timeout') {
-        console.warn("[isAdmin] getUser timed out, using email from req.supabaseUser for fallback checks");
-      } else {
-        console.error("Error fetching user in isAdmin:", userError);
-      }
-      // Use email from req.supabaseUser as fallback if database lookup fails
-      userEmail = req.supabaseUser?.email || null;
-      console.log(`[isAdmin] Using email from req.supabaseUser: ${userEmail || 'none'}`);
-    }
-
-    // Try role-based system: check user_roles table (if it exists)
-    try {
-      const result = await pool.query(
-        `
-          SELECT EXISTS (
-            SELECT 1
-            FROM public.user_roles ur
-            JOIN public.roles r ON r.id = ur.role_id
-            WHERE ur.user_id = $1 AND r.name = 'admin'
-          ) AS is_admin
-        `,
-        [userId]
-      );
-      
-      const isAdminFromRoles = result.rows[0]?.is_admin === true;
-      console.log(`[isAdmin] user_roles table check: ${isAdminFromRoles}`);
-      
-      if (isAdminFromRoles) {
-        // Ensure req.user is set for downstream middleware
-        if (!req.user) {
-          req.user = {
-            claims: { sub: userId }
-          };
-        }
-        console.log(`[isAdmin] Admin access granted via user_roles table for ${userId}`);
-        return next();
-      }
-    } catch (roleError: any) {
-      // If tables don't exist (e.g., migration not run), log and continue to fallback checks
-      if (roleError?.code === '42P01' || roleError?.message?.includes('does not exist')) {
-        console.warn("Role-based tables not found, using fallback admin checks:", roleError.message);
-      } else {
-        console.error("Error checking role-based admin access:", roleError);
-        // Continue to fallback checks instead of failing
-      }
-    }
-    
-    // Fallback: Check legacy user.role field (for backward compatibility)
-    if (user?.role === "admin") {
-      if (!req.user) {
-        req.user = {
-          claims: { sub: userId }
-        };
-      }
-      console.log(`[isAdmin] Admin access granted via user.role field for ${user.email || userId}`);
-      return next();
-    }
-    
-    // Fallback: Check admin emails from env (for backward compatibility)
+    // Quick check: ADMIN_EMAILS env var (fastest, no DB/API calls)
     const adminEmails = process.env.ADMIN_EMAILS?.split(",").map(e => e.trim()) || [];
-    if (user?.email && adminEmails.includes(user.email)) {
+    if (userEmail && adminEmails.includes(userEmail)) {
       if (!req.user) {
-        req.user = {
-          claims: { sub: userId }
-        };
+        req.user = { claims: { sub: userId } };
       }
-      console.log(`[isAdmin] Admin access granted via ADMIN_EMAILS env var for ${user.email}`);
+      console.log(`[isAdmin] Admin access granted via ADMIN_EMAILS env var for ${userEmail}`);
       return next();
     }
     
-    // Fallback: Check admin email pattern (for backward compatibility)
+    // Quick check: ADMIN_EMAIL_PATTERN (fast, no DB/API calls)
     const adminPattern = process.env.ADMIN_EMAIL_PATTERN;
-    if (adminPattern && user?.email) {
+    if (adminPattern && userEmail) {
       try {
         const regex = new RegExp(adminPattern);
-        if (regex.test(user.email)) {
+        if (regex.test(userEmail)) {
           if (!req.user) {
-            req.user = {
-              claims: { sub: userId }
-            };
+            req.user = { claims: { sub: userId } };
           }
-          console.log(`[isAdmin] Admin access granted via ADMIN_EMAIL_PATTERN for ${user.email}`);
+          console.log(`[isAdmin] Admin access granted via ADMIN_EMAIL_PATTERN for ${userEmail}`);
           return next();
         }
       } catch (regexError) {
         console.error("Invalid ADMIN_EMAIL_PATTERN regex:", regexError);
       }
     }
+    
+    // Run database checks in parallel with timeout
+    const checks = Promise.race([
+      Promise.allSettled([
+        // Check 1: Get user from database
+        storage.getUser(userId).catch(() => null),
+        // Check 2: Check user_roles table
+        pool.query(
+          `SELECT EXISTS (
+            SELECT 1 FROM public.user_roles ur
+            JOIN public.roles r ON r.id = ur.role_id
+            WHERE ur.user_id = $1 AND r.name = 'admin'
+          ) AS is_admin`,
+          [userId]
+        ).then(r => r.rows[0]?.is_admin === true).catch(() => false),
+        // Check 3: Check Supabase metadata (with timeout)
+        (async () => {
+          try {
+            const { getSupabaseAdmin } = await import('./supabase.js');
+            const supabaseAdmin = getSupabaseAdmin();
+            const { data: { user: fullUser }, error } = await supabaseAdmin.auth.admin.getUserById(userId);
+            if (!error && fullUser) {
+              return fullUser.app_metadata?.role === 'admin' || 
+                     fullUser.app_metadata?.is_admin === true ||
+                     fullUser.user_metadata?.role === 'admin' ||
+                     fullUser.user_metadata?.is_admin === true;
+            }
+          } catch {}
+          return false;
+        })()
+      ]),
+      // Timeout after 2 seconds
+      new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 2000))
+    ]).catch(() => null) as Promise<PromiseSettledResult<any>[] | null>;
+    
+    const results = await checks;
+    
+    if (results) {
+      const [userResult, rolesResult, metadataResult] = results;
+      
+      // Check user.role from database
+      if (userResult?.status === 'fulfilled' && userResult.value?.role === 'admin') {
+        if (!req.user) {
+          req.user = { claims: { sub: userId } };
+        }
+        console.log(`[isAdmin] Admin access granted via user.role field`);
+        return next();
+      }
+      
+      // Check user_roles table
+      if (rolesResult?.status === 'fulfilled' && rolesResult.value === true) {
+        if (!req.user) {
+          req.user = { claims: { sub: userId } };
+        }
+        console.log(`[isAdmin] Admin access granted via user_roles table`);
+        return next();
+      }
+      
+      // Check Supabase metadata
+      if (metadataResult?.status === 'fulfilled' && metadataResult.value === true) {
+        if (!req.user) {
+          req.user = { claims: { sub: userId } };
+        }
+        console.log(`[isAdmin] Admin access granted via Supabase metadata`);
+        return next();
+      }
+    }
 
-    console.warn(`[isAdmin] Admin access DENIED for userId: ${userId}, email: ${user?.email || 'unknown'}, role: ${user?.role || 'none'}`);
+    console.warn(`[isAdmin] Admin access DENIED for userId: ${userId}, email: ${userEmail || 'unknown'}`);
     return res.status(403).json({ message: "Admin access required" });
   } catch (error: any) {
     // Log error but return 403 instead of 500 to prevent information leakage
