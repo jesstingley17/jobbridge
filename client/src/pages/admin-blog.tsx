@@ -577,11 +577,14 @@ function BlogPostForm({
           id="content"
           value={content}
           onChange={(e) => setContent(e.target.value)}
-          rows={15}
+          rows={20}
           required
-          placeholder="Blog post content (markdown supported)"
+          placeholder="Blog post content (HTML supported: headings, tables, lists, blockquotes, etc.)"
           className="font-mono text-sm"
         />
+        <p className="text-xs text-muted-foreground">
+          HTML is fully supported. You can use headings (&lt;h1&gt; to &lt;h6&gt;), tables (&lt;table&gt;), lists (&lt;ul&gt;, &lt;ol&gt;), blockquotes (&lt;blockquote&gt;), images (&lt;img&gt;), and more. Paste your HTML directly here.
+        </p>
       </div>
 
       <div className="grid grid-cols-2 gap-4">
