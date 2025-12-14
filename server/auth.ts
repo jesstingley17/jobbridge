@@ -124,14 +124,16 @@ export const isAdmin: RequestHandler = async (req: any, res, next) => {
   try {
     // Get user email from req.supabaseUser first (fast, no DB query)
     const userEmail = req.supabaseUser?.email || null;
+    console.log(`[isAdmin] User email from req.supabaseUser: ${userEmail || 'none'}`);
     
     // Quick check: ADMIN_EMAILS env var (fastest, no DB/API calls)
     const adminEmails = process.env.ADMIN_EMAILS?.split(",").map(e => e.trim()) || [];
+    console.log(`[isAdmin] ADMIN_EMAILS env var: ${adminEmails.length > 0 ? adminEmails.join(', ') : 'NOT SET'}`);
     if (userEmail && adminEmails.includes(userEmail)) {
       if (!req.user) {
         req.user = { claims: { sub: userId } };
       }
-      console.log(`[isAdmin] Admin access granted via ADMIN_EMAILS env var for ${userEmail}`);
+      console.log(`[isAdmin] ✅ Admin access granted via ADMIN_EMAILS env var for ${userEmail}`);
       return next();
     }
     
