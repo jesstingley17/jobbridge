@@ -143,6 +143,7 @@ export function requireSupabaseAuth() {
           setTimeout(() => reject(new Error('Token verification timeout')), 3000); // 3 second timeout (reduced from 5s)
         });
         
+        // Use getUser with JWT token - this verifies the token and returns user info
         const verifyPromise = supabaseAdmin.auth.getUser(token);
         const result = await Promise.race([
           verifyPromise,
@@ -150,27 +151,36 @@ export function requireSupabaseAuth() {
         ]) as any;
         
         // Handle both timeout and actual result
-        if (result && result.data) {
-          const { data: { user }, error: verifyError } = result;
-          
-          if (verifyError || !user) {
-            console.error("JWT verification error:", verifyError?.message || "User not found");
-            return res.status(401).json({ 
-              error: verifyError?.message || "Unauthorized",
-              details: process.env.NODE_ENV === "development" ? verifyError : undefined
-            });
+        // The result structure is: { data: { user }, error }
+        if (result) {
+          // Check if it's an error (timeout or other)
+          if (result.error || result.message === 'Token verification timeout') {
+            throw result; // Will be caught below
           }
+          
+          // Check if result has data property
+          if (result.data) {
+            const { data: { user }, error: verifyError } = result;
+            
+            if (verifyError || !user) {
+              console.error("JWT verification error:", verifyError?.message || "User not found");
+              return res.status(401).json({ 
+                error: verifyError?.message || "Unauthorized",
+                details: process.env.NODE_ENV === "development" ? verifyError : undefined
+              });
+            }
 
-          // Attach user info to request
-          (req as any).supabaseUser = {
-            id: user.id,
-            role: user.role || "authenticated",
-            email: user.email,
-            email_confirmed_at: user.email_confirmed_at,
-          };
+            // Attach user info to request
+            (req as any).supabaseUser = {
+              id: user.id,
+              role: user.role || "authenticated",
+              email: user.email,
+              email_confirmed_at: user.email_confirmed_at,
+            };
 
-          next();
-          return;
+            next();
+            return;
+          }
         }
       } catch (adminError: any) {
         // If timeout or other error, skip JWKS fallback for now (it's also failing with 401)
