@@ -20,8 +20,7 @@ import {
   Save,
   X,
   ExternalLink,
-  RefreshCw,
-  EyeIcon
+  RefreshCw
 } from "lucide-react";
 import { Link } from "wouter";
 import { useLocation } from "wouter";
@@ -723,7 +722,7 @@ function BlogPostForm({
           variant="outline" 
           onClick={() => setShowPreview(!showPreview)}
         >
-          <EyeIcon className="h-4 w-4 mr-2" />
+          <Eye className="h-4 w-4 mr-2" />
           {showPreview ? "Hide Preview" : "Preview"}
         </Button>
         <div className="flex gap-2">
