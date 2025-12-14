@@ -140,39 +140,54 @@ export function requireSupabaseAuth() {
         
         // Add timeout to prevent hanging requests
         const timeoutPromise = new Promise((_, reject) => {
-          setTimeout(() => reject(new Error('Token verification timeout')), 5000); // 5 second timeout
+          setTimeout(() => reject(new Error('Token verification timeout')), 3000); // 3 second timeout (reduced from 5s)
         });
         
         const verifyPromise = supabaseAdmin.auth.getUser(token);
-        const { data: { user }, error: verifyError } = await Promise.race([
+        const result = await Promise.race([
           verifyPromise,
           timeoutPromise
         ]) as any;
         
-        if (verifyError || !user) {
-          console.error("JWT verification error:", verifyError?.message || "User not found");
-          return res.status(401).json({ 
-            error: verifyError?.message || "Unauthorized",
-            details: process.env.NODE_ENV === "development" ? verifyError : undefined
-          });
+        // Handle both timeout and actual result
+        if (result && result.data) {
+          const { data: { user }, error: verifyError } = result;
+          
+          if (verifyError || !user) {
+            console.error("JWT verification error:", verifyError?.message || "User not found");
+            return res.status(401).json({ 
+              error: verifyError?.message || "Unauthorized",
+              details: process.env.NODE_ENV === "development" ? verifyError : undefined
+            });
+          }
+
+          // Attach user info to request
+          (req as any).supabaseUser = {
+            id: user.id,
+            role: user.role || "authenticated",
+            email: user.email,
+            email_confirmed_at: user.email_confirmed_at,
+          };
+
+          next();
+          return;
         }
-
-        // Attach user info to request
-        (req as any).supabaseUser = {
-          id: user.id,
-          role: user.role || "authenticated",
-          email: user.email,
-          email_confirmed_at: user.email_confirmed_at,
-        };
-
-        next();
-        return;
       } catch (adminError: any) {
-        // Fallback to JWKS verification if admin API fails or times out
+        // If timeout or other error, skip JWKS fallback for now (it's also failing with 401)
+        // Just return 401 - the client can retry
         if (adminError.message === 'Token verification timeout') {
-          console.warn("Supabase Admin API verification timed out, falling back to JWKS");
+          console.warn("Supabase Admin API verification timed out");
+          return res.status(401).json({ 
+            error: "Authentication timeout",
+            message: "Token verification took too long. Please try again."
+          });
         } else {
-          console.warn("Supabase Admin API verification failed, falling back to JWKS:", adminError.message);
+          console.warn("Supabase Admin API verification failed:", adminError.message);
+          // Don't fall back to JWKS if it's also failing - just return error
+          return res.status(401).json({ 
+            error: adminError?.message || "Unauthorized",
+            details: process.env.NODE_ENV === "development" ? adminError : undefined
+          });
         }
       }
 

@@ -23,14 +23,15 @@ console.log(`[DB Init] Using database URL: ${databaseUrl.substring(0, 50)}...`);
 const isSupabase = databaseUrl.includes('pooler.supabase.com') || databaseUrl.includes('supabase.co');
 
 // Base connection config
+// Optimized for Vercel serverless: smaller pool, faster timeouts, but longer connection timeout
 const connectionConfig: any = { 
   connectionString: databaseUrl,
-  // Optimize for serverless: keep connections alive but don't keep too many
-  max: 2,  // Reduced from default 10 for serverless
-  idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 2000, // Reduced from 5000ms for faster failures
-  // Enable statement timeout to prevent long-running queries
-  statement_timeout: 10000, // 10 seconds max per query
+  max: 1,  // Single connection for serverless (functions are stateless)
+  idleTimeoutMillis: 10000, // Shorter idle timeout (10s instead of 30s)
+  connectionTimeoutMillis: 8000, // Longer connection timeout (8s) for Supabase pooler
+  statement_timeout: 8000, // 8 seconds max per query
+  // Prevent connection leaks in serverless
+  allowExitOnIdle: true,
 };
 
       // CRITICAL: Always allow self-signed certs for Supabase pooler connections
