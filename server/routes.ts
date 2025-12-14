@@ -661,7 +661,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get subscription status
-  app.get('/api/subscription/status', blockBots, isAuthenticated, async (req: any, res) => {
+  // Note: blockBots removed - BotID is disabled in client code
+  app.get('/api/subscription/status', isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user?.claims?.sub;
       if (!userId) {
