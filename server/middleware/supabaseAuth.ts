@@ -129,8 +129,12 @@ export function requireSupabaseAuth() {
       const token = auth.startsWith("Bearer ") ? auth.slice(7) : null;
 
       if (!token) {
+        console.warn("Missing Bearer token in request to:", req.path);
         return res.status(401).json({ error: "Missing Bearer token" });
       }
+      
+      // Log token info for debugging (first 20 chars only for security)
+      console.log(`[Auth] Verifying token for ${req.path}, token prefix: ${token.substring(0, 20)}...`);
 
       // Use Supabase Admin API to verify token instead of JWKS (more reliable)
       // Add timeout to prevent hanging
@@ -165,12 +169,15 @@ export function requireSupabaseAuth() {
             
             if (verifyError || !user) {
               console.error("JWT verification error:", verifyError?.message || "User not found");
+              console.error("Verification error details:", verifyError);
               return res.status(401).json({ 
                 error: verifyError?.message || "Unauthorized",
                 details: process.env.NODE_ENV === "development" ? verifyError : undefined
               });
             }
 
+            console.log(`[Auth] Token verified successfully for user: ${user.email || user.id}`);
+            
             // Attach user info to request
             (req as any).supabaseUser = {
               id: user.id,
@@ -185,9 +192,18 @@ export function requireSupabaseAuth() {
           
           // Check if result has error property (failed response)
           if (result.error) {
-            console.error("JWT verification error:", result.error?.message || "Verification failed");
+            console.error("JWT verification error in result:", result.error?.message || "Verification failed");
+            console.error("Full error object:", result.error);
             throw result.error; // Will be caught below
           }
+          
+          // If we get here, the result structure is unexpected
+          console.error("Unexpected result structure from getUser:", {
+            hasData: !!result.data,
+            hasError: !!result.error,
+            resultKeys: Object.keys(result),
+            resultType: typeof result
+          });
         }
       } catch (adminError: any) {
         // If timeout or other error, skip JWKS fallback for now (it's also failing with 401)
