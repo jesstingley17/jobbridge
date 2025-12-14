@@ -1,6 +1,7 @@
 import session from "express-session";
 import type { Express, RequestHandler, Request } from "express";
 import { storage } from "./storage.js";
+import { pool } from "./db.js";
 
 // Extend Express Request type to include user property
 declare module "express-serve-static-core" {
@@ -96,14 +97,17 @@ export const isAdmin: RequestHandler = async (req: any, res, next) => {
   
   try {
     // Use role-based system: check user_roles table
-    const result = await db.execute(sql`
-      SELECT EXISTS (
-        SELECT 1
-        FROM public.user_roles ur
-        JOIN public.roles r ON r.id = ur.role_id
-        WHERE ur.user_id = ${userId} AND r.name = 'admin'
-      ) AS is_admin
-    `);
+    const result = await pool.query(
+      `
+        SELECT EXISTS (
+          SELECT 1
+          FROM public.user_roles ur
+          JOIN public.roles r ON r.id = ur.role_id
+          WHERE ur.user_id = $1 AND r.name = 'admin'
+        ) AS is_admin
+      `,
+      [userId]
+    );
     
     const isAdmin = result.rows[0]?.is_admin === true;
     
