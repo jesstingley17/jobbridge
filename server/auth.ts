@@ -127,7 +127,18 @@ export const isAdmin: RequestHandler = async (req: any, res, next) => {
     try {
       const { getSupabaseAdmin } = await import('./supabase.js');
       const supabaseAdmin = getSupabaseAdmin();
-      const { data: { user: fullUser }, error: getUserError } = await supabaseAdmin.auth.admin.getUserById(userId);
+      
+      // Add timeout to prevent hanging during build/deploy
+      const metadataCheckPromise = supabaseAdmin.auth.admin.getUserById(userId);
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('Metadata check timeout')), 3000); // 3 second timeout
+      });
+      
+      const { data: { user: fullUser }, error: getUserError } = await Promise.race([
+        metadataCheckPromise,
+        timeoutPromise
+      ]) as any;
+      
       if (!getUserError && fullUser) {
         const metadataAdmin = fullUser.app_metadata?.role === 'admin' || 
                             fullUser.app_metadata?.is_admin === true ||
@@ -141,7 +152,11 @@ export const isAdmin: RequestHandler = async (req: any, res, next) => {
         }
       }
     } catch (metadataError: any) {
-      console.warn('Could not check Supabase metadata for admin status:', metadataError.message);
+      if (metadataError.message === 'Metadata check timeout') {
+        console.warn('[isAdmin] Supabase metadata check timed out, continuing with database checks');
+      } else {
+        console.warn('Could not check Supabase metadata for admin status:', metadataError.message);
+      }
     }
     
     if (isAdminFromMetadata) {
