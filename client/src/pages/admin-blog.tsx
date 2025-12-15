@@ -342,6 +342,17 @@ export default function AdminBlog() {
 
         {/* Posts List */}
         <div className="space-y-4">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-semibold">All Posts</h2>
+            <div className="flex items-center gap-2">
+              <Badge variant="outline" className="text-sm">
+                {posts.filter(p => p.published).length} Published
+              </Badge>
+              <Badge variant="secondary" className="text-sm">
+                {posts.filter(p => !p.published).length} Drafts
+              </Badge>
+            </div>
+          </div>
           {posts.length === 0 ? (
             <Card>
               <CardContent className="pt-6">

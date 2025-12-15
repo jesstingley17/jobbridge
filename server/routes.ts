@@ -3021,10 +3021,10 @@ Return JSON with:
     }
   });
 
-  app.put("/api/admin/blog/posts/:id", blockBots, isAuthenticated, isAdmin, async (req, res) => {
+  app.put("/api/admin/blog/posts/:id", requireSupabaseAuth(), isAdmin, async (req, res) => {
     try {
       const { id } = req.params;
-      const { title, slug, excerpt, content, authorName, featuredImage, published, tags, publishedAt, syncToContentful } = req.body;
+      const { title, slug, excerpt, content, authorName, featuredImage, featuredImageAltText, published, tags, publishedAt, syncToContentful } = req.body;
 
       const existingPost = await storage.getBlogPostById(id);
       if (!existingPost) {
