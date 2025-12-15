@@ -41,6 +41,7 @@ import Terms from "@/pages/terms";
 import EarlyAccess from "@/pages/early-access";
 import BetaTester from "@/pages/beta-tester";
 import AdminBlog from "@/pages/admin-blog";
+import AdminBlogPreview from "@/pages/admin-blog-preview";
 import AdminLogin from "@/pages/admin-login";
 import AdminResetPassword from "@/pages/admin-reset-password";
 import NotFound from "@/pages/not-found";
@@ -100,6 +101,7 @@ function Router() {
           <Route path="/admin/login" component={AdminLogin} />
           <Route path="/admin/reset-password" component={AdminResetPassword} />
           <Route path="/admin/blog" component={AdminBlog} />
+          <Route path="/admin/blog/preview" component={AdminBlogPreview} />
           <Route path="/contact" component={Contact} />
           <Route path="/notes" component={Notes} />
           <Route path="/privacy" component={Privacy} />

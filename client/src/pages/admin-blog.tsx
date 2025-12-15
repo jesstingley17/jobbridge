@@ -763,14 +763,44 @@ function BlogPostForm({
       </div>
 
       <div className="flex justify-between items-center pt-4">
-        <Button 
-          type="button" 
-          variant="outline" 
-          onClick={() => setShowPreview(!showPreview)}
-        >
-          <Eye className="h-4 w-4 mr-2" />
-          {showPreview ? "Hide Preview" : "Preview"}
-        </Button>
+        <div className="flex gap-2">
+          <Button 
+            type="button" 
+            variant="outline" 
+            onClick={() => {
+              // Store preview data in sessionStorage
+              const previewData = {
+                title,
+                slug,
+                excerpt,
+                content,
+                authorName,
+                featuredImage,
+                featuredImageAltText,
+                tags: tags.split(",").map((t) => t.trim()).filter(Boolean),
+                publishedAt,
+              };
+              
+              // Encode data for URL (base64)
+              const encoded = btoa(encodeURIComponent(JSON.stringify(previewData)));
+              
+              // Open in new tab with encoded data
+              const previewUrl = `/admin/blog/preview?data=${encoded}`;
+              window.open(previewUrl, '_blank', 'noopener,noreferrer');
+            }}
+          >
+            <ExternalLink className="h-4 w-4 mr-2" />
+            Preview in New Tab
+          </Button>
+          <Button 
+            type="button" 
+            variant="outline" 
+            onClick={() => setShowPreview(!showPreview)}
+          >
+            <Eye className="h-4 w-4 mr-2" />
+            {showPreview ? "Hide Preview" : "Preview"}
+          </Button>
+        </div>
         <div className="flex gap-2">
           <Button type="button" variant="outline" onClick={onCancel}>
             <X className="h-4 w-4 mr-2" />

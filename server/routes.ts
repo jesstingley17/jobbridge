@@ -2991,10 +2991,33 @@ Return JSON with:
       res.status(201).json({ post });
     } catch (error: any) {
       console.error("Error creating blog post:", error);
+      console.error("Error stack:", error.stack);
+      console.error("Error details:", {
+        message: error.message,
+        code: error.code,
+        detail: error.detail,
+        constraint: error.constraint,
+        body: req.body
+      });
+      
       if (error.code === '23505') { // Unique constraint violation
         return res.status(400).json({ error: "A post with this slug already exists" });
       }
-      res.status(500).json({ error: "Failed to create blog post" });
+      
+      // Return more detailed error in development
+      const errorMessage = process.env.NODE_ENV === 'development' 
+        ? error.message || "Failed to create blog post"
+        : "Failed to create blog post";
+      
+      res.status(500).json({ 
+        error: errorMessage,
+        details: process.env.NODE_ENV === 'development' ? {
+          code: error.code,
+          detail: error.detail,
+          constraint: error.constraint,
+          stack: error.stack
+        } : undefined
+      });
     }
   });
 
