@@ -501,7 +501,7 @@ function BlogPostForm({
   const [authorName, setAuthorName] = useState(post?.authorName || "The JobBridge Team");
   const [featuredImage, setFeaturedImage] = useState(post?.featuredImage || "");
   const [featuredImageAltText, setFeaturedImageAltText] = useState(post?.featuredImageAltText || "");
-  const [published, setPublished] = useState(post?.published ?? true);
+  const [published, setPublished] = useState(post?.published ?? false); // Default to draft
   const [tags, setTags] = useState(post?.tags?.join(", ") || "");
   const [syncToContentful, setSyncToContentful] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
