@@ -3071,10 +3071,13 @@ Return JSON with:
       if (tags !== undefined) updates.tags = normalizedTags;
       if (publishedAt !== undefined) updates.publishedAt = publishedAt ? new Date(publishedAt) : undefined;
 
+      console.log(`[Blog Post Update] Updating post ${id} with:`, Object.keys(updates));
       const updated = await storage.updateBlogPost(id, updates);
       if (!updated) {
+        console.error(`[Blog Post Update] Post ${id} not found`);
         return res.status(404).json({ error: "Post not found" });
       }
+      console.log(`[Blog Post Update] Successfully updated post ${id}:`, updated.title);
 
       // Optionally sync to Contentful if requested and CMA is configured
       // Allow syncing even if contentfulId doesn't exist (will create new entry)
