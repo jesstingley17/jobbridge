@@ -546,6 +546,7 @@ function BlogPostForm({
   };
 
   return (
+    <>
     <form onSubmit={handleSubmit} className="space-y-4">
       <div className="space-y-2">
         <Label htmlFor="title">Title *</Label>
@@ -848,6 +849,7 @@ function BlogPostForm({
       tags={tags}
       publishedAt={publishedAt}
     />
+    </>
   );
 }
 
