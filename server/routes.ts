@@ -2937,16 +2937,30 @@ Return JSON with:
         return res.status(400).json({ error: "Title, slug, and content are required" });
       }
 
+      // Normalize tags - ensure it's an array of strings or undefined
+      let normalizedTags: string[] | undefined = undefined;
+      if (tags) {
+        if (Array.isArray(tags)) {
+          normalizedTags = tags.filter(t => t && typeof t === 'string' && t.trim().length > 0);
+        } else if (typeof tags === 'string') {
+          normalizedTags = tags.split(',').map(t => t.trim()).filter(t => t.length > 0);
+        }
+      }
+      // Use undefined instead of empty array if no tags
+      if (normalizedTags && normalizedTags.length === 0) {
+        normalizedTags = undefined;
+      }
+
       const post = await storage.upsertBlogPost({
-        title,
-        slug,
-        excerpt,
-        content,
-        authorName: authorName || "The JobBridge Team",
-        featuredImage,
-        featuredImageAltText,
-        published: published !== false,
-        tags: Array.isArray(tags) ? tags : tags ? [tags] : [],
+        title: title.trim(),
+        slug: slug.trim(),
+        excerpt: excerpt?.trim() || undefined,
+        content: content.trim(),
+        authorName: authorName?.trim() || "The JobBridge Team",
+        featuredImage: featuredImage?.trim() || undefined,
+        featuredImageAltText: featuredImageAltText?.trim() || undefined,
+        published: published === true, // Explicitly convert to boolean
+        tags: normalizedTags,
         publishedAt: publishedAt ? new Date(publishedAt) : new Date(),
       });
 
