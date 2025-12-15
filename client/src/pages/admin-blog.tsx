@@ -510,7 +510,7 @@ function BlogPostForm({
     post?.publishedAt ? new Date(post.publishedAt).toISOString().split("T")[0] : new Date().toISOString().split("T")[0]
   );
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent, saveAsDraft: boolean = false) => {
     e.preventDefault();
     onSubmit({
       title,
@@ -520,7 +520,7 @@ function BlogPostForm({
       authorName,
       featuredImage,
       featuredImageAltText,
-      published,
+      published: saveAsDraft ? false : published,
       tags: tags.split(",").map((t) => t.trim()).filter(Boolean),
       publishedAt: new Date(publishedAt).toISOString(),
     });
@@ -806,9 +806,18 @@ function BlogPostForm({
             <X className="h-4 w-4 mr-2" />
             Cancel
           </Button>
+          <Button 
+            type="button" 
+            variant="outline" 
+            onClick={(e) => handleSubmit(e, true)}
+            disabled={isSubmitting}
+          >
+            <Save className="h-4 w-4 mr-2" />
+            {isSubmitting ? "Saving..." : "Save as Draft"}
+          </Button>
           <Button type="submit" disabled={isSubmitting}>
             <Save className="h-4 w-4 mr-2" />
-            {isSubmitting ? "Saving..." : post ? "Update" : "Create"}
+            {isSubmitting ? "Saving..." : published ? (post ? "Update" : "Publish") : (post ? "Update & Publish" : "Publish")}
           </Button>
         </div>
       </div>
