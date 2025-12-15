@@ -3045,16 +3045,30 @@ Return JSON with:
         return res.status(404).json({ error: "Post not found" });
       }
 
+      // Normalize tags - ensure it's an array of strings or undefined
+      let normalizedTags: string[] | undefined = undefined;
+      if (tags !== undefined) {
+        if (tags === null || tags === '') {
+          normalizedTags = undefined;
+        } else if (Array.isArray(tags)) {
+          normalizedTags = tags.filter(t => t && typeof t === 'string' && t.trim().length > 0);
+          if (normalizedTags.length === 0) normalizedTags = undefined;
+        } else if (typeof tags === 'string') {
+          normalizedTags = tags.split(',').map(t => t.trim()).filter(t => t.length > 0);
+          if (normalizedTags.length === 0) normalizedTags = undefined;
+        }
+      }
+
       const updates: any = {};
-      if (title !== undefined) updates.title = title;
-      if (slug !== undefined) updates.slug = slug;
-      if (excerpt !== undefined) updates.excerpt = excerpt || undefined;
-      if (content !== undefined) updates.content = content;
-      if (authorName !== undefined) updates.authorName = authorName || undefined;
-      if (featuredImage !== undefined) updates.featuredImage = featuredImage || undefined;
-      if (featuredImageAltText !== undefined) updates.featuredImageAltText = featuredImageAltText || undefined;
-      if (published !== undefined) updates.published = published ?? false;
-      if (tags !== undefined) updates.tags = Array.isArray(tags) ? tags : tags ? [tags] : undefined;
+      if (title !== undefined) updates.title = typeof title === 'string' ? title.trim() : title;
+      if (slug !== undefined) updates.slug = typeof slug === 'string' ? slug.trim() : slug;
+      if (excerpt !== undefined) updates.excerpt = excerpt ? (typeof excerpt === 'string' ? excerpt.trim() : excerpt) : undefined;
+      if (content !== undefined) updates.content = typeof content === 'string' ? content.trim() : content;
+      if (authorName !== undefined) updates.authorName = authorName ? (typeof authorName === 'string' ? authorName.trim() : authorName) : undefined;
+      if (featuredImage !== undefined) updates.featuredImage = featuredImage ? (typeof featuredImage === 'string' ? featuredImage.trim() : featuredImage) : undefined;
+      if (featuredImageAltText !== undefined) updates.featuredImageAltText = featuredImageAltText ? (typeof featuredImageAltText === 'string' ? featuredImageAltText.trim() : featuredImageAltText) : undefined;
+      if (published !== undefined) updates.published = published === true; // Explicitly convert to boolean
+      if (tags !== undefined) updates.tags = normalizedTags;
       if (publishedAt !== undefined) updates.publishedAt = publishedAt ? new Date(publishedAt) : undefined;
 
       const updated = await storage.updateBlogPost(id, updates);
