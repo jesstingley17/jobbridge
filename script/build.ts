@@ -1,6 +1,6 @@
 import { build as esbuild } from "esbuild";
 import { build as viteBuild } from "vite";
-import { rm, readFile, cp } from "fs/promises";
+import { rm, readFile, cp, mkdir } from "fs/promises";
 import { existsSync } from "fs";
 import { join } from "path";
 
