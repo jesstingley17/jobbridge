@@ -776,7 +776,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             setTimeout(() => reject(new Error('Upsert timeout')), 5000); // Increased to 5s
           });
           
-          user = await Promise.race([upsertPromise, upsertTimeout]);
+          user = await Promise.race([upsertPromise, upsertTimeout]) as any;
           // If user is admin, set the role even for newly created users
           if (isAdmin && user.role !== 'admin') {
             console.log(`[Auth] Newly created user ${user.email || user.id} is admin. Setting role.`);
