@@ -742,26 +742,78 @@ export class DatabaseStorage implements IStorage {
   }
 
   async upsertBlogPost(post: InsertBlogPost): Promise<BlogPost> {
-    if (post.contentfulId) {
-      // Check if post exists by Contentful ID
-      const existing = await this.getBlogPostByContentfulId(post.contentfulId);
-      if (existing) {
-        // Update existing post
+    try {
+      console.log("[Storage] upsertBlogPost called with:", {
+        title: post.title,
+        slug: post.slug,
+        hasContentfulId: !!post.contentfulId,
+        published: post.published
+      });
+
+      if (post.contentfulId) {
+        // Check if post exists by Contentful ID
+        const existing = await this.getBlogPostByContentfulId(post.contentfulId);
+        if (existing) {
+          console.log("[Storage] Updating existing post by Contentful ID:", existing.id);
+          // Update existing post
+          const [updated] = await db
+            .update(blogPosts)
+            .set({
+              ...post,
+              updatedAt: new Date(),
+            })
+            .where(eq(blogPosts.contentfulId, post.contentfulId))
+            .returning();
+          if (!updated) {
+            throw new Error("Failed to update blog post");
+          }
+          return updated;
+        }
+      }
+      
+      // Check if post with same slug exists
+      const existingBySlug = await db
+        .select()
+        .from(blogPosts)
+        .where(eq(blogPosts.slug, post.slug))
+        .limit(1);
+      
+      if (existingBySlug.length > 0) {
+        console.log("[Storage] Post with slug already exists, updating:", existingBySlug[0].id);
         const [updated] = await db
           .update(blogPosts)
           .set({
             ...post,
             updatedAt: new Date(),
           })
-          .where(eq(blogPosts.contentfulId, post.contentfulId))
+          .where(eq(blogPosts.slug, post.slug))
           .returning();
+        if (!updated) {
+          throw new Error("Failed to update blog post by slug");
+        }
         return updated;
       }
+      
+      // Insert new post
+      console.log("[Storage] Inserting new blog post");
+      const [newPost] = await db.insert(blogPosts).values(post).returning();
+      if (!newPost) {
+        throw new Error("Failed to insert blog post - no post returned");
+      }
+      console.log("[Storage] Blog post inserted successfully:", newPost.id);
+      return newPost;
+    } catch (error: any) {
+      console.error("[Storage] Error in upsertBlogPost:", {
+        message: error.message,
+        code: error.code,
+        detail: error.detail,
+        constraint: error.constraint,
+        table: error.table,
+        column: error.column,
+        stack: error.stack
+      });
+      throw error;
     }
-    
-    // Insert new post
-    const [newPost] = await db.insert(blogPosts).values(post).returning();
-    return newPost;
   }
 
   async incrementBlogPostViews(slug: string): Promise<void> {

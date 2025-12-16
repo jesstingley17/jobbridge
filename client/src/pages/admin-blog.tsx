@@ -82,22 +82,12 @@ export default function AdminBlog() {
 
   const createMutation = useMutation({
     mutationFn: async (post: Partial<BlogPost>) => {
-      console.log("[Blog Create] Attempting to create post:", { 
-        title: post.title, 
-        slug: post.slug,
-        hasContent: !!post.content,
-        published: post.published,
-        syncToContentful: (post as any).syncToContentful
-      });
       const response = await apiRequest("POST", "/api/admin/blog/posts", post);
       if (!response.ok) {
-        const error = await response.json().catch(() => ({ error: `HTTP ${response.status}: ${response.statusText}` }));
-        console.error("[Blog Create] Error response:", error);
-        throw new Error(error.error || error.message || `Failed to create post (${response.status})`);
+        const error = await response.json();
+        throw new Error(error.error || "Failed to create post");
       }
-      const result = await response.json();
-      console.log("[Blog Create] Success:", result);
-      return result;
+      return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/blog/posts"] });
@@ -109,9 +99,10 @@ export default function AdminBlog() {
       });
     },
     onError: (error: any) => {
+      console.error("[Blog Create] Mutation error:", error);
       toast({
-        title: "Error",
-        description: error.message || "Failed to create post",
+        title: "Error Creating Post",
+        description: error.message || "Failed to create post. Check console for details.",
         variant: "destructive",
       });
     },
@@ -543,17 +534,41 @@ function BlogPostForm({
 
   const handleSubmit = (e: React.FormEvent, saveAsDraft: boolean = false) => {
     e.preventDefault();
-    onSubmit({
+    
+    // Validate required fields
+    if (!title || !title.trim()) {
+      alert("Title is required");
+      return;
+    }
+    if (!slug || !slug.trim()) {
+      alert("Slug is required");
+      return;
+    }
+    if (!content || !content.trim()) {
+      alert("Content is required");
+      return;
+    }
+    
+    console.log("[Blog Form] Submitting:", {
       title,
       slug,
-      excerpt,
-      content,
-      authorName,
-      featuredImage,
-      featuredImageAltText,
+      hasContent: !!content,
+      published: saveAsDraft ? false : published,
+      saveAsDraft
+    });
+    
+    onSubmit({
+      title: title.trim(),
+      slug: slug.trim(),
+      excerpt: excerpt?.trim() || undefined,
+      content: content.trim(),
+      authorName: authorName?.trim() || "The JobBridge Team",
+      featuredImage: featuredImage?.trim() || undefined,
+      featuredImageAltText: featuredImageAltText?.trim() || undefined,
       published: saveAsDraft ? false : published,
       tags: tags.split(",").map((t) => t.trim()).filter(Boolean),
       publishedAt: new Date(publishedAt).toISOString(),
+      syncToContentful, // Include syncToContentful flag
     });
   };
 

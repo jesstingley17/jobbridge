@@ -2931,9 +2931,18 @@ Return JSON with:
 
   app.post("/api/admin/blog/posts", requireSupabaseAuth(), isAdmin, async (req, res) => {
     try {
+      console.log("[Blog Post Create] Request received:", {
+        hasTitle: !!req.body.title,
+        hasSlug: !!req.body.slug,
+        hasContent: !!req.body.content,
+        published: req.body.published,
+        syncToContentful: req.body.syncToContentful
+      });
+
       const { title, slug, excerpt, content, authorName, featuredImage, featuredImageAltText, published, tags, publishedAt, syncToContentful } = req.body;
       
       if (!title || !slug || !content) {
+        console.error("[Blog Post Create] Missing required fields:", { title: !!title, slug: !!slug, content: !!content });
         return res.status(400).json({ error: "Title, slug, and content are required" });
       }
 
@@ -2951,7 +2960,20 @@ Return JSON with:
         normalizedTags = undefined;
       }
 
-      const post = await storage.upsertBlogPost({
+      // Validate and parse publishedAt
+      let parsedPublishedAt: Date;
+      try {
+        parsedPublishedAt = publishedAt ? new Date(publishedAt) : new Date();
+        if (isNaN(parsedPublishedAt.getTime())) {
+          console.warn("[Blog Post Create] Invalid publishedAt date, using current date");
+          parsedPublishedAt = new Date();
+        }
+      } catch (dateError) {
+        console.warn("[Blog Post Create] Error parsing publishedAt, using current date:", dateError);
+        parsedPublishedAt = new Date();
+      }
+
+      const postData = {
         title: title.trim(),
         slug: slug.trim(),
         excerpt: excerpt?.trim() || undefined,
@@ -2961,8 +2983,19 @@ Return JSON with:
         featuredImageAltText: featuredImageAltText?.trim() || undefined,
         published: published === true, // Explicitly convert to boolean
         tags: normalizedTags,
-        publishedAt: publishedAt ? new Date(publishedAt) : new Date(),
+        publishedAt: parsedPublishedAt,
+      };
+
+      console.log("[Blog Post Create] Attempting to insert post:", {
+        title: postData.title,
+        slug: postData.slug,
+        published: postData.published,
+        hasTags: !!postData.tags
       });
+
+      const post = await storage.upsertBlogPost(postData);
+      
+      console.log("[Blog Post Create] Post created successfully:", post.id);
 
       // Optionally sync to Contentful if requested and CMA is configured
       if (syncToContentful) {
@@ -3004,18 +3037,37 @@ Return JSON with:
 
       res.status(201).json({ post });
     } catch (error: any) {
-      console.error("Error creating blog post:", error);
-      console.error("Error stack:", error.stack);
-      console.error("Error details:", {
+      console.error("[Blog Post Create] Error creating blog post:", error);
+      console.error("[Blog Post Create] Error stack:", error.stack);
+      console.error("[Blog Post Create] Error details:", {
         message: error.message,
         code: error.code,
         detail: error.detail,
         constraint: error.constraint,
-        body: req.body
+        table: error.table,
+        column: error.column,
+        body: {
+          title: req.body.title,
+          slug: req.body.slug,
+          hasContent: !!req.body.content
+        }
       });
       
+      // Handle specific database errors
       if (error.code === '23505') { // Unique constraint violation
-        return res.status(400).json({ error: "A post with this slug already exists" });
+        if (error.constraint?.includes('slug')) {
+          return res.status(400).json({ error: "A post with this slug already exists. Please choose a different slug." });
+        }
+        return res.status(400).json({ error: "A post with this information already exists" });
+      }
+      
+      if (error.code === '23502') { // Not null constraint violation
+        const missingField = error.column || 'unknown field';
+        return res.status(400).json({ error: `Missing required field: ${missingField}` });
+      }
+      
+      if (error.code === '23503') { // Foreign key constraint violation
+        return res.status(400).json({ error: "Invalid reference in post data" });
       }
       
       // Return more detailed error in development
@@ -3029,7 +3081,9 @@ Return JSON with:
           code: error.code,
           detail: error.detail,
           constraint: error.constraint,
-          stack: error.stack
+          table: error.table,
+          column: error.column,
+          message: error.message
         } : undefined
       });
     }
