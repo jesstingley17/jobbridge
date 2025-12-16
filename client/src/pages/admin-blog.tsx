@@ -82,12 +82,22 @@ export default function AdminBlog() {
 
   const createMutation = useMutation({
     mutationFn: async (post: Partial<BlogPost>) => {
+      console.log("[Blog Create] Attempting to create post:", { 
+        title: post.title, 
+        slug: post.slug,
+        hasContent: !!post.content,
+        published: post.published,
+        syncToContentful: (post as any).syncToContentful
+      });
       const response = await apiRequest("POST", "/api/admin/blog/posts", post);
       if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || "Failed to create post");
+        const error = await response.json().catch(() => ({ error: `HTTP ${response.status}: ${response.statusText}` }));
+        console.error("[Blog Create] Error response:", error);
+        throw new Error(error.error || error.message || `Failed to create post (${response.status})`);
       }
-      return response.json();
+      const result = await response.json();
+      console.log("[Blog Create] Success:", result);
+      return result;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/blog/posts"] });
@@ -232,11 +242,11 @@ export default function AdminBlog() {
     return (
       <div className="min-h-screen bg-background p-8">
         <div className="mx-auto max-w-7xl">
-          <Skeleton className="h-10 w-64 mb-8" />
-          <div className="space-y-4">
-            {[1, 2, 3].map((i) => (
-              <Skeleton key={i} className="h-32 w-full" />
-            ))}
+          <div className="flex items-center justify-center py-16">
+            <div className="text-center">
+              <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-primary" />
+              <p className="text-muted-foreground">Loading blog posts...</p>
+            </div>
           </div>
         </div>
       </div>
@@ -305,8 +315,17 @@ export default function AdminBlog() {
               onClick={() => syncMutation.mutate()}
               disabled={syncMutation.isPending}
             >
-              <RefreshCw className={`h-4 w-4 mr-2 ${syncMutation.isPending ? 'animate-spin' : ''}`} />
-              Sync from Contentful
+              {syncMutation.isPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Syncing...
+                </>
+              ) : (
+                <>
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                  Sync from Contentful
+                </>
+              )}
             </Button>
             <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
               <DialogTrigger asChild>
