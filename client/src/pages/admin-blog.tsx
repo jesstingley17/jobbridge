@@ -52,6 +52,7 @@ export default function AdminBlog() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [postToDelete, setPostToDelete] = useState<BlogPost | null>(null);
+  const [deleteSyncToContentful, setDeleteSyncToContentful] = useState(false);
 
   const { data: postsData, isLoading, error } = useQuery<{ posts: BlogPost[] }>({
     queryKey: ["/api/admin/blog/posts"],
@@ -81,7 +82,7 @@ export default function AdminBlog() {
   const posts = postsData?.posts || [];
 
   const createMutation = useMutation({
-    mutationFn: async (post: Partial<BlogPost>) => {
+    mutationFn: async (post: Partial<BlogPost> & { syncToContentful?: boolean }) => {
       const response = await apiRequest("POST", "/api/admin/blog/posts", post);
       if (!response.ok) {
         const error = await response.json();
@@ -109,8 +110,8 @@ export default function AdminBlog() {
   });
 
   const updateMutation = useMutation({
-    mutationFn: async ({ id, ...updates }: Partial<BlogPost> & { id: string }) => {
-      const response = await apiRequest("PUT", `/api/admin/blog/posts/${id}`, updates);
+    mutationFn: async ({ id, syncToContentful, ...updates }: Partial<BlogPost> & { id: string; syncToContentful?: boolean }) => {
+      const response = await apiRequest("PUT", `/api/admin/blog/posts/${id}`, { ...updates, syncToContentful });
       if (!response.ok) {
         const error = await response.json();
         throw new Error(error.error || "Failed to update post");
@@ -334,10 +335,11 @@ export default function AdminBlog() {
                 <BlogPostForm
                   post={editingPost}
                   onSubmit={(data) => {
+                    const { syncToContentful, ...postData } = data;
                     if (editingPost) {
-                      updateMutation.mutate({ id: editingPost.id, ...data });
+                      updateMutation.mutate({ id: editingPost.id, ...postData, syncToContentful });
                     } else {
-                      createMutation.mutate(data);
+                      createMutation.mutate({ ...postData, syncToContentful });
                     }
                   }}
                   onCancel={() => {
@@ -512,7 +514,7 @@ function BlogPostForm({
   isSubmitting,
 }: {
   post: BlogPost | null;
-  onSubmit: (data: Partial<BlogPost>) => void;
+  onSubmit: (data: Partial<BlogPost> & { syncToContentful?: boolean }) => void;
   onCancel: () => void;
   isSubmitting: boolean;
 }) {

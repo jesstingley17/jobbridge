@@ -2785,7 +2785,7 @@ Return JSON with:
         
         // Get all content types
         const contentTypeIds = entries.items.map((item: any) => item.sys.contentType.sys.id);
-        diagnostics.contentTypes = [...new Set(contentTypeIds)];
+        diagnostics.contentTypes = Array.from(new Set(contentTypeIds));
         
         // Try to fetch blog posts
         const posts = await fetchContentfulPosts();
@@ -3012,7 +3012,7 @@ Return JSON with:
             tags: post.tags || undefined,
             authorName: post.authorName || undefined,
             publishedAt: post.publishedAt || undefined,
-          }, post.published);
+          }, post.published ?? false);
 
           if (contentfulResult) {
             console.log(`[Blog Post] Contentful sync successful: ${contentfulResult.id}, published: ${contentfulResult.published}`);
@@ -3142,14 +3142,14 @@ Return JSON with:
             contentfulId: existingPost.contentfulId || undefined,
             title: updated.title,
             slug: updated.slug,
-            excerpt: updated.excerpt,
+            excerpt: updated.excerpt || undefined,
             content: updated.content,
-            featuredImage: updated.featuredImage,
-            published: updated.published,
-            tags: updated.tags,
-            authorName: updated.authorName,
-            publishedAt: updated.publishedAt,
-          }, updated.published);
+            featuredImage: updated.featuredImage || undefined,
+            published: updated.published ?? false,
+            tags: updated.tags || undefined,
+            authorName: updated.authorName || undefined,
+            publishedAt: updated.publishedAt || undefined,
+          }, updated.published ?? false);
 
           if (contentfulResult && contentfulResult.id && !existingPost.contentfulId) {
             // Update post with contentfulId if it was created
