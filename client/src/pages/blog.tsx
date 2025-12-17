@@ -1,49 +1,65 @@
-import { useState, useEffect } from "react";
-import { Link } from "wouter";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Search, Calendar, Eye, BookOpen, X } from "lucide-react";
+import { Search, Calendar, BookOpen, X } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
-import { apiRequest } from "@/lib/queryClient";
 
-interface BlogPost {
+interface BloggerPost {
   id: string;
   title: string;
-  slug: string;
-  excerpt: string;
+  url: string;
   content: string;
-  authorName: string;
-  featuredImage?: string;
-  published: boolean;
   publishedAt: string;
-  views: number;
-  tags: string[];
+  updatedAt?: string;
+  authorName?: string | null;
+  labels?: string[];
 }
 
 export default function Blog() {
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedTag, setSelectedTag] = useState<string | null>(null);
+  const [selectedLabel, setSelectedLabel] = useState<string | null>(null);
 
-  const { data: postsData, isLoading } = useQuery<{ posts: BlogPost[] }>({
-    queryKey: ["/api/blog/posts", searchQuery, selectedTag],
+  const { data: postsData, isLoading } = useQuery<{ posts: BloggerPost[] }>({
+    queryKey: ["/api/blogger/posts"],
     queryFn: async () => {
-      const params = new URLSearchParams();
-      if (searchQuery) params.set("search", searchQuery);
-      if (selectedTag) params.set("tag", selectedTag);
-      const response = await apiRequest("GET", `/api/blog/posts?${params.toString()}`);
+      const response = await fetch("/api/blogger/posts");
+      if (!response.ok) {
+        const text = await response.text().catch(() => response.statusText);
+        throw new Error(text || "Failed to load blog posts");
+      }
       return response.json();
     },
   });
 
   const posts = postsData?.posts || [];
-  const allTags = Array.from(new Set(posts.flatMap((p) => p.tags || [])));
+
+  // Derive labels (tags) from Blogger labels field
+  const allLabels = Array.from(
+    new Set(
+      posts.flatMap((p) => (p.labels && Array.isArray(p.labels) ? p.labels : []))
+    )
+  );
+
+  // Apply client-side search and label filtering
+  const filteredPosts = posts.filter((post) => {
+    const matchesLabel =
+      !selectedLabel ||
+      (post.labels && post.labels.includes(selectedLabel));
+
+    const plainText = post.content.replace(/<[^>]*>/g, "");
+    const haystack = `${post.title} ${plainText}`.toLowerCase();
+    const query = searchQuery.trim().toLowerCase();
+    const matchesSearch = !query || haystack.includes(query);
+
+    return matchesLabel && matchesSearch;
+  });
 
   const clearFilters = () => {
     setSearchQuery("");
-    setSelectedTag(null);
+    setSelectedLabel(null);
   };
 
   const formatDate = (dateString: string) => {
@@ -54,7 +70,7 @@ export default function Blog() {
     });
   };
 
-  const hasActiveFilters = searchQuery || selectedTag !== null;
+  const hasActiveFilters = searchQuery || selectedLabel !== null;
 
   return (
     <div className="min-h-screen bg-background">
@@ -106,23 +122,23 @@ export default function Blog() {
               )}
             </div>
 
-            {allTags.length > 0 && (
+            {allLabels.length > 0 && (
               <div className="flex flex-wrap gap-2">
                 <Button
-                  variant={selectedTag === null ? "default" : "outline"}
+                  variant={selectedLabel === null ? "default" : "outline"}
                   size="sm"
-                  onClick={() => setSelectedTag(null)}
+                  onClick={() => setSelectedLabel(null)}
                 >
                   All Topics
                 </Button>
-                {allTags.map((tag) => (
+                {allLabels.map((label) => (
                   <Button
-                    key={tag}
-                    variant={selectedTag === tag ? "default" : "outline"}
+                    key={label}
+                    variant={selectedLabel === label ? "default" : "outline"}
                     size="sm"
-                    onClick={() => setSelectedTag(tag)}
+                    onClick={() => setSelectedLabel(label)}
                   >
-                    {tag}
+                    {label}
                   </Button>
                 ))}
               </div>
@@ -131,8 +147,8 @@ export default function Blog() {
 
           {hasActiveFilters && (
             <div className="mt-4 text-sm text-muted-foreground">
-              Showing {posts.length} {posts.length === 1 ? "article" : "articles"}
-              {selectedTag && ` in "${selectedTag}"`}
+              Showing {filteredPosts.length} {filteredPosts.length === 1 ? "article" : "articles"}
+              {selectedLabel && ` in "${selectedLabel}"`}
               {searchQuery && ` matching "${searchQuery}"`}
             </div>
           )}
@@ -154,7 +170,7 @@ export default function Blog() {
                 </Card>
               ))}
             </div>
-          ) : posts.length === 0 ? (
+          ) : filteredPosts.length === 0 ? (
             <div className="text-center py-12">
               <BookOpen className="h-12 w-12 mx-auto text-muted-foreground mb-4" aria-hidden="true" />
               <h3 className="text-lg font-semibold mb-2">No articles found</h3>
@@ -171,34 +187,31 @@ export default function Blog() {
             </div>
           ) : (
             <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
-              {posts.map((post) => (
-                <Link key={post.id} href={`/blog/${post.slug}`}>
+              {filteredPosts.map((post) => (
+                <a
+                  key={post.id}
+                  href={post.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
                   <Card className="group h-full transition-all hover:shadow-lg hover:border-primary/50 cursor-pointer">
                     <CardHeader className="space-y-4">
-                      {post.featuredImage && (
-                        <div className="aspect-video overflow-hidden rounded-lg bg-muted">
-                          <img
-                            src={post.featuredImage}
-                            alt=""
-                            className="h-full w-full object-cover transition-transform group-hover:scale-105"
-                          />
-                        </div>
-                      )}
                       <div>
                         <h3 className="text-xl font-semibold group-hover:text-primary transition-colors line-clamp-2">
                           {post.title}
                         </h3>
                         <p className="mt-2 text-muted-foreground line-clamp-3">
-                          {post.excerpt}
+                          {/* Strip HTML tags for a simple text preview */}
+                          {post.content.replace(/<[^>]*>/g, "").slice(0, 160)}...
                         </p>
                       </div>
                     </CardHeader>
                     <CardContent>
-                      {post.tags && post.tags.length > 0 && (
+                      {post.labels && post.labels.length > 0 && (
                         <div className="flex flex-wrap gap-2">
-                          {post.tags.slice(0, 3).map((tag) => (
-                            <Badge key={tag} variant="secondary">
-                              {tag}
+                          {post.labels.slice(0, 3).map((label) => (
+                            <Badge key={label} variant="secondary">
+                              {label}
                             </Badge>
                           ))}
                         </div>
@@ -209,13 +222,9 @@ export default function Blog() {
                         <Calendar className="h-4 w-4" aria-hidden="true" />
                         <span>{formatDate(post.publishedAt)}</span>
                       </div>
-                      <div className="flex items-center gap-1">
-                        <Eye className="h-4 w-4" aria-hidden="true" />
-                        <span>{post.views || 0}</span>
-                      </div>
                     </CardFooter>
                   </Card>
-                </Link>
+                </a>
               ))}
             </div>
           )}

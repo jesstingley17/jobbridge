@@ -772,11 +772,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
             termsAccepted: false,
             marketingConsent: false,
           });
-          const upsertTimeout = new Promise((_, reject) => {
+          const upsertTimeout = new Promise<never>((_, reject) => {
             setTimeout(() => reject(new Error('Upsert timeout')), 5000); // Increased to 5s
           });
           
-          user = await Promise.race([upsertPromise, upsertTimeout]) as any;
+          const newUser = await Promise.race([upsertPromise, upsertTimeout]);
+          user = newUser;
           // If user is admin, set the role even for newly created users
           if (isAdmin && user.role !== 'admin') {
             console.log(`[Auth] Newly created user ${user.email || user.id} is admin. Setting role.`);
@@ -2886,7 +2887,100 @@ Return JSON with:
   });
 
 
-  // Admin blog management routes
+  // Public Blogger blog posts endpoint (Google Blogger integration)
+  // This reads posts from a public Google Blogger blog using the Blogger v3 API.
+  // Configuration (set in your environment / Vercel):
+  // - BLOGGER_API_KEY: restricted API key for Blogger API v3
+  // - BLOGGER_BLOG_URL: full URL to your Blogger blog (e.g. https://yourblog.blogspot.com/)
+  app.get("/api/blogger/posts", async (req, res) => {
+    const apiKey = process.env.BLOGGER_API_KEY || process.env.VITE_BLOGGER_API_KEY;
+    const blogUrl = process.env.BLOGGER_BLOG_URL;
+
+    if (!apiKey || !blogUrl) {
+      console.error("[Blogger] Missing configuration. BLOGGER_API_KEY or BLOGGER_BLOG_URL not set.", {
+        hasApiKey: !!apiKey,
+        hasBlogUrl: !!blogUrl,
+      });
+      return res.status(500).json({
+        error: "Blogger is not configured",
+        details: "Set BLOGGER_API_KEY and BLOGGER_BLOG_URL environment variables.",
+      });
+    }
+
+    try {
+      // First, resolve the blog by its URL to get the blogId
+      const byUrl = `https://www.googleapis.com/blogger/v3/blogs/byurl?url=${encodeURIComponent(
+        blogUrl
+      )}&key=${encodeURIComponent(apiKey)}`;
+
+      const blogRes = await fetch(byUrl);
+      if (!blogRes.ok) {
+        const text = await blogRes.text().catch(() => "");
+        console.error("[Blogger] Failed to resolve blog by URL", {
+          status: blogRes.status,
+          statusText: blogRes.statusText,
+          body: text,
+        });
+        return res.status(502).json({
+          error: "Failed to load blog metadata from Blogger",
+          details: `Blogger API responded with ${blogRes.status} ${blogRes.statusText}`,
+        });
+      }
+
+      const blogData: any = await blogRes.json();
+      const blogId = blogData?.id;
+      if (!blogId) {
+        console.error("[Blogger] Blog ID missing in byurl response", blogData);
+        return res.status(502).json({
+          error: "Failed to determine Blogger blog ID",
+          details: "Blogger API did not return an id for the provided BLOGGER_BLOG_URL.",
+        });
+      }
+
+      // Now fetch posts for this blog
+      const postsUrl = `https://www.googleapis.com/blogger/v3/blogs/${encodeURIComponent(
+        blogId
+      )}/posts?key=${encodeURIComponent(apiKey)}`;
+
+      const postsRes = await fetch(postsUrl);
+      if (!postsRes.ok) {
+        const text = await postsRes.text().catch(() => "");
+        console.error("[Blogger] Failed to fetch posts", {
+          status: postsRes.status,
+          statusText: postsRes.statusText,
+          body: text,
+        });
+        return res.status(502).json({
+          error: "Failed to load posts from Blogger",
+          details: `Blogger API responded with ${postsRes.status} ${postsRes.statusText}`,
+        });
+      }
+
+      const postsData: any = await postsRes.json();
+      const items: any[] = postsData?.items || [];
+
+      const posts = items.map((item) => ({
+        id: item.id,
+        title: item.title,
+        url: item.url,
+        content: item.content,
+        publishedAt: item.published,
+        updatedAt: item.updated,
+        authorName: item.author?.displayName || null,
+        labels: item.labels || [],
+      }));
+
+      res.json({ posts });
+    } catch (error: any) {
+      console.error("[Blogger] Unexpected error fetching posts:", error);
+      res.status(500).json({
+        error: "Failed to load blog posts from Blogger",
+        details: error?.message || String(error),
+      });
+    }
+  });
+
+  // Admin blog management routes (legacy - now superseded by Blogger for content)
   app.get("/api/admin/blog/posts", requireSupabaseAuth(), isAdmin, async (req: any, res) => {
     try {
       // Double-check authentication - use supabaseUser instead of req.user
