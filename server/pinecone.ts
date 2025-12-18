@@ -77,19 +77,68 @@ export async function listPineconeIndexes() {
 }
 
 /**
- * List all indexes in your Pinecone project
+ * Upsert vectors to a Pinecone index
+ * @param indexName - Name of the index
+ * @param vectors - Array of vectors with id, values, and optional metadata
  */
-export async function listPineconeIndexes() {
-  const client = getPineconeClient();
-  if (!client) {
-    throw new Error('Pinecone client not initialized. Set PINECONE_API_KEY environment variable.');
-  }
-
+export async function upsertVectors(
+  indexName: string,
+  vectors: Array<{
+    id: string;
+    values: number[];
+    metadata?: Record<string, any>;
+  }>
+) {
+  const index = await getPineconeIndex(indexName);
   try {
-    const indexes = await client.listIndexes();
-    return indexes;
+    await index.upsert(vectors);
+    console.log(`[Pinecone] Upserted ${vectors.length} vectors to index "${indexName}"`);
   } catch (error: any) {
-    console.error('[Pinecone] Failed to list indexes:', error.message);
+    console.error(`[Pinecone] Failed to upsert vectors to "${indexName}":`, error.message);
+    throw error;
+  }
+}
+
+/**
+ * Query vectors from a Pinecone index
+ * @param indexName - Name of the index
+ * @param queryVector - The vector to search for
+ * @param topK - Number of results to return (default: 10)
+ * @param filter - Optional metadata filter
+ */
+export async function queryVectors(
+  indexName: string,
+  queryVector: number[],
+  topK: number = 10,
+  filter?: Record<string, any>
+) {
+  const index = await getPineconeIndex(indexName);
+  try {
+    const queryResponse = await index.query({
+      vector: queryVector,
+      topK,
+      includeMetadata: true,
+      ...(filter && { filter }),
+    });
+    return queryResponse;
+  } catch (error: any) {
+    console.error(`[Pinecone] Failed to query index "${indexName}":`, error.message);
+    throw error;
+  }
+}
+
+/**
+ * Delete vectors from a Pinecone index
+ * @param indexName - Name of the index
+ * @param ids - Array of vector IDs to delete
+ */
+export async function deleteVectors(indexName: string, ids: string[]) {
+  const index = await getPineconeIndex(indexName);
+  try {
+    await index.deleteMany(ids);
+    console.log(`[Pinecone] Deleted ${ids.length} vectors from index "${indexName}"`);
+  } catch (error: any) {
+    console.error(`[Pinecone] Failed to delete vectors from "${indexName}":`, error.message);
     throw error;
   }
 }

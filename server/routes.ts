@@ -1512,10 +1512,112 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Semantic job search using Pinecone (enhanced search)
+  app.get("/api/jobs/semantic", async (req, res) => {
+    try {
+      const { query, location, type, limit } = req.query;
+      
+      if (!query || typeof query !== 'string') {
+        return res.status(400).json({ error: "Query parameter is required" });
+      }
+
+      const { searchJobsSemantic } = await import('./pineconeJobs.js');
+      
+      const results = await searchJobsSemantic(query, parseInt(limit as string) || 20, {
+        location: location as string | undefined,
+        type: type as string | undefined,
+      });
+
+      // Fetch full job details from database
+      const jobIds = results.map(r => r.jobId);
+      const jobs = await Promise.all(
+        jobIds.map(async (id) => {
+          try {
+            const job = await storage.getJob(id);
+            if (job) {
+              // Find matching result to include score
+              const match = results.find(r => r.jobId === id);
+              return {
+                ...job,
+                relevanceScore: match?.score || 0,
+              };
+            }
+            return null;
+          } catch {
+            return null;
+          }
+        })
+      );
+
+      const validJobs = jobs.filter(Boolean);
+      
+      res.json({
+        jobs: validJobs,
+        query,
+        totalResults: validJobs.length,
+        semanticSearch: true,
+      });
+    } catch (error: any) {
+      console.error("Error in semantic job search:", error);
+      res.status(500).json({ 
+        error: "Failed to perform semantic job search",
+        message: error.message 
+      });
+    }
+  });
+
+  // Resume-to-job matching using Pinecone
+  app.post("/api/jobs/match-resume", requireSupabaseAuth(), async (req: any, res) => {
+    try {
+      const { resumeText, limit } = req.body;
+      
+      if (!resumeText || typeof resumeText !== 'string') {
+        return res.status(400).json({ error: "resumeText is required" });
+      }
+
+      const { matchResumeToJobs } = await import('./pineconeJobs.js');
+      
+      const results = await matchResumeToJobs(resumeText, parseInt(limit) || 10);
+
+      // Fetch full job details
+      const jobIds = results.map(r => r.jobId);
+      const jobs = await Promise.all(
+        jobIds.map(async (id) => {
+          try {
+            const job = await storage.getJob(id);
+            if (job) {
+              const match = results.find(r => r.jobId === id);
+              return {
+                ...job,
+                matchScore: match?.score || 0,
+              };
+            }
+            return null;
+          } catch {
+            return null;
+          }
+        })
+      );
+
+      const validJobs = jobs.filter(Boolean);
+      
+      res.json({
+        jobs: validJobs,
+        totalMatches: validJobs.length,
+      });
+    } catch (error: any) {
+      console.error("Error matching resume to jobs:", error);
+      res.status(500).json({ 
+        error: "Failed to match resume to jobs",
+        message: error.message 
+      });
+    }
+  });
+
   // External jobs endpoint (from Indeed/RapidAPI with caching)
   app.get("/api/external-jobs", async (req, res) => {
     try {
-      const { query, location, type, accessibilityFilters } = req.query;
+      const { query, location, type, accessibilityFilters, indexInPinecone } = req.query;
       const filters = accessibilityFilters ? 
         (typeof accessibilityFilters === 'string' ? accessibilityFilters.split(',') : accessibilityFilters as string[]) 
         : undefined;
@@ -1525,6 +1627,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
         type as string | undefined,
         filters
       );
+      
+      // Optionally index jobs in Pinecone (if enabled and Pinecone is configured)
+      if (indexInPinecone === 'true' && process.env.PINECONE_API_KEY) {
+        const { indexJob } = await import('./pineconeJobs.js');
+        // Index jobs in background (don't wait for completion)
+        Promise.all(
+          externalJobs.map(job => 
+            indexJob({
+              id: job.id,
+              title: job.title || '',
+              description: job.description || '',
+              company: job.company || undefined,
+              location: job.location || undefined,
+              type: job.type || undefined,
+            }).catch(err => console.error(`Failed to index job ${job.id}:`, err))
+          )
+        ).catch(err => console.error('Error indexing external jobs:', err));
+      }
+      
       res.json(externalJobs);
     } catch (error) {
       console.error("Error fetching external jobs:", error);
@@ -2976,6 +3097,91 @@ Return JSON with:
       res.status(500).json({
         error: "Failed to load blog posts from Blogger",
         details: error?.message || String(error),
+      });
+    }
+  });
+
+  // Admin endpoint to index jobs in Pinecone
+  app.post("/api/admin/pinecone/index-jobs", requireSupabaseAuth(), isAdmin, async (req: any, res) => {
+    try {
+      const { jobIds, indexAll } = req.body;
+      
+      const { indexJob } = await import('./pineconeJobs.js');
+      
+      if (indexAll) {
+        // Index all jobs from database
+        const allJobs = await storage.searchJobs();
+        let indexed = 0;
+        let failed = 0;
+        
+        for (const job of allJobs) {
+          try {
+            await indexJob({
+              id: job.id,
+              title: job.title || '',
+              description: job.description || '',
+              company: job.company || undefined,
+              location: job.location || undefined,
+              type: job.type || undefined,
+              requirements: job.requirements || undefined,
+            });
+            indexed++;
+          } catch (error: any) {
+            console.error(`Failed to index job ${job.id}:`, error.message);
+            failed++;
+          }
+        }
+        
+        res.json({
+          success: true,
+          message: `Indexed ${indexed} jobs, ${failed} failed`,
+          indexed,
+          failed,
+        });
+      } else if (jobIds && Array.isArray(jobIds)) {
+        // Index specific jobs
+        let indexed = 0;
+        let failed = 0;
+        
+        for (const jobId of jobIds) {
+          try {
+            const job = await storage.getJob(jobId);
+            if (job) {
+              await indexJob({
+                id: job.id,
+                title: job.title || '',
+                description: job.description || '',
+                company: job.company || undefined,
+                location: job.location || undefined,
+                type: job.type || undefined,
+                requirements: job.requirements || undefined,
+              });
+              indexed++;
+            } else {
+              failed++;
+            }
+          } catch (error: any) {
+            console.error(`Failed to index job ${jobId}:`, error.message);
+            failed++;
+          }
+        }
+        
+        res.json({
+          success: true,
+          message: `Indexed ${indexed} jobs, ${failed} failed`,
+          indexed,
+          failed,
+        });
+      } else {
+        res.status(400).json({
+          error: "Either 'indexAll: true' or 'jobIds' array is required",
+        });
+      }
+    } catch (error: any) {
+      console.error("Error indexing jobs:", error);
+      res.status(500).json({
+        error: "Failed to index jobs",
+        message: error.message,
       });
     }
   });
