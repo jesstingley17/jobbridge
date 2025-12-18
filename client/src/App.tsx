@@ -40,6 +40,7 @@ import Cookies from "@/pages/cookies";
 import Terms from "@/pages/terms";
 import EarlyAccess from "@/pages/early-access";
 import BetaTester from "@/pages/beta-tester";
+import NewsletterPage from "@/pages/newsletter";
 import AdminBlog from "@/pages/admin-blog";
 import AdminBlogPreview from "@/pages/admin-blog-preview";
 import AdminLogin from "@/pages/admin-login";
@@ -96,21 +97,22 @@ function Router() {
       <Route path="/select-role" component={SelectRole} />
       <Route path="/community" component={Community} />
       <Route path="/pricing" component={Pricing} />
-          <Route path="/blog" component={Blog} />
-          <Route path="/blog/:slug" component={BlogPost} />
-          <Route path="/admin/login" component={AdminLogin} />
-          <Route path="/admin/reset-password" component={AdminResetPassword} />
-          <Route path="/admin/blog" component={AdminBlog} />
-          <Route path="/admin/blog/preview" component={AdminBlogPreview} />
-          <Route path="/contact" component={Contact} />
-          <Route path="/notes" component={Notes} />
-          <Route path="/privacy" component={Privacy} />
-          <Route path="/cookies" component={Cookies} />
-          <Route path="/terms" component={Terms} />
-          <Route path="/early-access" component={EarlyAccess} />
-          <Route path="/beta-tester" component={BetaTester} />
-          <Route path="/beta" component={BetaTester} />
-          <Route path="/auth" component={AuthWrapper} />
+      <Route path="/blog" component={Blog} />
+      <Route path="/blog/:slug" component={BlogPost} />
+      <Route path="/newsletter" component={NewsletterPage} />
+      <Route path="/admin/login" component={AdminLogin} />
+      <Route path="/admin/reset-password" component={AdminResetPassword} />
+      <Route path="/admin/blog" component={AdminBlog} />
+      <Route path="/admin/blog/preview" component={AdminBlogPreview} />
+      <Route path="/contact" component={Contact} />
+      <Route path="/notes" component={Notes} />
+      <Route path="/privacy" component={Privacy} />
+      <Route path="/cookies" component={Cookies} />
+      <Route path="/terms" component={Terms} />
+      <Route path="/early-access" component={EarlyAccess} />
+      <Route path="/beta-tester" component={BetaTester} />
+      <Route path="/beta" component={BetaTester} />
+      <Route path="/auth" component={AuthWrapper} />
       <Route path="/auth/sign-in" component={AuthWrapper} />
       <Route path="/auth/sign-up" component={AuthWrapper} />
       <Route path="/auth/callback" component={AuthCallback} />

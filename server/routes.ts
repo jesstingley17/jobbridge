@@ -2980,6 +2980,61 @@ Return JSON with:
     }
   });
 
+  // Pinecone test/status endpoint (admin only)
+  app.get("/api/pinecone/status", requireSupabaseAuth(), isAdmin, async (req: any, res) => {
+    try {
+      const { getPineconeClient, listPineconeIndexes, isPineconeConfigured } = await import("./pinecone.js");
+      
+      const apiKey = process.env.PINECONE_API_KEY;
+      const configured = isPineconeConfigured();
+      
+      const diagnostics: any = {
+        configured,
+        hasApiKey: !!apiKey,
+        apiKeyPrefix: apiKey ? `${apiKey.substring(0, 8)}...` : 'NOT SET',
+        indexes: [],
+        error: null,
+      };
+
+      if (!configured) {
+        return res.status(400).json({
+          error: "Pinecone is not configured",
+          diagnostics,
+          message: "Set PINECONE_API_KEY environment variable in Vercel",
+        });
+      }
+
+      try {
+        const client = getPineconeClient();
+        if (client) {
+          const indexes = await listPineconeIndexes();
+          diagnostics.indexes = indexes.indexes?.map((idx: any) => ({
+            name: idx.name,
+            dimension: idx.dimension,
+            metric: idx.metric,
+            host: idx.host,
+          })) || [];
+        }
+      } catch (error: any) {
+        diagnostics.error = error.message;
+        console.error("[Pinecone] Error listing indexes:", error);
+      }
+
+      res.json({
+        success: true,
+        message: configured ? "Pinecone is configured and connected" : "Pinecone is configured but connection failed",
+        diagnostics,
+      });
+    } catch (error: any) {
+      console.error("Error testing Pinecone connection:", error);
+      res.status(500).json({
+        error: "Failed to test Pinecone connection",
+        message: error.message,
+        stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+      });
+    }
+  });
+
   // Admin blog management routes (legacy - now superseded by Blogger for content)
   app.get("/api/admin/blog/posts", requireSupabaseAuth(), isAdmin, async (req: any, res) => {
     try {
