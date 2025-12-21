@@ -692,18 +692,26 @@ export default function Home() {
             </p>
 
             {/* Waitlist Form - HubSpot Integration */}
-            <Card className="mt-10 mx-auto max-w-md border-primary/20 bg-background/80 backdrop-blur-sm shadow-lg">
-              <CardContent className="pt-6 pb-6">
-                <div 
-                  className="hs-form-html" 
-                  data-region="na2" 
-                  data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb" 
-                  data-portal-id="244677572"
-                  role="form"
-                  aria-label="Waitlist signup form"
-                ></div>
-              </CardContent>
-            </Card>
+            <div className="mt-10 mx-auto max-w-md">
+              <div className="text-center mb-4">
+                <h2 className="text-2xl font-semibold mb-2">Join the Waitlist</h2>
+                <p className="text-muted-foreground text-sm">
+                  Be among the first to experience The JobBridge. Sign up to get notified when we launch!
+                </p>
+              </div>
+              <Card className="border-primary/20 bg-background/80 backdrop-blur-sm shadow-lg">
+                <CardContent className="pt-6 pb-6">
+                  <div 
+                    className="hs-form-html" 
+                    data-region="na2" 
+                    data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb" 
+                    data-portal-id="244677572"
+                    role="form"
+                    aria-label="Waitlist signup form"
+                  ></div>
+                </CardContent>
+              </Card>
+            </div>
           </div>
         </div>
       </section>
