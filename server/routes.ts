@@ -3008,11 +3008,39 @@ Return JSON with:
   });
 
 
-  // Public Blogger blog posts endpoint (Google Blogger integration)
-  // This reads posts from a public Google Blogger blog using the Blogger v3 API.
+  // Public HubSpot blog posts endpoint
+  // This reads posts from HubSpot Content API
   // Configuration (set in your environment / Vercel):
-  // - BLOGGER_API_KEY: restricted API key for Blogger API v3
-  // - BLOGGER_BLOG_URL: full URL to your Blogger blog (e.g. https://yourblog.blogspot.com/)
+  // - HUBSPOT_ACCESS_TOKEN: HubSpot private app access token
+  // - HUBSPOT_PORTAL_ID: HubSpot portal ID (optional, can be derived from token)
+  app.get("/api/hubspot/blog/posts", async (req, res) => {
+    try {
+      const accessToken = process.env.HUBSPOT_ACCESS_TOKEN || process.env.VITE_HUBSPOT_ACCESS_TOKEN;
+      const portalId = process.env.HUBSPOT_PORTAL_ID || process.env.VITE_HUBSPOT_PORTAL_ID || '244677572';
+      const limit = parseInt(req.query.limit as string) || 50;
+
+      if (!accessToken) {
+        console.error("[HubSpot Blog] Missing configuration. HUBSPOT_ACCESS_TOKEN not set.");
+        return res.status(500).json({
+          error: "HubSpot blog is not configured",
+          details: "Set HUBSPOT_ACCESS_TOKEN environment variable in Vercel.",
+        });
+      }
+
+      const { fetchHubSpotBlogPosts } = await import('./hubspotBlog.js');
+      const posts = await fetchHubSpotBlogPosts(portalId, accessToken, limit);
+
+      res.json({ posts });
+    } catch (error: any) {
+      console.error("[HubSpot Blog] Unexpected error fetching posts:", error);
+      res.status(500).json({
+        error: "Failed to load blog posts from HubSpot",
+        details: error?.message || String(error),
+      });
+    }
+  });
+
+  // Legacy Blogger endpoint (kept for backward compatibility, but deprecated)
   app.get("/api/blogger/posts", async (req, res) => {
     const apiKey = process.env.BLOGGER_API_KEY || process.env.VITE_BLOGGER_API_KEY;
     const blogUrl = process.env.BLOGGER_BLOG_URL;

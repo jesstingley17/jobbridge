@@ -7,25 +7,28 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Search, Calendar, BookOpen, X } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 
-interface BloggerPost {
+interface BlogPost {
   id: string;
   title: string;
   url: string;
   content: string;
+  excerpt?: string;
   publishedAt: string;
   updatedAt?: string;
   authorName?: string | null;
-  labels?: string[];
+  tags?: string[];
+  labels?: string[]; // For backward compatibility
+  featuredImage?: string;
 }
 
 export default function Blog() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedLabel, setSelectedLabel] = useState<string | null>(null);
 
-  const { data: postsData, isLoading } = useQuery<{ posts: BloggerPost[] }>({
-    queryKey: ["/api/blogger/posts"],
+  const { data: postsData, isLoading } = useQuery<{ posts: BlogPost[] }>({
+    queryKey: ["/api/hubspot/blog/posts"],
     queryFn: async () => {
-      const response = await fetch("/api/blogger/posts");
+      const response = await fetch("/api/hubspot/blog/posts");
       if (!response.ok) {
         const text = await response.text().catch(() => response.statusText);
         throw new Error(text || "Failed to load blog posts");
@@ -36,21 +39,26 @@ export default function Blog() {
 
   const posts = postsData?.posts || [];
 
-  // Derive labels (tags) from Blogger labels field
+  // Derive labels (tags) from tags or labels field
   const allLabels = Array.from(
     new Set(
-      posts.flatMap((p) => (p.labels && Array.isArray(p.labels) ? p.labels : []))
+      posts.flatMap((p) => {
+        if (p.tags && Array.isArray(p.tags)) return p.tags;
+        if (p.labels && Array.isArray(p.labels)) return p.labels;
+        return [];
+      })
     )
   );
 
   // Apply client-side search and label filtering
   const filteredPosts = posts.filter((post) => {
+    const postTags = post.tags || post.labels || [];
     const matchesLabel =
-      !selectedLabel ||
-      (post.labels && post.labels.includes(selectedLabel));
+      !selectedLabel || postTags.includes(selectedLabel);
 
     const plainText = post.content.replace(/<[^>]*>/g, "");
-    const haystack = `${post.title} ${plainText}`.toLowerCase();
+    const excerptText = post.excerpt ? post.excerpt.replace(/<[^>]*>/g, "") : "";
+    const haystack = `${post.title} ${plainText} ${excerptText}`.toLowerCase();
     const query = searchQuery.trim().toLowerCase();
     const matchesSearch = !query || haystack.includes(query);
 
@@ -207,11 +215,11 @@ export default function Blog() {
                       </div>
                     </CardHeader>
                     <CardContent>
-                      {post.labels && post.labels.length > 0 && (
+                      {(post.tags || post.labels) && (post.tags || post.labels)!.length > 0 && (
                         <div className="flex flex-wrap gap-2">
-                          {post.labels.slice(0, 3).map((label) => (
-                            <Badge key={label} variant="secondary">
-                              {label}
+                          {(post.tags || post.labels)!.slice(0, 3).map((tag) => (
+                            <Badge key={tag} variant="secondary">
+                              {tag}
                             </Badge>
                           ))}
                         </div>
