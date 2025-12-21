@@ -234,36 +234,31 @@ export default function Pricing() {
     },
   });
 
-  // Map Stripe products to plans
-  const plans: Plan[] = productsData?.products 
-    ? productsData.products.map((product) => {
-        const price = product.prices[0];
-        const amount = price?.unit_amount ? price.unit_amount / 100 : 0;
-        const interval = price?.recurring_interval || "month";
-        const defaultPlan = defaultPlans.find(p => 
-          product.name.toLowerCase().includes(p.name.toLowerCase()) ||
-          p.name.toLowerCase().includes(product.name.toLowerCase())
-        );
-        
-        return {
-          name: product.name,
-          subtitle: defaultPlan?.subtitle || "",
-          price: amount > 0 ? `$${amount}` : "Custom",
-          period: interval === "month" ? "per month" : interval === "year" ? "per year" : "contact us",
-          yearlyPrice: defaultPlan?.yearlyPrice,
-          yearlyPeriod: defaultPlan?.yearlyPeriod,
-          priceId: price?.id || null,
-          popular: product.name.toLowerCase().includes("core"),
-          description: defaultPlan?.description,
-          features: product.description 
-            ? product.description.split("\n").filter(Boolean)
-            : defaultPlan?.features || [],
-          notIncluded: defaultPlan?.notIncluded,
-          purpose: defaultPlan?.purpose,
-          contact: defaultPlan?.contact || false,
-        };
-      })
-    : defaultPlans;
+  // Always use default plans structure, but map Stripe priceIds if available
+  const plans: Plan[] = defaultPlans.map((defaultPlan) => {
+    // Try to find matching Stripe product for priceId
+    let priceId: string | null = null;
+    if (productsData?.products) {
+      const matchingProduct = productsData.products.find((product) => {
+        const productName = product.name.toLowerCase();
+        const planName = defaultPlan.name.toLowerCase();
+        // Match by name (flexible matching)
+        return productName.includes(planName) || 
+               planName.includes(productName) ||
+               (planName.includes("core") && productName.includes("pro")) ||
+               (planName.includes("pro") && productName.includes("pro"));
+      });
+      
+      if (matchingProduct?.prices?.[0]?.id) {
+        priceId = matchingProduct.prices[0].id;
+      }
+    }
+    
+    return {
+      ...defaultPlan,
+      priceId: priceId || defaultPlan.priceId,
+    };
+  });
 
   return (
     <div className="flex flex-col min-h-screen py-12">
