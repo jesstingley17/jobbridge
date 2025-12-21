@@ -193,6 +193,13 @@ export default function Home() {
         box-shadow: 0 0 0 3px hsl(var(--primary) / 0.1);
       }
 
+      /* Hover states */
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] input:hover,
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] textarea:hover,
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] select:hover {
+        border-color: hsl(var(--input) / 0.8);
+      }
+
       /* Submit button - Match design system with gradient */
       [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] input[type="submit"],
       [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-button,
@@ -217,10 +224,23 @@ export default function Home() {
       [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] button[type="submit"]:hover {
         opacity: 0.9;
         transform: translateY(-1px);
-        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
       }
 
-      /* Error messages */
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] input[type="submit"]:focus,
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-button:focus,
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] button[type="submit"]:focus {
+        outline: none;
+        box-shadow: 0 0 0 3px hsl(var(--primary) / 0.2);
+      }
+
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] input[type="submit"]:active,
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-button:active,
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] button[type="submit"]:active {
+        transform: translateY(0);
+      }
+
+      /* Error messages - High contrast, clear */
       [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-error-msgs {
         list-style: none;
         padding: 0;
@@ -236,6 +256,49 @@ export default function Home() {
         gap: 0.375rem;
       }
 
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-error-msgs li:before {
+        content: "⚠";
+        font-size: 1rem;
+      }
+
+      /* Field descriptions/help text */
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-field-desc {
+        font-size: 0.8125rem;
+        color: hsl(var(--muted-foreground)) !important;
+        margin-top: 0.25rem;
+        line-height: 1.4;
+      }
+
+      /* Checkboxes and radio buttons */
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] input[type="checkbox"],
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] input[type="radio"] {
+        width: 1.25rem;
+        height: 1.25rem;
+        min-width: 1.25rem;
+        min-height: 1.25rem;
+        margin-right: 0.5rem;
+        cursor: pointer;
+        accent-color: hsl(var(--primary));
+      }
+
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-radio {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        margin-bottom: 0.5rem;
+      }
+
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-radio label {
+        margin-bottom: 0;
+        cursor: pointer;
+      }
+
+      /* Loading state */
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-submit-loading {
+        opacity: 0.6;
+        cursor: not-allowed;
+      }
+
       /* Success messages */
       [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-main-font-element {
         color: hsl(var(--foreground)) !important;
@@ -247,10 +310,14 @@ export default function Home() {
       .dark [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] input[type="text"],
       .dark [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] input[type="email"],
       .dark [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] input[type="tel"],
+      .dark [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] input[type="number"],
+      .dark [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] textarea,
       .dark [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] select,
       [data-theme="dark"] [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] input[type="text"],
       [data-theme="dark"] [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] input[type="email"],
       [data-theme="dark"] [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] input[type="tel"],
+      [data-theme="dark"] [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] input[type="number"],
+      [data-theme="dark"] [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] textarea,
       [data-theme="dark"] [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] select {
         background-color: hsl(var(--background)) !important;
         color: hsl(var(--foreground)) !important;
@@ -267,6 +334,11 @@ export default function Home() {
         color: hsl(var(--foreground)) !important;
       }
 
+      .dark [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-field-desc,
+      [data-theme="dark"] [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-field-desc {
+        color: hsl(var(--muted-foreground)) !important;
+      }
+
       /* Ensure all text elements use proper colors */
       [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"],
       [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] * {
@@ -277,6 +349,91 @@ export default function Home() {
       [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] span,
       [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] div:not(.hs-form-field) {
         color: hsl(var(--foreground)) !important;
+      }
+
+      /* Required field indicator */
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-required {
+        color: hsl(var(--foreground));
+      }
+
+      /* Accessibility: Ensure all interactive elements are keyboard accessible */
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] *:focus-visible {
+        outline: 2px solid hsl(var(--primary)) !important;
+        outline-offset: 2px !important;
+      }
+
+      /* Responsive adjustments */
+      @media (max-width: 640px) {
+        [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] input[type="text"],
+        [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] input[type="email"],
+        [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] input[type="tel"],
+        [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] select {
+          font-size: 1rem; /* Prevent zoom on iOS */
+        }
+      }
+
+      /* Ensure proper spacing */
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-field:last-child {
+        margin-bottom: 0;
+      }
+
+      /* Override HubSpot's default styles with !important where needed */
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form input[type="text"],
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form input[type="email"],
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form input[type="tel"],
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form select,
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] form input[type="text"],
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] form input[type="email"],
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] form input[type="tel"],
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] form select {
+        width: 100% !important;
+        min-height: 2.75rem !important;
+        padding: 0.625rem 0.875rem !important;
+        font-size: 0.875rem !important;
+        line-height: 1.5 !important;
+        color: hsl(var(--foreground)) !important;
+        background-color: hsl(var(--background)) !important;
+        border: 1px solid hsl(var(--input)) !important;
+        border-radius: 0.5625rem !important;
+        font-family: var(--font-sans, Inter, system-ui, sans-serif) !important;
+      }
+
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form input[type="text"]:focus,
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form input[type="email"]:focus,
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form input[type="tel"]:focus,
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form select:focus,
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] form input[type="text"]:focus,
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] form input[type="email"]:focus,
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] form input[type="tel"]:focus,
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] form select:focus {
+        border-color: hsl(var(--primary)) !important;
+        box-shadow: 0 0 0 3px hsl(var(--primary) / 0.1) !important;
+        outline: none !important;
+      }
+
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form input[type="submit"],
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form .hs-button,
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form button[type="submit"],
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] form input[type="submit"],
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] form button[type="submit"] {
+        min-height: 2.75rem !important;
+        padding: 0.625rem 1.5rem !important;
+        font-size: 0.875rem !important;
+        font-weight: 500 !important;
+        color: white !important;
+        background: linear-gradient(to right, hsl(var(--primary)), hsl(var(--primary) / 0.8)) !important;
+        border: none !important;
+        border-radius: 0.5625rem !important;
+        width: 100% !important;
+        font-family: var(--font-sans, Inter, system-ui, sans-serif) !important;
+      }
+
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form label,
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] form label {
+        font-size: 0.875rem !important;
+        font-weight: 500 !important;
+        color: hsl(var(--foreground)) !important;
+        font-family: var(--font-sans, Inter, system-ui, sans-serif) !important;
       }
     `;
       document.head.appendChild(style);
@@ -340,8 +497,8 @@ export default function Home() {
             </p>
 
             {/* Waitlist Form - HubSpot Integration */}
-            <Card className="mt-10 mx-auto max-w-md border-primary/20 bg-background/50 backdrop-blur-sm">
-              <CardContent className="pt-6">
+            <Card className="mt-10 mx-auto max-w-md border-primary/20 bg-background/80 backdrop-blur-sm shadow-lg">
+              <CardContent className="pt-6 pb-6">
                 <div 
                   className="hs-form-html" 
                   data-region="na2" 
