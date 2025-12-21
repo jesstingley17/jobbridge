@@ -54,7 +54,7 @@ export default function BetaTester() {
             <CardHeader>
               <CardTitle>Beta Tester Application</CardTitle>
               <CardDescription>
-                Fill out the form below to join our beta testing program. We're looking for users who can provide valuable feedback to help us improve.
+                Fill out the form below to join our beta testing program. After submitting, you'll be redirected to create your account and access the platform.
               </CardDescription>
             </CardHeader>
             <CardContent>

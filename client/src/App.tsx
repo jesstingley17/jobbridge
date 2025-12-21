@@ -40,6 +40,7 @@ import Cookies from "@/pages/cookies";
 import Terms from "@/pages/terms";
 import EarlyAccess from "@/pages/early-access";
 import BetaTester from "@/pages/beta-tester";
+import CreateAccount from "@/pages/create-account";
 import NewsletterPage from "@/pages/newsletter";
 import AdminBlog from "@/pages/admin-blog";
 import AdminBlogPreview from "@/pages/admin-blog-preview";
@@ -112,6 +113,7 @@ function Router() {
       <Route path="/early-access" component={EarlyAccess} />
       <Route path="/beta-tester" component={BetaTester} />
       <Route path="/beta" component={BetaTester} />
+      <Route path="/create-account" component={CreateAccount} />
       <Route path="/auth" component={AuthWrapper} />
       <Route path="/auth/sign-in" component={AuthWrapper} />
       <Route path="/auth/sign-up" component={AuthWrapper} />
