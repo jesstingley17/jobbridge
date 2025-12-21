@@ -27,48 +27,145 @@ interface StripeProductsResponse {
   products: StripeProduct[];
 }
 
+interface Plan {
+  name: string;
+  subtitle?: string;
+  price: string;
+  period?: string;
+  yearlyPrice?: string;
+  yearlyPeriod?: string;
+  priceId: string | null;
+  popular?: boolean;
+  description?: string;
+  features: string[];
+  notIncluded?: string[];
+  purpose?: string;
+  contact?: boolean;
+}
+
 // Default plans fallback
 const defaultPlans = [
   {
     name: "Free",
+    subtitle: "Explore",
     price: "$0",
     period: "forever",
     priceId: null,
+    description: "You can look. You can't move furniture.",
     features: [
-      "Basic job search",
-      "1 resume template",
-      "Basic interview prep",
-      "Community access",
+      "Accessible job search (basic filters only)",
+      "Limited job recommendations (algorithm-lite)",
+      "Save up to 10 jobs",
+      "Application tracking (view-only)",
+      "Blog + resource access",
     ],
+    notIncluded: [
+      "No deep AI",
+      "No resume builder",
+      "No interview prep",
+      "No analytics",
+      "No magic",
+    ],
+    purpose: "Lead gen, trust-building, SEO fuel.",
   },
   {
-    name: "Pro",
+    name: "JobBridge Core",
+    subtitle: "Where real progress starts",
     price: "$29",
     period: "per month",
+    yearlyPrice: "$249",
+    yearlyPeriod: "per year",
     priceId: null,
     popular: true,
+    description: "This is your breadwinner tier.",
     features: [
-      "Unlimited job applications",
-      "All resume templates",
-      "AI interview coaching",
-      "Career DNA analysis",
-      "Priority support",
-      "Application tracking",
+      "Everything in Free, plus:",
+      "🧠 Career DNA Matching (Full Power)",
+      "  • Deep skill + experience analysis",
+      "  • Cultural fit modeling",
+      "  • Accessibility-first matching",
+      "  • Priority job recommendations",
+      "📄 Smart Resume Builder",
+      "  • ATS-optimized templates",
+      "  • AI content generation",
+      "  • Unlimited edits",
+      "  • PDF & Word export",
+      "📊 Application Tracking (Full)",
+      "  • Unlimited applications",
+      "  • Status tracking",
+      "  • Interview reminders",
     ],
   },
   {
-    name: "Enterprise",
-    price: "Custom",
-    period: "contact us",
+    name: "JobBridge Pro",
+    subtitle: "Aggressive growth. Serious intent.",
+    price: "$49",
+    period: "per month",
+    yearlyPrice: "$399",
+    yearlyPeriod: "per year",
     priceId: null,
+    description: "This is for users who are done playing around.",
     features: [
-      "Everything in Pro",
-      "Dedicated account manager",
-      "Custom integrations",
-      "Team collaboration",
-      "Advanced analytics",
-      "SLA guarantee",
+      "Everything in Core, plus:",
+      "🎯 Interview Preparation Suite",
+      "  • Role- and industry-specific AI questions",
+      "  • AI feedback + improvement scoring",
+      "  • Question bank access",
+      "  • Video practice mode",
+      "📈 Success Analytics",
+      "  • Resume-to-interview conversion insights",
+      "  • Application performance trends",
+      "  • Personalized improvement suggestions",
+      "💛 Career Resilience Tools",
+      "  • Burnout & stress management resources",
+      "  • Focused career coaching prompts",
     ],
+  },
+  {
+    name: "Sponsored / Institutional Access",
+    subtitle: "Same pricing. Different payer.",
+    price: "$0",
+    period: "to user",
+    priceId: null,
+    description: "No discounts. No guilt pricing. Just redistributed cost.",
+    features: [
+      "Full JobBridge Pro access",
+      "Progress reporting",
+      "Priority support",
+      "Billed to orgs: Bulk / per-seat contracts",
+    ],
+    contact: true,
+  },
+  {
+    name: "Job Developers & Coaches",
+    subtitle: "You're not a 'nice add-on.' You're infrastructure.",
+    price: "$99",
+    period: "per month per seat",
+    priceId: null,
+    description: "Org pricing scales from there",
+    features: [
+      "Multi-client management",
+      "Resume + application oversight",
+      "Interview readiness tracking",
+      "Reporting & documentation",
+      "Accessibility-informed insights",
+    ],
+    contact: true,
+  },
+  {
+    name: "Employers",
+    subtitle: "Inclusive Hiring, Done Right",
+    price: "$199–499",
+    period: "per month",
+    priceId: null,
+    description: "Pay to access prepared, matched candidates.",
+    features: [
+      "Job postings with accessibility signals",
+      "Candidate matching",
+      "Employer profile & insights",
+      "Or per-hire options",
+    ],
+    contact: true,
   },
 ];
 
@@ -138,21 +235,32 @@ export default function Pricing() {
   });
 
   // Map Stripe products to plans
-  const plans = productsData?.products 
+  const plans: Plan[] = productsData?.products 
     ? productsData.products.map((product) => {
         const price = product.prices[0];
         const amount = price?.unit_amount ? price.unit_amount / 100 : 0;
         const interval = price?.recurring_interval || "month";
+        const defaultPlan = defaultPlans.find(p => 
+          product.name.toLowerCase().includes(p.name.toLowerCase()) ||
+          p.name.toLowerCase().includes(product.name.toLowerCase())
+        );
         
         return {
           name: product.name,
+          subtitle: defaultPlan?.subtitle || "",
           price: amount > 0 ? `$${amount}` : "Custom",
           period: interval === "month" ? "per month" : interval === "year" ? "per year" : "contact us",
+          yearlyPrice: defaultPlan?.yearlyPrice,
+          yearlyPeriod: defaultPlan?.yearlyPeriod,
           priceId: price?.id || null,
-          popular: product.name.toLowerCase().includes("pro"),
+          popular: product.name.toLowerCase().includes("core"),
+          description: defaultPlan?.description,
           features: product.description 
             ? product.description.split("\n").filter(Boolean)
-            : defaultPlans.find(p => p.name === product.name)?.features || [],
+            : defaultPlan?.features || [],
+          notIncluded: defaultPlan?.notIncluded,
+          purpose: defaultPlan?.purpose,
+          contact: defaultPlan?.contact || false,
         };
       })
     : defaultPlans;
@@ -189,11 +297,11 @@ export default function Pricing() {
             ))}
           </div>
         ) : (
-          <div className="grid gap-8 md:grid-cols-3">
+          <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
             {plans.map((plan) => (
               <Card 
                 key={plan.name} 
-                className={plan.popular ? "border-primary shadow-lg relative" : ""}
+                className={plan.popular ? "border-primary shadow-lg relative md:col-span-2 lg:col-span-1" : ""}
               >
                 {plan.popular && (
                   <div className="bg-primary text-primary-foreground text-center py-1 text-sm font-medium rounded-t-lg">
@@ -201,51 +309,94 @@ export default function Pricing() {
                   </div>
                 )}
                 <CardHeader>
-                  <CardTitle>{plan.name}</CardTitle>
+                  <CardTitle className="text-2xl">{plan.name}</CardTitle>
+                  {plan.subtitle && (
+                    <p className="text-sm text-muted-foreground mt-1">{plan.subtitle}</p>
+                  )}
+                  {plan.description && (
+                    <p className="text-xs text-muted-foreground italic mt-2">{plan.description}</p>
+                  )}
                   <div className="mt-4">
                     <span className="text-3xl font-bold">{plan.price}</span>
-                    {plan.period !== "forever" && plan.period !== "contact us" && (
+                    {plan.period && (
                       <span className="text-sm text-muted-foreground"> / {plan.period}</span>
                     )}
-                    {plan.period === "forever" && (
-                      <span className="text-sm text-muted-foreground"> / {plan.period}</span>
+                    {plan.yearlyPrice && (
+                      <div className="mt-2">
+                        <span className="text-2xl font-bold">{plan.yearlyPrice}</span>
+                        <span className="text-sm text-muted-foreground"> / {plan.yearlyPeriod}</span>
+                      </div>
                     )}
                   </div>
                 </CardHeader>
                 <CardContent>
                   <Button 
                     className="w-full mb-6" 
-                    variant={plan.popular ? "default" : "outline"}
+                    variant={plan.popular ? "default" : plan.contact ? "outline" : "outline"}
                     onClick={() => {
-                      if (plan.name === "Enterprise" || !plan.priceId) {
+                      if (plan.contact || plan.name.includes("Sponsored") || plan.name.includes("Employers") || plan.name.includes("Coaches") || !plan.priceId) {
                         toast({
                           title: "Contact Us",
-                          description: "Please contact us for Enterprise pricing.",
+                          description: `Please contact us for ${plan.name} pricing.`,
                         });
                         setLocation("/contact");
                       } else {
                         checkoutMutation.mutate(plan.priceId);
                       }
                     }}
-                    disabled={checkoutMutation.isPending || !plan.priceId}
+                    disabled={checkoutMutation.isPending || (plan.contact && !plan.priceId)}
                   >
                     {checkoutMutation.isPending ? (
                       <>
                         <Loader2 className="h-4 w-4 mr-2 animate-spin" aria-hidden="true" />
                         Processing...
                       </>
+                    ) : plan.contact ? (
+                      "Contact Us"
                     ) : (
                       "Get Started"
                     )}
                   </Button>
-                  <ul className="space-y-3" role="list">
-                    {plan.features.map((feature, index) => (
-                      <li key={index} className="flex items-start gap-3">
-                        <Check className="h-5 w-5 flex-shrink-0 text-primary mt-0.5" aria-hidden="true" />
-                        <span className="text-sm text-muted-foreground">{feature}</span>
-                      </li>
-                    ))}
-                  </ul>
+                  {plan.purpose && (
+                    <p className="text-xs text-muted-foreground mb-4 italic">{plan.purpose}</p>
+                  )}
+                  <div className="space-y-4">
+                    <div>
+                      <p className="text-sm font-semibold mb-2">Includes:</p>
+                      <ul className="space-y-2" role="list">
+                        {plan.features.map((feature, index) => (
+                          <li key={index} className="flex items-start gap-2">
+                            {feature.startsWith("  •") ? (
+                              <>
+                                <span className="text-xs text-muted-foreground w-2 flex-shrink-0">•</span>
+                                <span className="text-xs text-muted-foreground">{feature.trim()}</span>
+                              </>
+                            ) : feature.includes("Everything in") || feature.includes("🧠") || feature.includes("📄") || feature.includes("📊") || feature.includes("🎯") || feature.includes("📈") || feature.includes("💛") ? (
+                              <span className="text-sm font-medium text-foreground">{feature}</span>
+                            ) : (
+                              <>
+                                <Check className="h-4 w-4 flex-shrink-0 text-primary mt-0.5" aria-hidden="true" />
+                                <span className="text-sm text-muted-foreground">{feature}</span>
+                              </>
+                            )}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                    {plan.notIncluded && plan.notIncluded.length > 0 && (
+                      <div>
+                        <p className="text-sm font-semibold mb-2 text-destructive">What's NOT included:</p>
+                        <ul className="space-y-2" role="list">
+                          {plan.notIncluded.map((item, index) => (
+                            <li key={index} className="flex items-start gap-2">
+                              <span className="text-xs text-muted-foreground">✗</span>
+                              <span className="text-xs text-muted-foreground">{item}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
                 </CardContent>
               </Card>
             ))}
