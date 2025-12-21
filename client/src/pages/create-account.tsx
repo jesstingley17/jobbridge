@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useLocation, useQuery } from "wouter";
+import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -16,7 +16,6 @@ import { Logo } from "@/components/logo";
 // Accessible at /create-account?email=user@example.com
 export default function CreateAccount() {
   const [, setLocation] = useLocation();
-  const [params] = useQuery();
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   
