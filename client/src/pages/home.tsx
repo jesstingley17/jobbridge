@@ -129,20 +129,27 @@ export default function Home() {
       style.id = 'hubspot-waitlist-form-custom-styles';
       style.textContent = `
       /* HubSpot Waitlist Form Accessibility & Design Styling */
-      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] {
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"],
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-html,
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-frame {
         font-family: var(--font-sans, Inter, system-ui, sans-serif);
       }
 
       /* Form container */
       [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form,
-      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] form {
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] form,
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-html .hs-form,
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-html form,
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-frame .hs-form {
         display: flex;
         flex-direction: column;
         gap: 1.5rem;
       }
 
       /* Field groups */
-      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-field {
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-field,
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-html .hs-form-field,
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-frame .hs-form-field {
         display: flex;
         flex-direction: column;
         gap: 0.5rem;
@@ -150,7 +157,9 @@ export default function Home() {
       }
 
       /* Labels - High contrast, clear typography */
-      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] label {
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] label,
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-html label,
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-frame label {
         font-size: 0.875rem;
         font-weight: 500;
         color: hsl(var(--foreground)) !important;
@@ -158,7 +167,9 @@ export default function Home() {
         margin-bottom: 0.375rem;
       }
 
-      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] label.hs-form-required:after {
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] label.hs-form-required:after,
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-html label.hs-form-required:after,
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-frame label.hs-form-required:after {
         content: " *";
         color: hsl(0 84% 45%);
         font-weight: 600;
@@ -170,7 +181,19 @@ export default function Home() {
       [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] input[type="tel"],
       [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] input[type="number"],
       [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] textarea,
-      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] select {
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] select,
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-html input[type="text"],
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-html input[type="email"],
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-html input[type="tel"],
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-html input[type="number"],
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-html textarea,
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-html select,
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-frame input[type="text"],
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-frame input[type="email"],
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-frame input[type="tel"],
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-frame input[type="number"],
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-frame textarea,
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-frame select {
         width: 100%;
         min-height: 2.75rem;
         padding: 0.625rem 0.875rem;
@@ -187,7 +210,13 @@ export default function Home() {
       /* Focus states - High visibility for accessibility */
       [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] input:focus,
       [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] textarea:focus,
-      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] select:focus {
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] select:focus,
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-html input:focus,
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-html textarea:focus,
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-html select:focus,
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-frame input:focus,
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-frame textarea:focus,
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-frame select:focus {
         outline: none;
         border-color: hsl(var(--primary));
         box-shadow: 0 0 0 3px hsl(var(--primary) / 0.1);
@@ -196,14 +225,25 @@ export default function Home() {
       /* Hover states */
       [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] input:hover,
       [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] textarea:hover,
-      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] select:hover {
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] select:hover,
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-html input:hover,
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-html textarea:hover,
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-html select:hover,
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-frame input:hover,
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-frame textarea:hover,
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-frame select:hover {
         border-color: hsl(var(--input) / 0.8);
       }
 
       /* Submit button - Match design system with gradient */
       [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] input[type="submit"],
       [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-button,
-      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] button[type="submit"] {
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] button[type="submit"],
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-html input[type="submit"],
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-html .hs-button,
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-html button[type="submit"],
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-frame input[type="submit"],
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-frame .hs-button {
         min-height: 2.75rem;
         padding: 0.625rem 1.5rem;
         font-size: 0.875rem;
@@ -221,7 +261,12 @@ export default function Home() {
 
       [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] input[type="submit"]:hover,
       [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-button:hover,
-      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] button[type="submit"]:hover {
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] button[type="submit"]:hover,
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-html input[type="submit"]:hover,
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-html .hs-button:hover,
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-html button[type="submit"]:hover,
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-frame input[type="submit"]:hover,
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-frame .hs-button:hover {
         opacity: 0.9;
         transform: translateY(-1px);
         box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
@@ -229,25 +274,39 @@ export default function Home() {
 
       [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] input[type="submit"]:focus,
       [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-button:focus,
-      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] button[type="submit"]:focus {
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] button[type="submit"]:focus,
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-html input[type="submit"]:focus,
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-html .hs-button:focus,
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-html button[type="submit"]:focus,
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-frame input[type="submit"]:focus,
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-frame .hs-button:focus {
         outline: none;
         box-shadow: 0 0 0 3px hsl(var(--primary) / 0.2);
       }
 
       [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] input[type="submit"]:active,
       [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-button:active,
-      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] button[type="submit"]:active {
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] button[type="submit"]:active,
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-html input[type="submit"]:active,
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-html .hs-button:active,
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-html button[type="submit"]:active,
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-frame input[type="submit"]:active,
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-frame .hs-button:active {
         transform: translateY(0);
       }
 
       /* Error messages - High contrast, clear */
-      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-error-msgs {
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-error-msgs,
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-html .hs-error-msgs,
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-frame .hs-error-msgs {
         list-style: none;
         padding: 0;
         margin: 0.375rem 0 0 0;
       }
 
-      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-error-msgs li {
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-error-msgs li,
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-html .hs-error-msgs li,
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-frame .hs-error-msgs li {
         color: hsl(0 84% 45%);
         font-size: 0.8125rem;
         margin-top: 0.25rem;
@@ -256,13 +315,17 @@ export default function Home() {
         gap: 0.375rem;
       }
 
-      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-error-msgs li:before {
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-error-msgs li:before,
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-html .hs-error-msgs li:before,
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-frame .hs-error-msgs li:before {
         content: "⚠";
         font-size: 1rem;
       }
 
       /* Field descriptions/help text */
-      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-field-desc {
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-field-desc,
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-html .hs-field-desc,
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-frame .hs-field-desc {
         font-size: 0.8125rem;
         color: hsl(var(--muted-foreground)) !important;
         margin-top: 0.25rem;
@@ -271,7 +334,11 @@ export default function Home() {
 
       /* Checkboxes and radio buttons */
       [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] input[type="checkbox"],
-      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] input[type="radio"] {
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] input[type="radio"],
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-html input[type="checkbox"],
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-html input[type="radio"],
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-frame input[type="checkbox"],
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-frame input[type="radio"] {
         width: 1.25rem;
         height: 1.25rem;
         min-width: 1.25rem;
@@ -281,26 +348,34 @@ export default function Home() {
         accent-color: hsl(var(--primary));
       }
 
-      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-radio {
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-radio,
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-html .hs-form-radio,
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-frame .hs-form-radio {
         display: flex;
         align-items: center;
         gap: 0.5rem;
         margin-bottom: 0.5rem;
       }
 
-      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-radio label {
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-radio label,
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-html .hs-form-radio label,
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-frame .hs-form-radio label {
         margin-bottom: 0;
         cursor: pointer;
       }
 
       /* Loading state */
-      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-submit-loading {
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-submit-loading,
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-html .hs-submit-loading,
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-frame .hs-submit-loading {
         opacity: 0.6;
         cursor: not-allowed;
       }
 
       /* Success messages */
-      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-main-font-element {
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-main-font-element,
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-html .hs-main-font-element,
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-frame .hs-main-font-element {
         color: hsl(var(--foreground)) !important;
         font-size: 0.875rem;
         line-height: 1.5;
@@ -313,51 +388,101 @@ export default function Home() {
       .dark [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] input[type="number"],
       .dark [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] textarea,
       .dark [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] select,
+      .dark [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-html input[type="text"],
+      .dark [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-html input[type="email"],
+      .dark [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-html input[type="tel"],
+      .dark [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-html input[type="number"],
+      .dark [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-html textarea,
+      .dark [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-html select,
+      .dark [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-frame input[type="text"],
+      .dark [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-frame input[type="email"],
+      .dark [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-frame input[type="tel"],
+      .dark [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-frame input[type="number"],
+      .dark [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-frame textarea,
+      .dark [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-frame select,
       [data-theme="dark"] [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] input[type="text"],
       [data-theme="dark"] [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] input[type="email"],
       [data-theme="dark"] [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] input[type="tel"],
       [data-theme="dark"] [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] input[type="number"],
       [data-theme="dark"] [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] textarea,
-      [data-theme="dark"] [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] select {
+      [data-theme="dark"] [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] select,
+      [data-theme="dark"] [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-html input[type="text"],
+      [data-theme="dark"] [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-html input[type="email"],
+      [data-theme="dark"] [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-html input[type="tel"],
+      [data-theme="dark"] [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-html input[type="number"],
+      [data-theme="dark"] [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-html textarea,
+      [data-theme="dark"] [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-html select,
+      [data-theme="dark"] [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-frame input[type="text"],
+      [data-theme="dark"] [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-frame input[type="email"],
+      [data-theme="dark"] [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-frame input[type="tel"],
+      [data-theme="dark"] [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-frame input[type="number"],
+      [data-theme="dark"] [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-frame textarea,
+      [data-theme="dark"] [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-frame select {
         background-color: hsl(var(--background)) !important;
         color: hsl(var(--foreground)) !important;
         border-color: hsl(var(--input)) !important;
       }
 
       .dark [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] label,
-      [data-theme="dark"] [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] label {
+      .dark [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-html label,
+      .dark [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-frame label,
+      [data-theme="dark"] [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] label,
+      [data-theme="dark"] [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-html label,
+      [data-theme="dark"] [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-frame label {
         color: hsl(var(--foreground)) !important;
       }
 
       .dark [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-main-font-element,
-      [data-theme="dark"] [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-main-font-element {
+      .dark [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-html .hs-main-font-element,
+      .dark [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-frame .hs-main-font-element,
+      [data-theme="dark"] [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-main-font-element,
+      [data-theme="dark"] [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-html .hs-main-font-element,
+      [data-theme="dark"] [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-frame .hs-main-font-element {
         color: hsl(var(--foreground)) !important;
       }
 
       .dark [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-field-desc,
-      [data-theme="dark"] [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-field-desc {
+      .dark [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-html .hs-field-desc,
+      .dark [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-frame .hs-field-desc,
+      [data-theme="dark"] [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-field-desc,
+      [data-theme="dark"] [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-html .hs-field-desc,
+      [data-theme="dark"] [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-frame .hs-field-desc {
         color: hsl(var(--muted-foreground)) !important;
       }
 
       /* Ensure all text elements use proper colors */
       [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"],
-      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] * {
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] *,
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-html,
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-html *,
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-frame,
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-frame * {
         color: inherit;
       }
 
       [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] p,
       [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] span,
-      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] div:not(.hs-form-field) {
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] div:not(.hs-form-field),
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-html p,
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-html span,
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-html div:not(.hs-form-field),
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-frame p,
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-frame span,
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-frame div:not(.hs-form-field) {
         color: hsl(var(--foreground)) !important;
       }
 
       /* Required field indicator */
-      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-required {
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-required,
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-html .hs-form-required,
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-frame .hs-form-required {
         color: hsl(var(--foreground));
       }
 
       /* Accessibility: Ensure all interactive elements are keyboard accessible */
-      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] *:focus-visible {
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] *:focus-visible,
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-html *:focus-visible,
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-frame *:focus-visible {
         outline: 2px solid hsl(var(--primary)) !important;
         outline-offset: 2px !important;
       }
@@ -367,13 +492,29 @@ export default function Home() {
         [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] input[type="text"],
         [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] input[type="email"],
         [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] input[type="tel"],
-        [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] select {
+        [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] input[type="number"],
+        [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] textarea,
+        [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] select,
+        [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-html input[type="text"],
+        [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-html input[type="email"],
+        [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-html input[type="tel"],
+        [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-html input[type="number"],
+        [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-html textarea,
+        [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-html select,
+        [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-frame input[type="text"],
+        [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-frame input[type="email"],
+        [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-frame input[type="tel"],
+        [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-frame input[type="number"],
+        [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-frame textarea,
+        [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-frame select {
           font-size: 1rem; /* Prevent zoom on iOS */
         }
       }
 
       /* Ensure proper spacing */
-      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-field:last-child {
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-field:last-child,
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-html .hs-form-field:last-child,
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-frame .hs-form-field:last-child {
         margin-bottom: 0;
       }
 
@@ -381,11 +522,33 @@ export default function Home() {
       [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form input[type="text"],
       [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form input[type="email"],
       [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form input[type="tel"],
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form input[type="number"],
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form textarea,
       [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form select,
       [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] form input[type="text"],
       [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] form input[type="email"],
       [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] form input[type="tel"],
-      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] form select {
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] form input[type="number"],
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] form textarea,
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] form select,
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-html .hs-form input[type="text"],
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-html .hs-form input[type="email"],
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-html .hs-form input[type="tel"],
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-html .hs-form input[type="number"],
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-html .hs-form textarea,
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-html .hs-form select,
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-html form input[type="text"],
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-html form input[type="email"],
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-html form input[type="tel"],
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-html form input[type="number"],
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-html form textarea,
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-html form select,
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-frame .hs-form input[type="text"],
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-frame .hs-form input[type="email"],
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-frame .hs-form input[type="tel"],
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-frame .hs-form input[type="number"],
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-frame .hs-form textarea,
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-frame .hs-form select {
         width: 100% !important;
         min-height: 2.75rem !important;
         padding: 0.625rem 0.875rem !important;
@@ -401,11 +564,33 @@ export default function Home() {
       [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form input[type="text"]:focus,
       [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form input[type="email"]:focus,
       [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form input[type="tel"]:focus,
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form input[type="number"]:focus,
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form textarea:focus,
       [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form select:focus,
       [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] form input[type="text"]:focus,
       [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] form input[type="email"]:focus,
       [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] form input[type="tel"]:focus,
-      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] form select:focus {
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] form input[type="number"]:focus,
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] form textarea:focus,
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] form select:focus,
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-html .hs-form input[type="text"]:focus,
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-html .hs-form input[type="email"]:focus,
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-html .hs-form input[type="tel"]:focus,
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-html .hs-form input[type="number"]:focus,
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-html .hs-form textarea:focus,
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-html .hs-form select:focus,
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-html form input[type="text"]:focus,
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-html form input[type="email"]:focus,
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-html form input[type="tel"]:focus,
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-html form input[type="number"]:focus,
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-html form textarea:focus,
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-html form select:focus,
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-frame .hs-form input[type="text"]:focus,
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-frame .hs-form input[type="email"]:focus,
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-frame .hs-form input[type="tel"]:focus,
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-frame .hs-form input[type="number"]:focus,
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-frame .hs-form textarea:focus,
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-frame .hs-form select:focus {
         border-color: hsl(var(--primary)) !important;
         box-shadow: 0 0 0 3px hsl(var(--primary) / 0.1) !important;
         outline: none !important;
@@ -415,7 +600,14 @@ export default function Home() {
       [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form .hs-button,
       [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form button[type="submit"],
       [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] form input[type="submit"],
-      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] form button[type="submit"] {
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] form button[type="submit"],
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-html .hs-form input[type="submit"],
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-html .hs-form .hs-button,
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-html .hs-form button[type="submit"],
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-html form input[type="submit"],
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-html form button[type="submit"],
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-frame .hs-form input[type="submit"],
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-frame .hs-form .hs-button {
         min-height: 2.75rem !important;
         padding: 0.625rem 1.5rem !important;
         font-size: 0.875rem !important;
@@ -429,7 +621,10 @@ export default function Home() {
       }
 
       [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form label,
-      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] form label {
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] form label,
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-html .hs-form label,
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-html form label,
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-frame .hs-form label {
         font-size: 0.875rem !important;
         font-weight: 500 !important;
         color: hsl(var(--foreground)) !important;
