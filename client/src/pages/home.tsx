@@ -695,12 +695,20 @@ export default function Home() {
             <div className="mt-10 mx-auto max-w-md">
               <div className="text-center mb-4">
                 <h2 className="text-2xl font-semibold mb-2">Join the Waitlist</h2>
-                <p className="text-muted-foreground text-sm">
+                <p className="text-muted-foreground text-sm mb-2">
                   Be among the first to experience The JobBridge. Sign up to get notified when we launch!
+                </p>
+                <p className="text-xs text-muted-foreground/80 italic">
+                  This is a waitlist signup form. By submitting, you'll be added to our waitlist and notified when The JobBridge platform launches.
                 </p>
               </div>
               <Card className="border-primary/20 bg-background/80 backdrop-blur-sm shadow-lg">
                 <CardContent className="pt-6 pb-6">
+                  <div className="mb-3 text-center">
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                      Waitlist Signup Form
+                    </p>
+                  </div>
                   <div 
                     className="hs-form-html" 
                     data-region="na2" 
