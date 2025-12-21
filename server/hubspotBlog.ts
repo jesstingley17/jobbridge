@@ -1,16 +1,14 @@
 // HubSpot blog content integration
-// Fetches blog posts from HubSpot Content API
+// Fetches blog posts from HubSpot CMS API v3
 
 const HUBSPOT_API_BASE = 'https://api.hubapi.com';
 
 /**
- * Fetch blog posts from HubSpot
- * @param portalId - HubSpot portal ID
+ * Fetch blog posts from HubSpot CMS API v3
  * @param accessToken - HubSpot private app access token
  * @param limit - Maximum number of posts to fetch (default: 50)
  */
 export async function fetchHubSpotBlogPosts(
-  portalId: string,
   accessToken: string,
   limit: number = 50
 ): Promise<Array<{
@@ -26,9 +24,9 @@ export async function fetchHubSpotBlogPosts(
   featuredImage?: string;
 }>> {
   try {
-    // First, get the blog ID (we'll use the default blog or search for it)
-    // HubSpot API endpoint for blog posts
-    const blogPostsUrl = `${HUBSPOT_API_BASE}/content/api/v2/blog-posts?limit=${limit}&orderBy=-publishDate&state=PUBLISHED`;
+    // HubSpot CMS API v3 endpoint for blog posts
+    // Use the newer v3 API which is more reliable
+    const blogPostsUrl = `${HUBSPOT_API_BASE}/cms/v3/blogs/posts?limit=${limit}&sort=-createdAt`;
     
     const response = await fetch(blogPostsUrl, {
       headers: {
@@ -44,21 +42,29 @@ export async function fetchHubSpotBlogPosts(
     }
 
     const data = await response.json();
-    const posts = data.objects || data || [];
+    const posts = data.results || data.objects || data || [];
 
     // Map HubSpot blog posts to our format
-    return posts.map((post: any) => ({
-      id: post.id?.toString() || post.guid || '',
-      title: post.name || post.title || 'Untitled',
-      url: post.url || post.absoluteUrl || '',
-      content: post.postBody || post.post_summary || '',
-      excerpt: post.postSummary || post.metaDescription || '',
-      publishedAt: post.publishDate || post.created || new Date().toISOString(),
-      updatedAt: post.updated || post.publishDate,
-      authorName: post.blogAuthor?.displayName || post.blogAuthor?.fullName || null,
-      tags: post.tagIds ? post.tagIds.map((tag: any) => typeof tag === 'string' ? tag : tag.name) : [],
-      featuredImage: post.featuredImage || post.featuredImageUrl || undefined,
-    }));
+    return posts.map((post: any) => {
+      // Extract content - HubSpot v3 API structure
+      const postBody = post.postBody || post.html || post.content || '';
+      const excerpt = post.postSummary || post.metaDescription || post.summary || '';
+      
+      return {
+        id: post.id?.toString() || post.guid || '',
+        title: post.name || post.title || 'Untitled',
+        url: post.url || post.absoluteUrl || post.fullUrl || '',
+        content: postBody,
+        excerpt: excerpt,
+        publishedAt: post.publishDate || post.createdAt || post.created || new Date().toISOString(),
+        updatedAt: post.updatedAt || post.updated || post.publishDate,
+        authorName: post.blogAuthor?.displayName || post.blogAuthor?.fullName || post.authorName || null,
+        tags: post.tagIds ? 
+          post.tagIds.map((tag: any) => typeof tag === 'string' ? tag : tag.name || tag) : 
+          (post.tags || []),
+        featuredImage: post.featuredImage || post.featuredImageUrl || post.featuredImageUrl || undefined,
+      };
+    });
   } catch (error: any) {
     console.error('[HubSpot Blog] Error fetching posts:', error);
     throw error;
@@ -66,10 +72,10 @@ export async function fetchHubSpotBlogPosts(
 }
 
 /**
- * Fetch a single blog post by ID or URL
+ * Fetch a single blog post by ID
  */
 export async function fetchHubSpotBlogPost(
-  postIdOrUrl: string,
+  postId: string,
   accessToken: string
 ): Promise<{
   id: string;
@@ -84,8 +90,8 @@ export async function fetchHubSpotBlogPost(
   featuredImage?: string;
 } | null> {
   try {
-    // Try to fetch by ID first
-    const postUrl = `${HUBSPOT_API_BASE}/content/api/v2/blog-posts/${postIdOrUrl}`;
+    // HubSpot CMS API v3 endpoint for a single post
+    const postUrl = `${HUBSPOT_API_BASE}/cms/v3/blogs/posts/${postId}`;
     
     const response = await fetch(postUrl, {
       headers: {
@@ -101,15 +107,17 @@ export async function fetchHubSpotBlogPost(
     const post = await response.json();
     
     return {
-      id: post.id?.toString() || post.guid || '',
+      id: post.id?.toString() || '',
       title: post.name || post.title || 'Untitled',
-      url: post.url || post.absoluteUrl || '',
-      content: post.postBody || post.post_summary || '',
-      excerpt: post.postSummary || post.metaDescription || '',
-      publishedAt: post.publishDate || post.created || new Date().toISOString(),
-      updatedAt: post.updated || post.publishDate,
-      authorName: post.blogAuthor?.displayName || post.blogAuthor?.fullName || null,
-      tags: post.tagIds ? post.tagIds.map((tag: any) => typeof tag === 'string' ? tag : tag.name) : [],
+      url: post.url || post.absoluteUrl || post.fullUrl || '',
+      content: post.postBody || post.html || post.content || '',
+      excerpt: post.postSummary || post.metaDescription || post.summary || '',
+      publishedAt: post.publishDate || post.createdAt || post.created || new Date().toISOString(),
+      updatedAt: post.updatedAt || post.updated || post.publishDate,
+      authorName: post.blogAuthor?.displayName || post.blogAuthor?.fullName || post.authorName || null,
+      tags: post.tagIds ? 
+        post.tagIds.map((tag: any) => typeof tag === 'string' ? tag : tag.name || tag) : 
+        (post.tags || []),
       featuredImage: post.featuredImage || post.featuredImageUrl || undefined,
     };
   } catch (error: any) {

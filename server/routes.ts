@@ -3009,26 +3009,25 @@ Return JSON with:
 
 
   // Public HubSpot blog posts endpoint
-  // This reads posts from HubSpot Content API
+  // This reads posts from HubSpot CMS API v3
   // Configuration (set in your environment / Vercel):
-  // - HUBSPOT_ACCESS_TOKEN: HubSpot private app access token
-  // - HUBSPOT_PORTAL_ID: HubSpot portal ID (optional, can be derived from token)
+  // - HUBSPOT_ACCESS_TOKEN: HubSpot private app access token (required)
+  //   Create a private app in HubSpot and grant "Read" access to "Blog posts" scope
   app.get("/api/hubspot/blog/posts", async (req, res) => {
     try {
       const accessToken = process.env.HUBSPOT_ACCESS_TOKEN || process.env.VITE_HUBSPOT_ACCESS_TOKEN;
-      const portalId = process.env.HUBSPOT_PORTAL_ID || process.env.VITE_HUBSPOT_PORTAL_ID || '244677572';
       const limit = parseInt(req.query.limit as string) || 50;
 
       if (!accessToken) {
         console.error("[HubSpot Blog] Missing configuration. HUBSPOT_ACCESS_TOKEN not set.");
         return res.status(500).json({
           error: "HubSpot blog is not configured",
-          details: "Set HUBSPOT_ACCESS_TOKEN environment variable in Vercel.",
+          details: "Set HUBSPOT_ACCESS_TOKEN environment variable in Vercel. Create a private app in HubSpot with 'Blog posts' read access.",
         });
       }
 
       const { fetchHubSpotBlogPosts } = await import('./hubspotBlog.js');
-      const posts = await fetchHubSpotBlogPosts(portalId, accessToken, limit);
+      const posts = await fetchHubSpotBlogPosts(accessToken, limit);
 
       res.json({ posts });
     } catch (error: any) {
