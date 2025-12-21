@@ -11,22 +11,22 @@ export default function BetaTester() {
   // Load HubSpot forms script and apply custom styling
   useEffect(() => {
     // Check if script is already loaded
-    if (document.querySelector('script[src*="hsforms.net"]')) {
+    if (document.querySelector('script[src*="hsforms.net/forms/embed"]')) {
       // Script already loaded, just apply styles
       applyHubSpotStyles();
       return;
     }
 
     const script = document.createElement('script');
-    script.src = 'https://js-na2.hsforms.net/forms/embed/244677572.js';
+    script.src = 'https://js-na2.hsforms.net/forms/embed/developer/244677572.js';
     script.defer = true;
     
     // Wait for script to load, then wait for form to render
     script.onload = () => {
       // Wait for form to be injected into DOM
       const checkForm = setInterval(() => {
-        const formFrame = document.querySelector('.hs-form-frame');
-        if (formFrame && formFrame.querySelector('.hs-form')) {
+        const formContainer = document.querySelector('.hs-form-html');
+        if (formContainer && (formContainer.querySelector('.hs-form') || formContainer.querySelector('form'))) {
           clearInterval(checkForm);
           applyHubSpotStyles();
         }
@@ -50,11 +50,14 @@ export default function BetaTester() {
       style.id = 'hubspot-form-custom-styles';
       style.textContent = `
       /* HubSpot Form Accessibility & Design Styling */
+      .hs-form-html,
       .hs-form-frame {
         font-family: var(--font-sans, Inter, system-ui, sans-serif);
       }
 
       /* Form container */
+      .hs-form-html .hs-form,
+      .hs-form-html form,
       .hs-form-frame .hs-form {
         display: flex;
         flex-direction: column;
@@ -62,6 +65,7 @@ export default function BetaTester() {
       }
 
       /* Field groups */
+      .hs-form-html .hs-form-field,
       .hs-form-frame .hs-form-field {
         display: flex;
         flex-direction: column;
@@ -70,6 +74,7 @@ export default function BetaTester() {
       }
 
       /* Labels - High contrast, clear typography */
+      .hs-form-html label,
       .hs-form-frame label {
         font-size: 0.875rem;
         font-weight: 500;
@@ -78,6 +83,7 @@ export default function BetaTester() {
         margin-bottom: 0.375rem;
       }
 
+      .hs-form-html label.hs-form-required:after,
       .hs-form-frame label.hs-form-required:after {
         content: " *";
         color: hsl(0 84% 45%);
@@ -85,6 +91,12 @@ export default function BetaTester() {
       }
 
       /* Input fields - Match design system */
+      .hs-form-html input[type="text"],
+      .hs-form-html input[type="email"],
+      .hs-form-html input[type="tel"],
+      .hs-form-html input[type="number"],
+      .hs-form-html textarea,
+      .hs-form-html select,
       .hs-form-frame input[type="text"],
       .hs-form-frame input[type="email"],
       .hs-form-frame input[type="tel"],
@@ -105,6 +117,9 @@ export default function BetaTester() {
       }
 
       /* Focus states - High visibility for accessibility */
+      .hs-form-html input:focus,
+      .hs-form-html textarea:focus,
+      .hs-form-html select:focus,
       .hs-form-frame input:focus,
       .hs-form-frame textarea:focus,
       .hs-form-frame select:focus {
@@ -114,6 +129,9 @@ export default function BetaTester() {
       }
 
       /* Hover states */
+      .hs-form-html input:hover,
+      .hs-form-html textarea:hover,
+      .hs-form-html select:hover,
       .hs-form-frame input:hover,
       .hs-form-frame textarea:hover,
       .hs-form-frame select:hover {
@@ -121,12 +139,14 @@ export default function BetaTester() {
       }
 
       /* Textarea */
+      .hs-form-html textarea,
       .hs-form-frame textarea {
         min-height: 6rem;
         resize: vertical;
       }
 
       /* Select dropdowns */
+      .hs-form-html select,
       .hs-form-frame select {
         cursor: pointer;
         background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23333' d='M6 9L1 4h10z'/%3E%3C/svg%3E");
@@ -138,6 +158,8 @@ export default function BetaTester() {
       }
 
       /* Checkboxes and radio buttons - Larger touch targets */
+      .hs-form-html input[type="checkbox"],
+      .hs-form-html input[type="radio"],
       .hs-form-frame input[type="checkbox"],
       .hs-form-frame input[type="radio"] {
         width: 1.25rem;
@@ -149,6 +171,7 @@ export default function BetaTester() {
         accent-color: hsl(var(--primary));
       }
 
+      .hs-form-html .hs-form-radio,
       .hs-form-frame .hs-form-radio {
         display: flex;
         align-items: center;
@@ -156,12 +179,16 @@ export default function BetaTester() {
         margin-bottom: 0.5rem;
       }
 
+      .hs-form-html .hs-form-radio label,
       .hs-form-frame .hs-form-radio label {
         margin-bottom: 0;
         cursor: pointer;
       }
 
       /* Submit button - Match design system */
+      .hs-form-html input[type="submit"],
+      .hs-form-html .hs-button,
+      .hs-form-html button[type="submit"],
       .hs-form-frame input[type="submit"],
       .hs-form-frame .hs-button {
         min-height: 2.75rem;
@@ -179,6 +206,9 @@ export default function BetaTester() {
         margin-top: 0.5rem;
       }
 
+      .hs-form-html input[type="submit"]:hover,
+      .hs-form-html .hs-button:hover,
+      .hs-form-html button[type="submit"]:hover,
       .hs-form-frame input[type="submit"]:hover,
       .hs-form-frame .hs-button:hover {
         opacity: 0.9;
@@ -186,24 +216,32 @@ export default function BetaTester() {
         box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
       }
 
+      .hs-form-html input[type="submit"]:focus,
+      .hs-form-html .hs-button:focus,
+      .hs-form-html button[type="submit"]:focus,
       .hs-form-frame input[type="submit"]:focus,
       .hs-form-frame .hs-button:focus {
         outline: none;
         box-shadow: 0 0 0 3px hsl(var(--primary) / 0.2);
       }
 
+      .hs-form-html input[type="submit"]:active,
+      .hs-form-html .hs-button:active,
+      .hs-form-html button[type="submit"]:active,
       .hs-form-frame input[type="submit"]:active,
       .hs-form-frame .hs-button:active {
         transform: translateY(0);
       }
 
       /* Error messages - High contrast, clear */
+      .hs-form-html .hs-error-msgs,
       .hs-form-frame .hs-error-msgs {
         list-style: none;
         padding: 0;
         margin: 0.375rem 0 0 0;
       }
 
+      .hs-form-html .hs-error-msgs li,
       .hs-form-frame .hs-error-msgs li {
         color: hsl(0 84% 45%);
         font-size: 0.8125rem;
@@ -213,12 +251,14 @@ export default function BetaTester() {
         gap: 0.375rem;
       }
 
+      .hs-form-html .hs-error-msgs li:before,
       .hs-form-frame .hs-error-msgs li:before {
         content: "⚠";
         font-size: 1rem;
       }
 
       /* Success messages */
+      .hs-form-html .hs-main-font-element,
       .hs-form-frame .hs-main-font-element {
         color: hsl(var(--foreground)) !important;
         font-size: 0.875rem;
@@ -226,6 +266,7 @@ export default function BetaTester() {
       }
 
       /* Field descriptions/help text */
+      .hs-form-html .hs-field-desc,
       .hs-form-frame .hs-field-desc {
         font-size: 0.8125rem;
         color: hsl(var(--muted-foreground)) !important;
@@ -234,11 +275,16 @@ export default function BetaTester() {
       }
 
       /* Ensure all text elements use proper colors */
+      .hs-form-html,
+      .hs-form-html *,
       .hs-form-frame,
       .hs-form-frame * {
         color: inherit;
       }
 
+      .hs-form-html p,
+      .hs-form-html span,
+      .hs-form-html div:not(.hs-form-field),
       .hs-form-frame p,
       .hs-form-frame span,
       .hs-form-frame div:not(.hs-form-field) {
@@ -246,23 +292,37 @@ export default function BetaTester() {
       }
 
       /* Required field indicator */
+      .hs-form-html .hs-form-required,
       .hs-form-frame .hs-form-required {
         color: hsl(var(--foreground));
       }
 
       /* Loading state */
+      .hs-form-html .hs-submit-loading,
       .hs-form-frame .hs-submit-loading {
         opacity: 0.6;
         cursor: not-allowed;
       }
 
       /* Dark mode support */
+      .dark .hs-form-html input[type="text"],
+      .dark .hs-form-html input[type="email"],
+      .dark .hs-form-html input[type="tel"],
+      .dark .hs-form-html input[type="number"],
+      .dark .hs-form-html textarea,
+      .dark .hs-form-html select,
       .dark .hs-form-frame input[type="text"],
       .dark .hs-form-frame input[type="email"],
       .dark .hs-form-frame input[type="tel"],
       .dark .hs-form-frame input[type="number"],
       .dark .hs-form-frame textarea,
       .dark .hs-form-frame select,
+      [data-theme="dark"] .hs-form-html input[type="text"],
+      [data-theme="dark"] .hs-form-html input[type="email"],
+      [data-theme="dark"] .hs-form-html input[type="tel"],
+      [data-theme="dark"] .hs-form-html input[type="number"],
+      [data-theme="dark"] .hs-form-html textarea,
+      [data-theme="dark"] .hs-form-html select,
       [data-theme="dark"] .hs-form-frame input[type="text"],
       [data-theme="dark"] .hs-form-frame input[type="email"],
       [data-theme="dark"] .hs-form-frame input[type="tel"],
@@ -274,23 +334,35 @@ export default function BetaTester() {
         border-color: hsl(var(--input)) !important;
       }
 
+      .dark .hs-form-html label,
       .dark .hs-form-frame label,
+      [data-theme="dark"] .hs-form-html label,
       [data-theme="dark"] .hs-form-frame label {
         color: hsl(var(--foreground)) !important;
       }
 
+      .dark .hs-form-html .hs-main-font-element,
       .dark .hs-form-frame .hs-main-font-element,
+      [data-theme="dark"] .hs-form-html .hs-main-font-element,
       [data-theme="dark"] .hs-form-frame .hs-main-font-element {
         color: hsl(var(--foreground)) !important;
       }
 
+      .dark .hs-form-html .hs-field-desc,
       .dark .hs-form-frame .hs-field-desc,
+      [data-theme="dark"] .hs-form-html .hs-field-desc,
       [data-theme="dark"] .hs-form-frame .hs-field-desc {
         color: hsl(var(--muted-foreground)) !important;
       }
 
       /* Responsive adjustments */
       @media (max-width: 640px) {
+        .hs-form-html input[type="text"],
+        .hs-form-html input[type="email"],
+        .hs-form-html input[type="tel"],
+        .hs-form-html input[type="number"],
+        .hs-form-html textarea,
+        .hs-form-html select,
         .hs-form-frame input[type="text"],
         .hs-form-frame input[type="email"],
         .hs-form-frame input[type="tel"],
@@ -302,17 +374,31 @@ export default function BetaTester() {
       }
 
       /* Ensure proper spacing */
+      .hs-form-html .hs-form-field:last-child,
       .hs-form-frame .hs-form-field:last-child {
         margin-bottom: 0;
       }
 
       /* Accessibility: Ensure all interactive elements are keyboard accessible */
+      .hs-form-html *:focus-visible,
       .hs-form-frame *:focus-visible {
         outline: 2px solid hsl(var(--primary)) !important;
         outline-offset: 2px !important;
       }
 
       /* Override HubSpot's default styles with !important where needed */
+      .hs-form-html .hs-form input[type="text"],
+      .hs-form-html .hs-form input[type="email"],
+      .hs-form-html .hs-form input[type="tel"],
+      .hs-form-html .hs-form input[type="number"],
+      .hs-form-html .hs-form textarea,
+      .hs-form-html .hs-form select,
+      .hs-form-html form input[type="text"],
+      .hs-form-html form input[type="email"],
+      .hs-form-html form input[type="tel"],
+      .hs-form-html form input[type="number"],
+      .hs-form-html form textarea,
+      .hs-form-html form select,
       .hs-form-frame .hs-form input[type="text"],
       .hs-form-frame .hs-form input[type="email"],
       .hs-form-frame .hs-form input[type="tel"],
@@ -331,6 +417,18 @@ export default function BetaTester() {
         font-family: var(--font-sans, Inter, system-ui, sans-serif) !important;
       }
 
+      .hs-form-html .hs-form input[type="text"]:focus,
+      .hs-form-html .hs-form input[type="email"]:focus,
+      .hs-form-html .hs-form input[type="tel"]:focus,
+      .hs-form-html .hs-form input[type="number"]:focus,
+      .hs-form-html .hs-form textarea:focus,
+      .hs-form-html .hs-form select:focus,
+      .hs-form-html form input[type="text"]:focus,
+      .hs-form-html form input[type="email"]:focus,
+      .hs-form-html form input[type="tel"]:focus,
+      .hs-form-html form input[type="number"]:focus,
+      .hs-form-html form textarea:focus,
+      .hs-form-html form select:focus,
       .hs-form-frame .hs-form input[type="text"]:focus,
       .hs-form-frame .hs-form input[type="email"]:focus,
       .hs-form-frame .hs-form input[type="tel"]:focus,
@@ -342,6 +440,11 @@ export default function BetaTester() {
         outline: none !important;
       }
 
+      .hs-form-html .hs-form input[type="submit"],
+      .hs-form-html .hs-form .hs-button,
+      .hs-form-html .hs-form button[type="submit"],
+      .hs-form-html form input[type="submit"],
+      .hs-form-html form button[type="submit"],
       .hs-form-frame .hs-form input[type="submit"],
       .hs-form-frame .hs-form .hs-button {
         min-height: 2.75rem !important;
@@ -356,6 +459,8 @@ export default function BetaTester() {
         font-family: var(--font-sans, Inter, system-ui, sans-serif) !important;
       }
 
+      .hs-form-html .hs-form label,
+      .hs-form-html form label,
       .hs-form-frame .hs-form label {
         font-size: 0.875rem !important;
         font-weight: 500 !important;
@@ -411,7 +516,7 @@ export default function BetaTester() {
             </CardHeader>
             <CardContent>
               <div 
-                className="hs-form-frame" 
+                className="hs-form-html" 
                 data-region="na2" 
                 data-form-id="0dbbf15a-78b1-4ec3-8dd0-32cbb2ea1ad0" 
                 data-portal-id="244677572"
