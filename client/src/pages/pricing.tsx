@@ -330,11 +330,8 @@ export default function Pricing() {
                     variant={plan.popular ? "default" : plan.contact ? "outline" : "outline"}
                     onClick={() => {
                       if (plan.contact || plan.name.includes("Sponsored") || plan.name.includes("Employers") || plan.name.includes("Coaches") || !plan.priceId) {
-                        toast({
-                          title: "Contact Us",
-                          description: `Please contact us for ${plan.name} pricing.`,
-                        });
-                        setLocation("/contact");
+                        // Redirect to contact page with plan information
+                        setLocation(`/contact?plan=${encodeURIComponent(plan.name)}&type=pricing`);
                       } else {
                         checkoutMutation.mutate(plan.priceId);
                       }

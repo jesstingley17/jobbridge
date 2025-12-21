@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -18,17 +19,43 @@ import { useToast } from "@/hooks/use-toast";
 
 export default function Contact() {
   const { toast } = useToast();
+  const [, setLocation] = useLocation();
   const [formData, setFormData] = useState({
     name: "",
     email: "",
     subject: "",
     message: "",
     type: "general",
+    planName: "",
   });
+
+  // Check for plan query parameter from pricing page
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const plan = params.get("plan");
+    const type = params.get("type");
+    
+    if (plan) {
+      setFormData(prev => ({
+        ...prev,
+        planName: plan,
+        subject: `Inquiry about ${plan}`,
+        message: `I'm interested in learning more about the ${plan} plan. Please provide more information.`,
+        type: type === "pricing" ? "general" : prev.type,
+      }));
+    }
+  }, []);
 
   const contactMutation = useMutation({
     mutationFn: async (data: typeof formData) => {
-      const response = await apiRequest("POST", "/api/contact", data);
+      const response = await apiRequest("POST", "/api/contact", {
+        name: data.name,
+        email: data.email,
+        subject: data.subject,
+        message: data.message,
+        type: data.type,
+        planName: data.planName || undefined,
+      });
       return response.json();
     },
     onSuccess: () => {
