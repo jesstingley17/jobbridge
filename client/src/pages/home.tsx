@@ -1,15 +1,6 @@
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import {
   Sparkles,
   FileText,
@@ -27,11 +18,8 @@ import {
   Rocket,
 } from "lucide-react";
 import { Logo } from "@/components/logo";
-import { useState, useEffect } from "react";
-import { useMutation } from "@tanstack/react-query";
-import { apiRequest } from "@/lib/queryClient";
+import { useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
-import { Card, CardContent } from "@/components/ui/card";
 
 const features = [
   {
@@ -98,85 +86,219 @@ const howItWorks = [
 
 export default function Home() {
   const { toast } = useToast();
-  const [formData, setFormData] = useState({
-    firstName: "",
-    lastName: "",
-    email: "",
-    role: "",
-    company: "",
-  });
-  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleWaitlistSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!formData.firstName || !formData.lastName || !formData.email) {
-      toast({
-        title: "Missing information",
-        description: "Please fill in all required fields.",
-        variant: "destructive",
-      });
+  // Load HubSpot forms script and apply custom styling for waitlist form
+  useEffect(() => {
+    // Check if script is already loaded
+    if (document.querySelector('script[src*="hsforms.net/forms/embed"]')) {
+      // Script already loaded, just apply styles
+      applyHubSpotWaitlistStyles();
       return;
     }
 
-    setIsSubmitting(true);
-
-    // Create a form element to submit to AWeber
-    const form = document.createElement("form");
-    form.method = "POST";
-    form.action = "https://www.aweber.com/scripts/addlead.pl";
-    form.acceptCharset = "UTF-8";
-    form.style.display = "none";
-
-    // Add hidden fields
-    const addHiddenField = (name: string, value: string) => {
-      const input = document.createElement("input");
-      input.type = "hidden";
-      input.name = name;
-      input.value = value;
-      form.appendChild(input);
+    const script = document.createElement('script');
+    script.src = 'https://js-na2.hsforms.net/forms/embed/developer/244677572.js';
+    script.defer = true;
+    
+    // Wait for script to load, then wait for form to render
+    script.onload = () => {
+      // Wait for form to be injected into DOM
+      const checkForm = setInterval(() => {
+        const waitlistForm = document.querySelector('[data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"]');
+        if (waitlistForm && (waitlistForm.querySelector('.hs-form') || waitlistForm.querySelector('form'))) {
+          clearInterval(checkForm);
+          applyHubSpotWaitlistStyles();
+        }
+      }, 100);
+      
+      // Stop checking after 10 seconds
+      setTimeout(() => clearInterval(checkForm), 10000);
     };
+    
+    document.head.appendChild(script);
 
-    addHiddenField("meta_web_form_id", "539205314");
-    addHiddenField("meta_split_id", "");
-    addHiddenField("listname", "awlist6912956");
-    addHiddenField("redirect", window.location.href);
-    addHiddenField("meta_adtracking", "Waitlist");
-    addHiddenField("meta_message", "1");
-    addHiddenField("meta_required", "name (awf_first),name (awf_last),email");
-    addHiddenField("meta_tooltip", "");
+    // Apply styles function
+    function applyHubSpotWaitlistStyles() {
+      // Check if styles already applied
+      if (document.getElementById('hubspot-waitlist-form-custom-styles')) {
+        return;
+      }
 
-    // Add form data
-    addHiddenField("name (awf_first)", formData.firstName);
-    addHiddenField("name (awf_last)", formData.lastName);
-    addHiddenField("email", formData.email);
-    if (formData.role) {
-      addHiddenField("custom Your Role", formData.role);
+      // Add custom CSS for HubSpot waitlist form accessibility and styling
+      const style = document.createElement('style');
+      style.id = 'hubspot-waitlist-form-custom-styles';
+      style.textContent = `
+      /* HubSpot Waitlist Form Accessibility & Design Styling */
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] {
+        font-family: var(--font-sans, Inter, system-ui, sans-serif);
+      }
+
+      /* Form container */
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form,
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] form {
+        display: flex;
+        flex-direction: column;
+        gap: 1.5rem;
+      }
+
+      /* Field groups */
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-form-field {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+        margin-bottom: 0;
+      }
+
+      /* Labels - High contrast, clear typography */
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] label {
+        font-size: 0.875rem;
+        font-weight: 500;
+        color: hsl(var(--foreground)) !important;
+        line-height: 1.5;
+        margin-bottom: 0.375rem;
+      }
+
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] label.hs-form-required:after {
+        content: " *";
+        color: hsl(0 84% 45%);
+        font-weight: 600;
+      }
+
+      /* Input fields - Match design system */
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] input[type="text"],
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] input[type="email"],
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] input[type="tel"],
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] input[type="number"],
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] textarea,
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] select {
+        width: 100%;
+        min-height: 2.75rem;
+        padding: 0.625rem 0.875rem;
+        font-size: 0.875rem;
+        line-height: 1.5;
+        color: hsl(var(--foreground));
+        background-color: hsl(var(--background));
+        border: 1px solid hsl(var(--input));
+        border-radius: 0.5625rem;
+        transition: all 0.2s ease;
+        font-family: inherit;
+      }
+
+      /* Focus states - High visibility for accessibility */
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] input:focus,
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] textarea:focus,
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] select:focus {
+        outline: none;
+        border-color: hsl(var(--primary));
+        box-shadow: 0 0 0 3px hsl(var(--primary) / 0.1);
+      }
+
+      /* Submit button - Match design system with gradient */
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] input[type="submit"],
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-button,
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] button[type="submit"] {
+        min-height: 2.75rem;
+        padding: 0.625rem 1.5rem;
+        font-size: 0.875rem;
+        font-weight: 500;
+        color: white !important;
+        background: linear-gradient(to right, hsl(var(--primary)), hsl(var(--primary) / 0.8)) !important;
+        border: none !important;
+        border-radius: 0.5625rem;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        font-family: inherit;
+        width: 100%;
+        margin-top: 0.5rem;
+      }
+
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] input[type="submit"]:hover,
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-button:hover,
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] button[type="submit"]:hover {
+        opacity: 0.9;
+        transform: translateY(-1px);
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      }
+
+      /* Error messages */
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-error-msgs {
+        list-style: none;
+        padding: 0;
+        margin: 0.375rem 0 0 0;
+      }
+
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-error-msgs li {
+        color: hsl(0 84% 45%);
+        font-size: 0.8125rem;
+        margin-top: 0.25rem;
+        display: flex;
+        align-items: center;
+        gap: 0.375rem;
+      }
+
+      /* Success messages */
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-main-font-element {
+        color: hsl(var(--foreground)) !important;
+        font-size: 0.875rem;
+        line-height: 1.5;
+      }
+
+      /* Dark mode support */
+      .dark [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] input[type="text"],
+      .dark [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] input[type="email"],
+      .dark [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] input[type="tel"],
+      .dark [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] select,
+      [data-theme="dark"] [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] input[type="text"],
+      [data-theme="dark"] [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] input[type="email"],
+      [data-theme="dark"] [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] input[type="tel"],
+      [data-theme="dark"] [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] select {
+        background-color: hsl(var(--background)) !important;
+        color: hsl(var(--foreground)) !important;
+        border-color: hsl(var(--input)) !important;
+      }
+
+      .dark [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] label,
+      [data-theme="dark"] [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] label {
+        color: hsl(var(--foreground)) !important;
+      }
+
+      .dark [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-main-font-element,
+      [data-theme="dark"] [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] .hs-main-font-element {
+        color: hsl(var(--foreground)) !important;
+      }
+
+      /* Ensure all text elements use proper colors */
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"],
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] * {
+        color: inherit;
+      }
+
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] p,
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] span,
+      [data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb"] div:not(.hs-form-field) {
+        color: hsl(var(--foreground)) !important;
+      }
+    `;
+      document.head.appendChild(style);
     }
-    if (formData.company) {
-      addHiddenField("custom Organization", formData.company);
-    }
 
-    document.body.appendChild(form);
-    form.submit();
-    
-    // Show success message
-    toast({
-      title: "Success!",
-      description: "You've been added to the waitlist. Check your email for confirmation.",
-    });
-    
-    // Reset form
-    setFormData({
-      firstName: "",
-      lastName: "",
-      email: "",
-      role: "",
-      company: "",
-    });
-    
-    setIsSubmitting(false);
-  };
+    // Apply styles immediately (in case form is already loaded)
+    applyHubSpotWaitlistStyles();
+
+    // Also try applying after a delay to catch late-loading forms
+    const delayedApply = setTimeout(() => {
+      applyHubSpotWaitlistStyles();
+    }, 2000);
+
+    // Cleanup function
+    return () => {
+      clearTimeout(delayedApply);
+      const existingStyle = document.getElementById('hubspot-waitlist-form-custom-styles');
+      if (existingStyle && existingStyle.parentNode) {
+        existingStyle.parentNode.removeChild(existingStyle);
+      }
+    };
+  }, []);
 
   return (
     <div className="flex flex-col">
@@ -217,119 +339,19 @@ export default function Home() {
               The most comprehensive, accessible, and user-friendly job search platform designed with the success and wellbeing of people with disabilities in mind.
             </p>
 
-            {/* Waitlist Form - AWeber Integration */}
-            <form onSubmit={handleWaitlistSubmit} className="mt-10 mx-auto max-w-md space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="waitlist-first-name" className="text-sm font-medium">
-                    First Name <span className="text-red-500">*</span>
-                  </Label>
-                  <Input
-                    id="waitlist-first-name"
-                    type="text"
-                    placeholder="John"
-                    value={formData.firstName}
-                    onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
-                    className="rounded-md"
-                    required
-                    data-testid="input-waitlist-first-name"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="waitlist-last-name" className="text-sm font-medium">
-                    Last Name <span className="text-red-500">*</span>
-                  </Label>
-                  <Input
-                    id="waitlist-last-name"
-                    type="text"
-                    placeholder="Doe"
-                    value={formData.lastName}
-                    onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
-                    className="rounded-md"
-                    required
-                    data-testid="input-waitlist-last-name"
-                  />
-                </div>
-              </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="waitlist-email" className="text-sm font-medium">
-                  Email <span className="text-red-500">*</span>
-                </Label>
-                <Input
-                  id="waitlist-email"
-                  type="email"
-                  placeholder="you@example.com"
-                  value={formData.email}
-                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  className="rounded-md"
-                  required
-                  data-testid="input-waitlist-email"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="waitlist-role" className="text-sm font-medium">
-                  Your Role
-                </Label>
-                <Select
-                  value={formData.role}
-                  onValueChange={(value) => setFormData({ ...formData, role: value })}
-                >
-                  <SelectTrigger id="waitlist-role" className="rounded-md">
-                    <SelectValue placeholder="Select your role" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Job Developer">Job Developer</SelectItem>
-                    <SelectItem value="Participant">Participant</SelectItem>
-                    <SelectItem value="Business">Business</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="waitlist-company" className="text-sm font-medium">
-                  Company
-                </Label>
-                <Input
-                  id="waitlist-company"
-                  type="text"
-                  placeholder="Your Company"
-                  value={formData.company}
-                  onChange={(e) => setFormData({ ...formData, company: e.target.value })}
-                  className="rounded-md"
-                  data-testid="input-waitlist-company"
-                />
-              </div>
-
-              <Button
-                type="submit"
-                className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white border-0 gap-2"
-                disabled={isSubmitting}
-                data-testid="button-join-waitlist"
-              >
-                {isSubmitting ? (
-                  "Submitting..."
-                ) : (
-                  <>
-                    Join Waitlist
-                    <ArrowRight className="h-4 w-4" aria-hidden="true" />
-                  </>
-                )}
-              </Button>
-
-              <p className="text-xs text-center text-muted-foreground">
-                We respect your{" "}
-                <a
-                  href="https://www.aweber.com/permission.htm"
-                  target="_blank"
-                  rel="nofollow"
-                  className="text-primary hover:underline"
-                >
-                  email privacy
-                </a>
-              </p>
-            </form>
+            {/* Waitlist Form - HubSpot Integration */}
+            <Card className="mt-10 mx-auto max-w-md border-primary/20 bg-background/50 backdrop-blur-sm">
+              <CardContent className="pt-6">
+                <div 
+                  className="hs-form-html" 
+                  data-region="na2" 
+                  data-form-id="1f0d787b-0c7b-4516-acdb-5f1baf3f4cfb" 
+                  data-portal-id="244677572"
+                  role="form"
+                  aria-label="Waitlist signup form"
+                ></div>
+              </CardContent>
+            </Card>
           </div>
         </div>
       </section>
