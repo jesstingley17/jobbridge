@@ -555,6 +555,14 @@ export default function BetaTester() {
                 <p>
                   Your application will be reviewed manually by our team. If approved, you'll receive an email with instructions to create your account and access the platform.
                 </p>
+                <p className="text-sm font-semibold text-foreground mt-3">
+                  🎯 <strong>Your Access Level:</strong> Beta testers receive <strong>full access to all features</strong> based on the role they select:
+                </p>
+                <ul className="text-sm text-muted-foreground mt-2 space-y-1 list-disc list-inside ml-4">
+                  <li>Select <strong>"Job Seeker"</strong> → You'll get <strong>Pro tier</strong> access (all AI features, unlimited applications)</li>
+                  <li>Select <strong>"Employer"</strong> → You'll get <strong>Enterprise tier</strong> access (analytics, API, team features, job posting)</li>
+                  <li>Select <strong>"Developer/Partner"</strong> → You'll get <strong>Enterprise tier</strong> access (API, analytics, all advanced features)</li>
+                </ul>
                 <div className="rounded-md bg-primary/10 border border-primary/20 p-3 mt-3">
                   <p className="text-sm font-semibold text-foreground mb-1">Beta Tester Benefits (Based on Your Role):</p>
                   <ul className="text-sm text-muted-foreground space-y-1 list-disc list-inside">
