@@ -3186,6 +3186,67 @@ Return JSON with:
     }
   });
 
+  // Supabase connection diagnostic endpoint (admin only)
+  app.get("/api/supabase/status", requireSupabaseAuth(), isAdmin, async (req: any, res) => {
+    try {
+      const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+      const hasServiceKey = !!process.env.SUPABASE_SERVICE_ROLE_KEY;
+      
+      const diagnostics: any = {
+        configured: !!supabaseUrl && hasServiceKey,
+        hasUrl: !!supabaseUrl,
+        hasServiceKey: hasServiceKey,
+        urlPrefix: supabaseUrl ? `${supabaseUrl.substring(0, 30)}...` : 'NOT SET',
+        connectionTest: null,
+        error: null,
+      };
+
+      if (!supabaseUrl || !hasServiceKey) {
+        return res.status(400).json({
+          error: "Supabase is not configured",
+          diagnostics,
+          message: "Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY environment variables in Vercel",
+        });
+      }
+
+      try {
+        const { getSupabaseAdmin } = await import('./supabase.js');
+        const supabaseAdmin = getSupabaseAdmin();
+        
+        // Test connection with a simple query
+        const { data, error } = await supabaseAdmin.auth.admin.listUsers({ page: 1, perPage: 1 });
+        
+        if (error) {
+          diagnostics.connectionTest = 'failed';
+          diagnostics.error = error.message;
+          diagnostics.errorCode = error.status;
+        } else {
+          diagnostics.connectionTest = 'success';
+          diagnostics.userCount = data?.users?.length || 0;
+        }
+      } catch (error: any) {
+        diagnostics.connectionTest = 'failed';
+        diagnostics.error = error.message;
+        diagnostics.errorStack = process.env.NODE_ENV === 'development' ? error.stack : undefined;
+      }
+
+      res.json({
+        success: diagnostics.connectionTest === 'success',
+        message: diagnostics.connectionTest === 'success' 
+          ? "Supabase is configured and connected" 
+          : "Supabase is configured but connection failed",
+        diagnostics,
+      });
+    } catch (error: any) {
+      console.error("Error testing Supabase connection:", error);
+      res.status(500).json({
+        error: "Failed to test Supabase connection",
+        message: error.message,
+        stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+      });
+    }
+  });
+
   // Pinecone test/status endpoint (admin only)
   app.get("/api/pinecone/status", requireSupabaseAuth(), isAdmin, async (req: any, res) => {
     try {
