@@ -504,12 +504,36 @@ export default function BetaTester() {
             <p className="text-lg text-muted-foreground mb-4">
               Be among the first to experience The JobBridge and help shape the future of accessible job searching
             </p>
+            
+            {/* Beta Tester Benefits */}
+            <div className="inline-flex items-center gap-2 rounded-lg border-2 border-primary/50 bg-primary/10 px-4 py-3 mb-4">
+              <Sparkles className="h-5 w-5 text-primary flex-shrink-0" />
+              <div className="text-left">
+                <p className="font-semibold text-primary">Full Platform Access</p>
+                <p className="text-sm text-muted-foreground">
+                  Beta testers get access to <strong>all features</strong> including Pro and Enterprise tier functionality at no cost.
+                </p>
+              </div>
+            </div>
+
+            {/* Manual Approval Warning */}
             <div className="inline-flex items-center gap-2 rounded-lg border-2 border-amber-500/50 bg-amber-50 dark:bg-amber-950/20 px-4 py-3 mb-4">
               <span className="text-2xl">⚠️</span>
               <div className="text-left">
                 <p className="font-semibold text-amber-900 dark:text-amber-100">Manual Approval Required</p>
                 <p className="text-sm text-amber-800 dark:text-amber-200">
                   Beta access is granted by manual review. You'll receive an email notification once your application has been reviewed.
+                </p>
+              </div>
+            </div>
+
+            {/* Active Participation Requirement */}
+            <div className="inline-flex items-center gap-2 rounded-lg border-2 border-blue-500/50 bg-blue-50 dark:bg-blue-950/20 px-4 py-3 mb-4">
+              <span className="text-2xl">💬</span>
+              <div className="text-left">
+                <p className="font-semibold text-blue-900 dark:text-blue-100">Active Participation Required</p>
+                <p className="text-sm text-blue-800 dark:text-blue-200">
+                  Beta testers must be <strong>actively using the platform</strong> and <strong>providing regular feedback</strong> to maintain access. Inactive accounts may have access revoked.
                 </p>
               </div>
             </div>
@@ -526,7 +550,21 @@ export default function BetaTester() {
                 <p>
                   Your application will be reviewed manually by our team. If approved, you'll receive an email with instructions to create your account and access the platform.
                 </p>
-                <p className="text-sm text-muted-foreground italic">
+                <div className="rounded-md bg-primary/10 border border-primary/20 p-3 mt-3">
+                  <p className="text-sm font-semibold text-foreground mb-1">Beta Tester Benefits:</p>
+                  <ul className="text-sm text-muted-foreground space-y-1 list-disc list-inside">
+                    <li>Full access to all platform features (Pro + Enterprise tiers)</li>
+                    <li>No subscription fees during beta period</li>
+                    <li>Direct input on product development</li>
+                  </ul>
+                  <p className="text-sm font-semibold text-foreground mt-3 mb-1">Requirements:</p>
+                  <ul className="text-sm text-muted-foreground space-y-1 list-disc list-inside">
+                    <li>Active platform usage (regular logins and feature testing)</li>
+                    <li>Regular feedback submission (bug reports, feature requests, usability insights)</li>
+                    <li>Participation in beta surveys and interviews when requested</li>
+                  </ul>
+                </div>
+                <p className="text-sm text-muted-foreground italic mt-3">
                   Please allow 2-5 business days for review. We'll notify you via email once a decision has been made.
                 </p>
               </CardDescription>
