@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Sparkles } from "lucide-react";
+import { Sparkles, Clock, Mail } from "lucide-react";
 
 // Beta tester signup page - accessible at /beta-tester and /beta
 export default function BetaTester() {
@@ -500,18 +500,35 @@ export default function BetaTester() {
                 <Sparkles className="h-8 w-8 text-primary" />
               </div>
             </div>
-            <h1 className="text-4xl font-bold mb-4">Join Our Beta Program</h1>
-            <p className="text-lg text-muted-foreground">
+            <h1 className="text-4xl font-bold mb-4">Apply for Beta Access</h1>
+            <p className="text-lg text-muted-foreground mb-4">
               Be among the first to experience The JobBridge and help shape the future of accessible job searching
             </p>
+            <div className="inline-flex items-center gap-2 rounded-lg border-2 border-amber-500/50 bg-amber-50 dark:bg-amber-950/20 px-4 py-3 mb-4">
+              <span className="text-2xl">⚠️</span>
+              <div className="text-left">
+                <p className="font-semibold text-amber-900 dark:text-amber-100">Manual Approval Required</p>
+                <p className="text-sm text-amber-800 dark:text-amber-200">
+                  Beta access is granted by manual review. You'll receive an email notification once your application has been reviewed.
+                </p>
+              </div>
+            </div>
           </div>
 
           {/* HubSpot Form */}
           <Card>
             <CardHeader>
-              <CardTitle>Application Form</CardTitle>
-              <CardDescription>
-                After submitting, you'll be redirected to create your account and access the platform.
+              <CardTitle>Beta Tester Application</CardTitle>
+              <CardDescription className="space-y-2">
+                <p>
+                  <strong className="text-foreground">Important:</strong> This is an application form, not an immediate signup.
+                </p>
+                <p>
+                  Your application will be reviewed manually by our team. If approved, you'll receive an email with instructions to create your account and access the platform.
+                </p>
+                <p className="text-sm text-muted-foreground italic">
+                  Please allow 2-5 business days for review. We'll notify you via email once a decision has been made.
+                </p>
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -523,6 +540,42 @@ export default function BetaTester() {
                 role="form"
                 aria-label="Beta tester application form"
               ></div>
+            </CardContent>
+          </Card>
+
+          {/* Approval Process Info */}
+          <Card className="mt-8 border-primary/20 bg-primary/5">
+            <CardContent className="pt-6">
+              <h3 className="font-semibold mb-4 text-center">What Happens Next?</h3>
+              <div className="space-y-4">
+                <div className="flex items-start gap-3">
+                  <div className="flex-shrink-0 rounded-full bg-primary/10 p-2">
+                    <Mail className="h-4 w-4 text-primary" />
+                  </div>
+                  <div>
+                    <p className="font-medium text-sm">1. Submit Your Application</p>
+                    <p className="text-sm text-muted-foreground">Fill out the form above with your information.</p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-3">
+                  <div className="flex-shrink-0 rounded-full bg-primary/10 p-2">
+                    <Clock className="h-4 w-4 text-primary" />
+                  </div>
+                  <div>
+                    <p className="font-medium text-sm">2. Manual Review Process</p>
+                    <p className="text-sm text-muted-foreground">Our team will review your application (typically 2-5 business days).</p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-3">
+                  <div className="flex-shrink-0 rounded-full bg-primary/10 p-2">
+                    <Sparkles className="h-4 w-4 text-primary" />
+                  </div>
+                  <div>
+                    <p className="font-medium text-sm">3. Approval Notification</p>
+                    <p className="text-sm text-muted-foreground">If approved, you'll receive an email with account creation instructions.</p>
+                  </div>
+                </div>
+              </div>
             </CardContent>
           </Card>
 
