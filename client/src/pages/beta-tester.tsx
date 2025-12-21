@@ -617,6 +617,34 @@ export default function BetaTester() {
             </CardContent>
           </Card>
 
+          {/* Lifetime Access Incentive */}
+          <Card className="mt-8 border-green-500/50 bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-950/30 dark:to-emerald-950/30">
+            <CardContent className="pt-6">
+              <div className="text-center mb-4">
+                <div className="inline-flex items-center justify-center rounded-full bg-green-500/20 p-3 mb-3">
+                  <Sparkles className="h-6 w-6 text-green-600 dark:text-green-400" />
+                </div>
+                <h3 className="font-bold text-lg mb-2 text-green-900 dark:text-green-100">Lifetime Access Reward</h3>
+                <p className="text-sm text-green-800 dark:text-green-200 font-medium">
+                  At the end of the beta testing period, the <strong>most active beta testers</strong> will receive <strong>lifetime free access</strong> to the platform!
+                </p>
+              </div>
+              <div className="space-y-2 text-sm text-green-700 dark:text-green-300">
+                <p className="font-semibold">How to qualify:</p>
+                <ul className="space-y-1 list-disc list-inside ml-2">
+                  <li>Consistent platform usage throughout the beta period</li>
+                  <li>Regular, detailed feedback submissions</li>
+                  <li>Active participation in beta surveys and interviews</li>
+                  <li>Helpful bug reports and feature suggestions</li>
+                  <li>Engagement with the beta tester community</li>
+                </ul>
+                <p className="mt-3 text-xs italic text-green-600 dark:text-green-400">
+                  The more active and engaged you are, the better your chances of earning lifetime access!
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+
           {/* Info Section */}
           <div className="mt-8 text-center">
             <p className="text-sm text-muted-foreground">
