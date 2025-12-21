@@ -111,9 +111,14 @@ async function verifyJwtWithJwks(token: string, projectUrl: string) {
  */
 export function requireSupabaseAuth() {
   const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+  const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
   
   if (!supabaseUrl) {
-    console.error("SUPABASE_URL not set - JWT verification will fail");
+    console.error("[Supabase Auth] SUPABASE_URL not set - JWT verification will fail");
+  }
+  
+  if (!supabaseServiceRoleKey) {
+    console.error("[Supabase Auth] SUPABASE_SERVICE_ROLE_KEY not set - Admin operations will fail");
   }
 
   return async (req: Request, res: Response, next: NextFunction) => {
@@ -139,7 +144,16 @@ export function requireSupabaseAuth() {
       // Use Supabase Admin API to verify token - simpler approach
       try {
         const { getSupabaseAdmin } = await import('../supabase.js');
-        const supabaseAdmin = getSupabaseAdmin();
+        let supabaseAdmin;
+        try {
+          supabaseAdmin = getSupabaseAdmin();
+        } catch (initError: any) {
+          console.error('[Supabase Auth] Failed to initialize Supabase admin client:', initError.message);
+          return res.status(500).json({
+            error: "Supabase configuration error",
+            message: initError.message || "Failed to connect to Supabase. Please check environment variables.",
+          });
+        }
         
         // Add timeout to prevent hanging requests
         const timeoutPromise = new Promise((_, reject) => {

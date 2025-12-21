@@ -298,7 +298,14 @@ export default function BetaTester() {
               {/* HubSpot form will load here */}
             </CardHeader>
             <CardContent>
-              <div className="hs-form-frame" data-region="na2" data-form-id="0dbbf15a-78b1-4ec3-8dd0-32cbb2ea1ad0" data-portal-id="244677572"></div>
+              <div 
+                className="hs-form-frame" 
+                data-region="na2" 
+                data-form-id="0dbbf15a-78b1-4ec3-8dd0-32cbb2ea1ad0" 
+                data-portal-id="244677572"
+                role="form"
+                aria-label="Beta tester application form"
+              ></div>
             </CardContent>
           </Card>
 
