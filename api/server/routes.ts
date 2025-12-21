@@ -1210,8 +1210,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const existingUser = await storage.getUserByEmail(email);
       
       if (existingUser) {
-        // User already exists - update their info if needed
-        if (marketingConsent !== undefined || firstName || lastName) {
+        // User already exists - update their info if needed, including role and tier for beta testers
+        const validRole = role && ['participant', 'employer', 'developer'].includes(role) 
+          ? role 
+          : existingUser.role || 'participant';
+        const subscriptionTier = validRole === 'participant' ? 'pro' : 'enterprise';
+        
+        if (marketingConsent !== undefined || firstName || lastName || role) {
           await storage.updateUser(existingUser.id, {
             firstName: firstName || existingUser.firstName || null,
             lastName: lastName || existingUser.lastName || null,
@@ -1219,6 +1224,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             marketingConsentAt: marketingConsent ? new Date() : existingUser.marketingConsentAt || null,
             termsAccepted: existingUser.termsAccepted || true,
             termsAcceptedAt: existingUser.termsAcceptedAt || new Date(),
+            role: validRole,
+            subscriptionTier: subscriptionTier, // Update tier for beta testers
           });
         }
         return res.json({ 
@@ -1228,6 +1235,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
           user: existingUser
         });
       }
+      
+      // Determine subscription tier based on role for beta testers
+      // Beta testers get full access: participant -> pro, employer/developer -> enterprise
+      const validRole = role && ['participant', 'employer', 'developer'].includes(role) 
+        ? role 
+        : 'participant'; // Default to participant if invalid/missing
+      
+      const subscriptionTier = validRole === 'participant' ? 'pro' : 'enterprise';
       
       // Check if user exists in Supabase Auth (they may have signed up via Supabase first)
       // If so, use their Supabase ID; otherwise, let database generate one
@@ -1242,8 +1257,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           termsAcceptedAt: new Date(),
           marketingConsent: marketingConsent || false,
           marketingConsentAt: marketingConsent ? new Date() : null,
-          // Mark as beta tester in role or add a note
-          role: "participant", // Default role
+          role: validRole,
+          subscriptionTier: subscriptionTier, // Beta testers get full access based on role
         });
         
         // Send welcome email for beta testers

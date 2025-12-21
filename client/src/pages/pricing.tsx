@@ -14,6 +14,10 @@ interface StripePrice {
   unit_amount: number;
   recurring_interval: string;
   currency: string;
+  metadata?: {
+    nickname?: string;
+    [key: string]: string | undefined;
+  };
 }
 
 interface StripeProduct {
@@ -29,12 +33,16 @@ interface StripeProductsResponse {
 
 interface Plan {
   name: string;
+  role: 'participant' | 'job_developer' | 'employer' | 'free' | 'beta';
   subtitle?: string;
   price: string;
   period?: string;
+  monthlyPriceId?: string | null;
   yearlyPrice?: string;
   yearlyPeriod?: string;
-  priceId: string | null;
+  yearlyPriceId?: string | null;
+  sponsoredPriceId?: string | null;
+  priceId: string | null; // Legacy - for backward compatibility
   popular?: boolean;
   description?: string;
   features: string[];
@@ -43,10 +51,11 @@ interface Plan {
   contact?: boolean;
 }
 
-// Default plans fallback
+// Default plans fallback - Role-based structure
 const defaultPlans = [
   {
     name: "Free",
+    role: 'free' as const,
     subtitle: "Explore",
     price: "$0",
     period: "forever",
@@ -69,17 +78,20 @@ const defaultPlans = [
     purpose: "Lead gen, trust-building, SEO fuel.",
   },
   {
-    name: "JobBridge Core",
-    subtitle: "Where real progress starts",
+    name: "Participant (Job Seeker)",
+    role: 'participant' as const,
+    subtitle: "AI-powered job matching & career tools",
     price: "$29",
     period: "per month",
     yearlyPrice: "$249",
     yearlyPeriod: "per year",
+    monthlyPriceId: null,
+    yearlyPriceId: null,
+    sponsoredPriceId: null,
     priceId: null,
     popular: true,
-    description: "This is your breadwinner tier.",
+    description: "AI-powered job matching, resume tools, interview prep, and application tracking.",
     features: [
-      "Everything in Free, plus:",
       "🧠 Career DNA Matching (Full Power)",
       "  • Deep skill + experience analysis",
       "  • Cultural fit modeling",
@@ -94,78 +106,52 @@ const defaultPlans = [
       "  • Unlimited applications",
       "  • Status tracking",
       "  • Interview reminders",
-    ],
-  },
-  {
-    name: "JobBridge Pro",
-    subtitle: "Aggressive growth. Serious intent.",
-    price: "$49",
-    period: "per month",
-    yearlyPrice: "$399",
-    yearlyPeriod: "per year",
-    priceId: null,
-    description: "This is for users who are done playing around.",
-    features: [
-      "Everything in Core, plus:",
       "🎯 Interview Preparation Suite",
       "  • Role- and industry-specific AI questions",
       "  • AI feedback + improvement scoring",
-      "  • Question bank access",
-      "  • Video practice mode",
-      "📈 Success Analytics",
-      "  • Resume-to-interview conversion insights",
-      "  • Application performance trends",
-      "  • Personalized improvement suggestions",
-      "💛 Career Resilience Tools",
-      "  • Burnout & stress management resources",
-      "  • Focused career coaching prompts",
     ],
   },
   {
-    name: "Sponsored / Institutional Access",
-    subtitle: "Same pricing. Different payer.",
-    price: "$0",
-    period: "to user",
-    priceId: null,
-    description: "No discounts. No guilt pricing. Just redistributed cost.",
-    features: [
-      "Full JobBridge Pro access",
-      "Progress reporting",
-      "Priority support",
-      "Billed to orgs: Bulk / per-seat contracts",
-    ],
-    contact: true,
-  },
-  {
-    name: "Job Developers & Coaches",
-    subtitle: "You're not a 'nice add-on.' You're infrastructure.",
+    name: "Job Developer / Career Coach",
+    role: 'job_developer' as const,
+    subtitle: "Multi-participant coaching workspace",
     price: "$99",
     period: "per month per seat",
+    yearlyPrice: "$999",
+    yearlyPeriod: "per year per seat",
+    monthlyPriceId: null,
+    yearlyPriceId: null,
     priceId: null,
-    description: "Org pricing scales from there",
+    description: "Multi-participant coaching workspace with AI tools, reporting, and compliance features.",
     features: [
       "Multi-client management",
       "Resume + application oversight",
       "Interview readiness tracking",
       "Reporting & documentation",
       "Accessibility-informed insights",
+      "AI-powered coaching tools",
+      "Compliance features",
     ],
-    contact: true,
+    contact: false, // Can checkout directly
   },
   {
-    name: "Employers",
-    subtitle: "Inclusive Hiring, Done Right",
-    price: "$199–499",
+    name: "Employer (HR Manager)",
+    role: 'employer' as const,
+    subtitle: "Inclusive Hiring Portal",
+    price: "$199",
     period: "per month",
     priceId: null,
-    description: "Pay to access prepared, matched candidates.",
+    monthlyPriceId: null,
+    yearlyPriceId: null,
+    description: "Employer hiring portal with inclusive job posts, candidate matching, and compliance tools.",
     features: [
       "Job postings with accessibility signals",
       "Candidate matching",
       "Employer profile & insights",
-      "Or per-hire options",
+      "Compliance tools",
+      "Inclusive hiring analytics",
     ],
-    contact: true,
+    contact: false, // Can checkout directly
   },
 ];
 
@@ -234,29 +220,63 @@ export default function Pricing() {
     },
   });
 
-  // Always use default plans structure, but map Stripe priceIds if available
+  // Map Stripe products to plans by role
   const plans: Plan[] = defaultPlans.map((defaultPlan) => {
-    // Try to find matching Stripe product for priceId
-    let priceId: string | null = null;
+    // Skip mapping for free and beta plans (no Stripe products)
+    if (defaultPlan.role === 'free' || defaultPlan.role === 'beta') {
+      return defaultPlan;
+    }
+
+    let monthlyPriceId: string | null = null;
+    let yearlyPriceId: string | null = null;
+    let sponsoredPriceId: string | null = null;
+    let priceId: string | null = null; // Legacy fallback
+
     if (productsData?.products) {
+      // Map by role-based product names
+      const productNameMap: Record<string, string> = {
+        'participant': 'JobBridge – Participant Access',
+        'job_developer': 'JobBridge – Job Developer Workspace',
+        'employer': 'JobBridge – Inclusive Hiring Portal',
+      };
+
+      const expectedProductName = productNameMap[defaultPlan.role];
       const matchingProduct = productsData.products.find((product) => {
-        const productName = product.name.toLowerCase();
-        const planName = defaultPlan.name.toLowerCase();
-        // Match by name (flexible matching)
-        return productName.includes(planName) || 
-               planName.includes(productName) ||
-               (planName.includes("core") && productName.includes("pro")) ||
-               (planName.includes("pro") && productName.includes("pro"));
+        return product.name === expectedProductName || 
+               product.name.toLowerCase().includes(defaultPlan.role.toLowerCase());
       });
-      
-      if (matchingProduct?.prices?.[0]?.id) {
-        priceId = matchingProduct.prices[0].id;
+
+      if (matchingProduct?.prices) {
+        // Map prices by nickname or interval
+        for (const price of matchingProduct.prices) {
+          const nickname = (price.metadata?.nickname || '').toLowerCase();
+          const interval = (price.recurring_interval || '').toLowerCase();
+          
+          // Match by nickname first (most reliable)
+          if (nickname.includes('monthly') || nickname.includes('_core_monthly') || nickname.includes('_pro_monthly') || nickname.includes('_standard_monthly')) {
+            monthlyPriceId = price.id;
+            if (!priceId) priceId = price.id; // Legacy fallback
+          } else if (nickname.includes('annual') || nickname.includes('yearly') || nickname.includes('_core_annual') || nickname.includes('_pro_annual')) {
+            yearlyPriceId = price.id;
+          } else if (nickname.includes('sponsored') || nickname.includes('_sponsored')) {
+            sponsoredPriceId = price.id;
+          } else if (interval === 'month' && !monthlyPriceId) {
+            // Fallback: use interval if no nickname match
+            monthlyPriceId = price.id;
+            if (!priceId) priceId = price.id;
+          } else if (interval === 'year' && !yearlyPriceId) {
+            yearlyPriceId = price.id;
+          }
+        }
       }
     }
-    
+
     return {
       ...defaultPlan,
-      priceId: priceId || defaultPlan.priceId,
+      monthlyPriceId: monthlyPriceId || defaultPlan.monthlyPriceId,
+      yearlyPriceId: yearlyPriceId || defaultPlan.yearlyPriceId,
+      sponsoredPriceId: sponsoredPriceId || defaultPlan.sponsoredPriceId,
+      priceId: priceId || defaultPlan.priceId, // Legacy fallback
     };
   });
 
@@ -312,16 +332,77 @@ export default function Pricing() {
                     <p className="text-xs text-muted-foreground italic mt-2">{plan.description}</p>
                   )}
                   <div className="mt-4">
-                    <span className="text-3xl font-bold">{plan.price}</span>
-                    {plan.period && (
-                      <span className="text-sm text-muted-foreground"> / {plan.period}</span>
-                    )}
-                    {plan.yearlyPrice && (
-                      <div className="mt-2">
-                        <span className="text-2xl font-bold">{plan.yearlyPrice}</span>
-                        <span className="text-sm text-muted-foreground"> / {plan.yearlyPeriod}</span>
+                    {/* Price selection for plans with multiple prices */}
+                    {(plan.monthlyPriceId || plan.yearlyPriceId || plan.sponsoredPriceId) && (
+                      <div className="mb-4 flex gap-2">
+                        {plan.monthlyPriceId && (
+                          <button
+                            type="button"
+                            onClick={() => setSelectedPrices({ ...selectedPrices, [plan.name]: 'monthly' })}
+                            className={`flex-1 px-3 py-2 text-sm rounded-md border transition-colors ${
+                              selectedPrices[plan.name] === 'monthly' || !selectedPrices[plan.name]
+                                ? 'border-primary bg-primary/10 text-primary font-medium'
+                                : 'border-input bg-background text-muted-foreground hover:border-primary/50'
+                            }`}
+                          >
+                            Monthly
+                          </button>
+                        )}
+                        {plan.yearlyPriceId && (
+                          <button
+                            type="button"
+                            onClick={() => setSelectedPrices({ ...selectedPrices, [plan.name]: 'yearly' })}
+                            className={`flex-1 px-3 py-2 text-sm rounded-md border transition-colors ${
+                              selectedPrices[plan.name] === 'yearly'
+                                ? 'border-primary bg-primary/10 text-primary font-medium'
+                                : 'border-input bg-background text-muted-foreground hover:border-primary/50'
+                            }`}
+                          >
+                            Annual
+                          </button>
+                        )}
+                        {plan.sponsoredPriceId && (
+                          <button
+                            type="button"
+                            onClick={() => setSelectedPrices({ ...selectedPrices, [plan.name]: 'sponsored' })}
+                            className={`flex-1 px-3 py-2 text-sm rounded-md border transition-colors ${
+                              selectedPrices[plan.name] === 'sponsored'
+                                ? 'border-primary bg-primary/10 text-primary font-medium'
+                                : 'border-input bg-background text-muted-foreground hover:border-primary/50'
+                            }`}
+                          >
+                            Sponsored
+                          </button>
+                        )}
                       </div>
                     )}
+                    
+                    {/* Display selected price */}
+                    <div>
+                      {(!selectedPrices[plan.name] || selectedPrices[plan.name] === 'monthly') && (
+                        <>
+                          <span className="text-3xl font-bold">{plan.price}</span>
+                          {plan.period && (
+                            <span className="text-sm text-muted-foreground"> / {plan.period}</span>
+                          )}
+                        </>
+                      )}
+                      {selectedPrices[plan.name] === 'yearly' && plan.yearlyPrice && (
+                        <>
+                          <span className="text-3xl font-bold">{plan.yearlyPrice}</span>
+                          {plan.yearlyPeriod && (
+                            <span className="text-sm text-muted-foreground"> / {plan.yearlyPeriod}</span>
+                          )}
+                        </>
+                      )}
+                      {selectedPrices[plan.name] === 'sponsored' && (
+                        <>
+                          <span className="text-3xl font-bold">$0</span>
+                          <span className="text-sm text-muted-foreground"> / to user</span>
+                          <p className="text-xs text-muted-foreground mt-1 italic">Billed to organization</p>
+                        </>
+                      )}
+                    </div>
                   </div>
                 </CardHeader>
                 <CardContent>
@@ -332,12 +413,51 @@ export default function Pricing() {
                       e.preventDefault();
                       e.stopPropagation();
                       
-                      if (plan.contact || plan.name.includes("Sponsored") || plan.name.includes("Employers") || plan.name.includes("Coaches") || !plan.priceId) {
-                        // Redirect to contact page with plan information
+                      // Free plan - no checkout needed
+                      if (plan.role === 'free') {
+                        toast({
+                          title: "Free Plan",
+                          description: "You're already on the free plan! Sign up to get started.",
+                        });
+                        setLocation("/auth");
+                        return;
+                      }
+
+                      // Beta/Waitlist - no Stripe product
+                      if (plan.role === 'beta') {
+                        toast({
+                          title: "Beta Access",
+                          description: "Beta access is granted through manual approval. Apply on the beta tester page.",
+                        });
+                        setLocation("/beta-tester");
+                        return;
+                      }
+
+                      // Determine which priceId to use based on selection
+                      const priceSelection = selectedPrices[plan.name] || 'monthly';
+                      let selectedPriceId: string | null = null;
+
+                      if (priceSelection === 'monthly' && plan.monthlyPriceId) {
+                        selectedPriceId = plan.monthlyPriceId;
+                      } else if (priceSelection === 'yearly' && plan.yearlyPriceId) {
+                        selectedPriceId = plan.yearlyPriceId;
+                      } else if (priceSelection === 'sponsored' && plan.sponsoredPriceId) {
+                        selectedPriceId = plan.sponsoredPriceId;
+                      } else {
+                        // Fallback to legacy priceId or first available
+                        selectedPriceId = plan.priceId || plan.monthlyPriceId || plan.yearlyPriceId || null;
+                      }
+
+                      // Sponsored pricing - redirect to contact
+                      if (priceSelection === 'sponsored' || plan.contact) {
                         const planParam = encodeURIComponent(plan.name);
-                        window.location.href = `/contact?plan=${planParam}&type=pricing`;
-                      } else if (plan.priceId) {
-                        checkoutMutation.mutate(plan.priceId);
+                        window.location.href = `/contact?plan=${planParam}&type=pricing&pricing=sponsored`;
+                        return;
+                      }
+
+                      // Checkout with selected price
+                      if (selectedPriceId) {
+                        checkoutMutation.mutate(selectedPriceId);
                       } else {
                         toast({
                           title: "Contact Us",
@@ -353,8 +473,10 @@ export default function Pricing() {
                         <Loader2 className="h-4 w-4 mr-2 animate-spin" aria-hidden="true" />
                         Processing...
                       </>
-                    ) : plan.contact ? (
+                    ) : plan.contact || selectedPrices[plan.name] === 'sponsored' ? (
                       "Contact Us"
+                    ) : plan.role === 'free' ? (
+                      "Sign Up Free"
                     ) : (
                       "Get Started"
                     )}
