@@ -331,12 +331,19 @@ export default function Pricing() {
                     onClick={() => {
                       if (plan.contact || plan.name.includes("Sponsored") || plan.name.includes("Employers") || plan.name.includes("Coaches") || !plan.priceId) {
                         // Redirect to contact page with plan information
-                        setLocation(`/contact?plan=${encodeURIComponent(plan.name)}&type=pricing`);
-                      } else {
+                        const planParam = encodeURIComponent(plan.name);
+                        setLocation(`/contact?plan=${planParam}&type=pricing`);
+                      } else if (plan.priceId) {
                         checkoutMutation.mutate(plan.priceId);
+                      } else {
+                        toast({
+                          title: "Contact Us",
+                          description: `Please contact us for ${plan.name} pricing.`,
+                        });
+                        setLocation(`/contact?plan=${encodeURIComponent(plan.name)}&type=pricing`);
                       }
                     }}
-                    disabled={checkoutMutation.isPending || (plan.contact && !plan.priceId)}
+                    disabled={checkoutMutation.isPending}
                   >
                     {checkoutMutation.isPending ? (
                       <>
