@@ -56,6 +56,7 @@ export default function BetaTester() {
               <CardDescription>
                 Fill out the form below to join our beta testing program. After submitting, you'll be redirected to create your account and access the platform.
               </CardDescription>
+              {/* HubSpot form will load here */}
             </CardHeader>
             <CardContent>
               <div className="hs-form-frame" data-region="na2" data-form-id="0dbbf15a-78b1-4ec3-8dd0-32cbb2ea1ad0" data-portal-id="244677572"></div>
