@@ -33,7 +33,7 @@ interface StripeProductsResponse {
 
 interface Plan {
   name: string;
-  role: 'participant' | 'job_developer' | 'employer' | 'free' | 'beta';
+  role: 'participant' | 'job_developer' | 'employer' | 'free';
   subtitle?: string;
   price: string;
   period?: string;
@@ -159,6 +159,7 @@ export default function Pricing() {
   const [, setLocation] = useLocation();
   const { isAuthenticated } = useAuth();
   const { toast } = useToast();
+  const [selectedPrices, setSelectedPrices] = useState<Record<string, 'monthly' | 'yearly' | 'sponsored'>>({});
 
   // Check for success/cancel from Stripe
   useEffect(() => {
@@ -222,8 +223,8 @@ export default function Pricing() {
 
   // Map Stripe products to plans by role
   const plans: Plan[] = defaultPlans.map((defaultPlan) => {
-    // Skip mapping for free and beta plans (no Stripe products)
-    if (defaultPlan.role === 'free' || defaultPlan.role === 'beta') {
+    // Skip mapping for free plans (no Stripe products)
+    if (defaultPlan.role === 'free') {
       return defaultPlan;
     }
 
@@ -423,15 +424,7 @@ export default function Pricing() {
                         return;
                       }
 
-                      // Beta/Waitlist - no Stripe product
-                      if (plan.role === 'beta') {
-                        toast({
-                          title: "Beta Access",
-                          description: "Beta access is granted through manual approval. Apply on the beta tester page.",
-                        });
-                        setLocation("/beta-tester");
-                        return;
-                      }
+                      // Note: Beta/Waitlist users don't have Stripe products - handled via feature flags
 
                       // Determine which priceId to use based on selection
                       const priceSelection = selectedPrices[plan.name] || 'monthly';
