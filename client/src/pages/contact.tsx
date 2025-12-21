@@ -63,7 +63,9 @@ export default function Contact() {
         title: "Message Sent!",
         description: "Thank you for reaching out. We'll get back to you within 24-48 hours.",
       });
-      setFormData({ name: "", email: "", subject: "", message: "", type: "general" });
+      setFormData({ name: "", email: "", subject: "", message: "", type: "general", planName: "" });
+      // Clear URL params after successful submission
+      setLocation("/contact");
     },
     onError: () => {
       toast({
@@ -213,6 +215,7 @@ export default function Contact() {
                         <SelectContent>
                           <SelectItem value="general">General Inquiry</SelectItem>
                           <SelectItem value="help">Help & Support</SelectItem>
+                          <SelectItem value="pricing">Pricing Inquiry</SelectItem>
                         </SelectContent>
                       </Select>
                       <p className="text-xs text-muted-foreground mt-1">
