@@ -6,6 +6,8 @@ import { createServer } from "http";
 import { runMigrations } from 'stripe-replit-sync';
 import { getStripeSync } from './stripeClient.js';
 import { WebhookHandlers } from './webhookHandlers.js';
+// BotID is now handled per-route via blockBots middleware
+// No global middleware needed - client-side initBotId() handles initialization
 
 const app = express();
 const httpServer = createServer(app);
@@ -16,39 +18,44 @@ declare module "http" {
   }
 }
 
-// Initialize Stripe schema and sync data on startup
-async function initStripe() {
+// Initialize Stripe schema and sync data in background (non-blocking)
+// This runs asynchronously so it doesn't block server startup
+function initStripe() {
   const databaseUrl = process.env.DATABASE_URL;
   if (!databaseUrl) {
     console.log('DATABASE_URL not set, skipping Stripe initialization');
     return;
   }
 
-  try {
-    console.log('Initializing Stripe schema...');
-    await runMigrations({ databaseUrl });
-    console.log('Stripe schema ready');
+  // Run in background - don't await, don't block server startup
+  (async () => {
+    try {
+      console.log('Initializing Stripe schema in background...');
+      await runMigrations({ databaseUrl });
+      console.log('Stripe schema ready');
 
-    const stripeSync = await getStripeSync();
+      const stripeSync = await getStripeSync();
 
-    console.log('Setting up managed webhook...');
-    const webhookBaseUrl = `https://${process.env.REPLIT_DOMAINS?.split(',')[0]}`;
-    const { webhook, uuid } = await stripeSync.findOrCreateManagedWebhook(
-      `${webhookBaseUrl}/api/stripe/webhook`,
-      { enabled_events: ['*'], description: 'Managed webhook for Stripe sync' }
-    );
-    console.log(`Webhook configured: ${webhook.url} (UUID: ${uuid})`);
+      console.log('Setting up managed webhook in background...');
+      const webhookBaseUrl = `https://${process.env.REPLIT_DOMAINS?.split(',')[0]}`;
+      const { webhook, uuid } = await stripeSync.findOrCreateManagedWebhook(
+        `${webhookBaseUrl}/api/stripe/webhook`,
+        { enabled_events: ['*'], description: 'Managed webhook for Stripe sync' }
+      );
+      console.log(`Webhook configured: ${webhook.url} (UUID: ${uuid})`);
 
-    console.log('Syncing Stripe data in background...');
-    stripeSync.syncBackfill()
-      .then(() => console.log('Stripe data synced'))
-      .catch((err: Error) => console.error('Error syncing Stripe data:', err));
-  } catch (error) {
-    console.error('Failed to initialize Stripe:', error);
-  }
+      console.log('Syncing Stripe data in background...');
+      stripeSync.syncBackfill()
+        .then(() => console.log('Stripe data synced'))
+        .catch((err: Error) => console.error('Error syncing Stripe data:', err));
+    } catch (error) {
+      console.error('Failed to initialize Stripe (non-blocking):', error);
+      // Don't throw - this is background initialization
+    }
+  })();
 }
 
-// Initialize Stripe on startup
+// Initialize Stripe in background (non-blocking)
 initStripe();
 
 // Register Stripe webhook route BEFORE express.json()
@@ -183,6 +190,9 @@ app.use(
 
 app.use(express.urlencoded({ extended: false }));
 
+// BotID is now handled per-route via blockBots middleware in routes.ts
+// Client-side initBotId() in App.tsx handles initialization
+
 export function log(message: string, source = "express") {
   const formattedTime = new Date().toLocaleTimeString("en-US", {
     hour: "numeric",
@@ -198,6 +208,19 @@ app.use((req, res, next) => {
   const start = Date.now();
   const path = req.path;
   let capturedJsonResponse: Record<string, any> | undefined = undefined;
+  
+  // Log BotID detection for monitoring (if set by blockBots middleware)
+  const botidInfo = (req as any).botid;
+  if (botidInfo) {
+    const botInfo = {
+      isBot: botidInfo.isBot,
+      verified: botidInfo.verified,
+      userAgent: req.headers['user-agent']?.substring(0, 50),
+    };
+    if (botidInfo.isBot) {
+      log(`Bot detected: ${JSON.stringify(botInfo)}`, 'botid');
+    }
+  }
 
   const originalResJson = res.json;
   res.json = function (bodyJson, ...args) {
@@ -221,6 +244,10 @@ app.use((req, res, next) => {
 });
 
 (async () => {
+  // Initialize session middleware (must be before routes that use sessions)
+  const { getSession } = await import("./auth.js");
+  app.use(getSession());
+  
   const server = await registerRoutes(app);
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {

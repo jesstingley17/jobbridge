@@ -19,15 +19,34 @@ if (!databaseUrl) {
 console.log(`[DB Init] Using database URL: ${databaseUrl.substring(0, 50)}...`);
 
 // Parse connection string and add SSL config if needed
+// Supabase pooler connections use self-signed certificates, so we must allow them
+const isSupabase = databaseUrl.includes('pooler.supabase.com') || databaseUrl.includes('supabase.co');
+
+// Base connection config
+// Optimized for Vercel serverless: smaller pool, faster timeouts, but longer connection timeout
 const connectionConfig: any = { 
   connectionString: databaseUrl,
-  // Optimize for serverless: keep connections alive but don't keep too many
-  max: 2,  // Reduced from default 10 for serverless
-  idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 5000,
-  // Always allow self-signed certs for now (pooler connections use them)
-  ssl: { rejectUnauthorized: false },
+  max: 1,  // Single connection for serverless (functions are stateless)
+  idleTimeoutMillis: 10000, // Shorter idle timeout (10s instead of 30s)
+  connectionTimeoutMillis: 10000, // Longer connection timeout (10s) for Supabase pooler - increased from 8s
+  statement_timeout: 8000, // 8 seconds max per query
+  // Prevent connection leaks in serverless
+  allowExitOnIdle: true,
 };
+
+// CRITICAL: Always allow self-signed certs for Supabase pooler connections
+// This is required for Supabase's connection pooler to work
+// node-postgres requires explicit SSL config even if connection string has sslmode
+// Set SSL config unconditionally to ensure it's always applied
+connectionConfig.ssl = {
+  rejectUnauthorized: false, // Allow self-signed certificates (required for Supabase pooler)
+};
+
+if (isSupabase) {
+  console.log('[DB Init] SSL configured for Supabase pooler connection (rejectUnauthorized: false)');
+} else {
+  console.log('[DB Init] SSL configured for database connection (rejectUnauthorized: false)');
+}
 
 // Handle SSL for databases that require it (keep ssl: false from above since we set it directly)
 // Additional configuration can be added here if needed
@@ -39,6 +58,16 @@ let db: any;
 
 try {
   pool = new Pool(connectionConfig);
+  
+  // Add error handlers to prevent unhandled rejections
+  pool.on('error', (err: Error) => {
+    console.error('[DB Pool] Unexpected error on idle client:', err);
+  });
+  
+  pool.on('connect', (client) => {
+    console.log('[DB Pool] Client connected');
+  });
+  
   db = drizzle(pool, { schema });
   console.log('[DB Init] Pool and Drizzle initialized successfully');
 } catch (poolErr: any) {

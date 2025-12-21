@@ -1,12 +1,30 @@
 import { type Express } from "express";
 import { createServer as createViteServer, createLogger } from "vite";
 import { type Server } from "http";
-import viteConfig from "../vite.config";
 import fs from "fs";
 import path from "path";
 import { nanoid } from "nanoid";
 
 const viteLogger = createLogger();
+
+// Helper to get vite config - handles different build contexts
+async function getViteConfig() {
+  try {
+    // Try to import vite config - this will fail in Vercel production but that's OK
+    // This file is only used in development anyway
+    const configModule = await import("../vite.config.js");
+    return configModule.default || configModule;
+  } catch {
+    try {
+      const configModule = await import("../vite.config.ts");
+      return configModule.default || configModule;
+    } catch {
+      // If vite config can't be imported (e.g., in Vercel production), use empty object
+      // This file shouldn't be used in production anyway
+      return {};
+    }
+  }
+}
 
 export async function setupVite(server: Server, app: Express) {
   const serverOptions = {
@@ -15,9 +33,10 @@ export async function setupVite(server: Server, app: Express) {
     allowedHosts: true as const,
   };
 
+  const viteConfig = await getViteConfig();
   const vite = await createViteServer({
-    ...viteConfig,
-    configFile: false,
+    ...(viteConfig || {}),
+    configFile: path.resolve(import.meta.dirname, "..", "vite.config.ts"),
     customLogger: {
       ...viteLogger,
       error: (msg, options) => {

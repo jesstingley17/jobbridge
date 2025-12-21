@@ -95,24 +95,34 @@ async function buildAll() {
     await cp("shared", "api/shared", { recursive: true });
   }
 
-  // Copy server/middleware directory to api/server/middleware for Vercel
-  // Vercel runs api/index.ts which imports from ../server/middleware
-  if (existsSync("server/middleware")) {
-    console.log("copying server/middleware directory...");
+  // Copy all server files to api/server for Vercel
+  // Vercel runs api/index.ts which imports from ../server/*
+  if (existsSync("server")) {
+    console.log("copying server files to api/server...");
     // Ensure api/server directory exists
     const apiServerPath = "api/server";
     if (!existsSync(apiServerPath)) {
-      // Create api/server directory structure
       await mkdir(apiServerPath, { recursive: true });
     }
-    // Copy middleware directory
-    const apiMiddlewarePath = join(apiServerPath, "middleware");
-    // Remove existing middleware if it exists to avoid conflicts
-    if (existsSync(apiMiddlewarePath)) {
-      await rm(apiMiddlewarePath, { recursive: true, force: true });
+    
+    // Copy all server files (but exclude node_modules if any)
+    const serverFiles = await import("fs/promises").then(m => m.readdir("server", { withFileTypes: true }));
+    for (const file of serverFiles) {
+      const sourcePath = join("server", file.name);
+      const destPath = join(apiServerPath, file.name);
+      
+      if (file.isDirectory()) {
+        // For directories, copy recursively
+        if (existsSync(destPath)) {
+          await rm(destPath, { recursive: true, force: true });
+        }
+        await cp(sourcePath, destPath, { recursive: true });
+      } else if (file.isFile() && file.name.endsWith('.ts')) {
+        // Copy TypeScript files
+        await cp(sourcePath, destPath);
+      }
     }
-    await cp("server/middleware", apiMiddlewarePath, { recursive: true });
-    console.log("✓ Middleware copied successfully");
+    console.log("✓ Server files copied successfully");
   }
 }
 

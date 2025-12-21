@@ -12,10 +12,18 @@ function getSupabaseAdmin() {
   if (!supabaseUrl || !supabaseServiceRoleKey) {
     const errorMsg = 'Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY environment variables. ' +
       'Set them in your .env file or deployment environment (Vercel).';
-    console.error(errorMsg);
-    console.error('SUPABASE_URL:', supabaseUrl ? 'SET' : 'MISSING');
-    console.error('SUPABASE_SERVICE_ROLE_KEY:', supabaseServiceRoleKey ? 'SET' : 'MISSING');
+    console.error('[Supabase] Configuration Error:', errorMsg);
+    console.error('[Supabase] SUPABASE_URL:', supabaseUrl ? `${supabaseUrl.substring(0, 20)}...` : 'MISSING');
+    console.error('[Supabase] SUPABASE_SERVICE_ROLE_KEY:', supabaseServiceRoleKey ? `${supabaseServiceRoleKey.substring(0, 10)}...` : 'MISSING');
     throw new Error(errorMsg);
+  }
+
+  // Validate URL format
+  try {
+    new URL(supabaseUrl);
+  } catch (urlError) {
+    console.error('[Supabase] Invalid SUPABASE_URL format:', supabaseUrl);
+    throw new Error(`Invalid SUPABASE_URL format: ${supabaseUrl}`);
   }
 
   if (!supabaseAdmin) {
@@ -25,10 +33,35 @@ function getSupabaseAdmin() {
           autoRefreshToken: false,
           persistSession: false,
         },
+        global: {
+          headers: {
+            'x-client-info': 'jobbridge-server',
+          },
+        },
       });
-      console.log('Supabase admin client initialized successfully');
+      console.log('[Supabase] Admin client initialized successfully');
+      console.log('[Supabase] URL:', supabaseUrl);
+      
+      // Test connection with a simple query
+      (async () => {
+        try {
+          const { data, error } = await supabaseAdmin.auth.admin.listUsers({ page: 1, perPage: 1 });
+          if (error) {
+            console.warn('[Supabase] Connection test warning:', error.message);
+          } else {
+            console.log('[Supabase] Connection test successful');
+          }
+        } catch (testError: any) {
+          console.warn('[Supabase] Connection test failed (non-fatal):', testError.message);
+        }
+      })();
     } catch (error: any) {
-      console.error('Failed to create Supabase client:', error);
+      console.error('[Supabase] Failed to create Supabase client:', error);
+      console.error('[Supabase] Error details:', {
+        message: error.message,
+        code: error.code,
+        stack: error.stack,
+      });
       throw error;
     }
   }

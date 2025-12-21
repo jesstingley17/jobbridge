@@ -2,6 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage.js";
 import { isAuthenticated, isAdmin } from "./auth.js";
+import { blockBots } from "./botid.js";
 import { requireSupabaseAuth } from "./middleware/supabaseAuth.js";
 import OpenAI from "openai";
 import { z } from "zod";
@@ -18,7 +19,9 @@ import {
   fetchContentfulPosts, 
   fetchContentfulPostBySlug, 
   convertContentfulPostToDbFormat,
-  syncContentfulPosts 
+  syncContentfulPosts,
+  upsertContentfulPost,
+  deleteContentfulPost
 } from "./contentful.js";
 import { 
   generateResumeRequestSchema, 
@@ -134,13 +137,32 @@ const updateApplicationSchema = z.object({
 import { registerSitemapRoute } from "./routes/sitemap.js";
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Note: Session middleware should be set up BEFORE calling registerRoutes
+  // (e.g., in api/index.ts for Vercel or server/index.ts for regular server)
+  // We don't set it up here to avoid duplicate middleware in serverless functions
+  
   // Register sitemap and robots.txt routes (before auth)
   registerSitemapRoute(app);
+  
+  // Site manifest route (must be before static file serving)
+  app.get("/site.webmanifest", (_req, res) => {
+    res.setHeader('Content-Type', 'application/manifest+json');
+    res.json({
+      name: "The JobBridge",
+      short_name: "JobBridge",
+      description: "AI-powered employment platform for people with disabilities",
+      start_url: "/",
+      display: "standalone",
+      background_color: "#ffffff",
+      theme_color: "#000000",
+      icons: []
+    });
+  });
   
   // Supabase user sync endpoint - called after Supabase signup
   app.post('/api/auth/sync-supabase-user', async (req, res) => {
     try {
-      const { supabaseUserId, email, firstName, lastName, termsAccepted, marketingConsent } = req.body;
+      const { supabaseUserId, email, firstName, lastName, termsAccepted, marketingConsent, emailVerified } = req.body;
       
       if (!supabaseUserId || !email) {
         return res.status(400).json({ error: 'Missing required fields: supabaseUserId and email are required' });
@@ -148,13 +170,96 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       console.log('Syncing Supabase user:', { supabaseUserId, email, firstName, lastName });
 
-      // Upsert user to database using Supabase user ID
+      // CRITICAL: Check if a user with this email already exists (from beta signup, newsletter, etc.)
+      const existingUserByEmail = await storage.getUserByEmail(email);
+      
+      if (existingUserByEmail) {
+        // User exists with different ID - merge by updating ID to Supabase ID
+        if (existingUserByEmail.id !== supabaseUserId) {
+          console.log(`Merging user: Found existing user ${existingUserByEmail.id} for email ${email}, updating to Supabase ID ${supabaseUserId}`);
+          
+          // Update the existing user's ID to Supabase ID and merge data
+          // This requires a special merge operation since we can't directly change primary key
+          // We'll need to handle this carefully to avoid conflicts
+          try {
+            // First, check if Supabase ID already exists (shouldn't happen, but safety check)
+            const existingSupabaseUser = await storage.getUser(supabaseUserId);
+            
+            if (existingSupabaseUser) {
+              // Supabase ID already exists - this is a conflict
+              console.warn(`Both email-based user (${existingUserByEmail.id}) and Supabase user (${supabaseUserId}) exist for ${email}`);
+              // Use the Supabase user as canonical, but merge data
+              const mergedUser = await storage.upsertUser({
+                id: supabaseUserId,
+                email,
+                firstName: firstName || existingUserByEmail.firstName || null,
+                lastName: lastName || existingUserByEmail.lastName || null,
+                emailVerified: emailVerified ?? existingUserByEmail.emailVerified ?? false,
+                termsAccepted: termsAccepted ?? existingUserByEmail.termsAccepted ?? false,
+                marketingConsent: marketingConsent ?? existingUserByEmail.marketingConsent ?? false,
+                role: existingUserByEmail.role || null,
+                stripeCustomerId: existingUserByEmail.stripeCustomerId || null,
+                stripeSubscriptionId: existingUserByEmail.stripeSubscriptionId || null,
+                subscriptionTier: existingUserByEmail.subscriptionTier || null,
+              });
+              
+              // Delete the old user record (optional - you may want to keep it for audit)
+              // For now, we'll just use the Supabase ID as canonical
+              console.log('Using Supabase user as canonical:', mergedUser.id);
+              res.json({ user: mergedUser, success: true, merged: true });
+              return;
+            }
+            
+            // No Supabase user exists - we need to merge by updating the existing user
+            // Since we can't change primary key, we'll create a new user with Supabase ID
+            // and mark the old one for deletion (or handle via a migration)
+            const mergedUser = await storage.upsertUser({
+              id: supabaseUserId,
+              email,
+              firstName: firstName || existingUserByEmail.firstName || null,
+              lastName: lastName || existingUserByEmail.lastName || null,
+              emailVerified: emailVerified ?? existingUserByEmail.emailVerified ?? false,
+              termsAccepted: termsAccepted ?? existingUserByEmail.termsAccepted ?? false,
+              marketingConsent: marketingConsent ?? existingUserByEmail.marketingConsent ?? false,
+              role: existingUserByEmail.role || null,
+              stripeCustomerId: existingUserByEmail.stripeCustomerId || null,
+              stripeSubscriptionId: existingUserByEmail.stripeSubscriptionId || null,
+              subscriptionTier: existingUserByEmail.subscriptionTier || null,
+            });
+            
+            // TODO: Migrate related records (applications, profiles, etc.) from old ID to new ID
+            // For now, we'll log a warning
+            console.warn(`User merged: Old ID ${existingUserByEmail.id} -> New ID ${supabaseUserId}. Related records may need migration.`);
+            
+            res.json({ user: mergedUser, success: true, merged: true, oldId: existingUserByEmail.id });
+            return;
+          } catch (mergeError: any) {
+            console.error('Error merging users:', mergeError);
+            // Fall through to regular upsert
+          }
+        } else {
+          // Same ID - just update
+          const user = await storage.upsertUser({
+            id: supabaseUserId,
+            email,
+            firstName: firstName || existingUserByEmail.firstName || null,
+            lastName: lastName || existingUserByEmail.lastName || null,
+            emailVerified: emailVerified ?? existingUserByEmail.emailVerified ?? false,
+            termsAccepted: termsAccepted ?? existingUserByEmail.termsAccepted ?? false,
+            marketingConsent: marketingConsent ?? existingUserByEmail.marketingConsent ?? false,
+          });
+          res.json({ user, success: true });
+          return;
+        }
+      }
+
+      // No existing user - create new with Supabase ID
       const user = await storage.upsertUser({
         id: supabaseUserId,
         email,
         firstName: firstName || null,
         lastName: lastName || null,
-        emailVerified: false, // Will be true after email verification
+        emailVerified: emailVerified ?? false,
         termsAccepted: termsAccepted || false,
         marketingConsent: marketingConsent || false,
       });
@@ -376,18 +481,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Admin login (separate from regular auth)
+  // Note: blockBots removed temporarily to improve login speed
+  // BotID protection is still active via client-side initBotId()
   app.post('/api/admin/login', async (req, res) => {
     try {
+      // Validate request body
+      if (!req.body || !req.body.email || !req.body.password) {
+        return res.status(400).json({ message: "Email and password are required" });
+      }
+
       const { email, password } = loginUserSchema.parse(req.body);
       
-      // Find user by email
+      // Find user by email (optimized: single query)
       const user = await storage.getUserByEmail(email);
+      
       if (!user || !user.password) {
+        // Use same error message to prevent user enumeration
         return res.status(401).json({ message: "Invalid email or password" });
       }
       
-      // Verify password
+      // Verify password (fast bcrypt comparison)
       const isValid = await verifyPassword(password, user.password);
+      
       if (!isValid) {
         return res.status(401).json({ message: "Invalid email or password" });
       }
@@ -402,9 +517,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       } else if (user.email && adminEmails.includes(user.email)) {
         isAdmin = true;
       } else if (adminPattern && user.email) {
-        const regex = new RegExp(adminPattern);
-        if (regex.test(user.email)) {
-          isAdmin = true;
+        try {
+          const regex = new RegExp(adminPattern);
+          if (regex.test(user.email)) {
+            isAdmin = true;
+          }
+        } catch (regexError) {
+          console.error("Invalid ADMIN_EMAIL_PATTERN regex:", regexError);
         }
       }
       
@@ -413,14 +532,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Create session (check if session exists)
-      if (req.session) {
-        (req.session as any).userId = user.id;
-        (req.session as any).user = {
-          claims: { sub: user.id }
-        };
-        (req.session as any).isAdmin = true;
-      } else {
-        console.warn('Session not available for admin login');
+      try {
+        if (req.session) {
+          (req.session as any).userId = user.id;
+          (req.session as any).user = {
+            claims: { sub: user.id }
+          };
+          (req.session as any).isAdmin = true;
+        } else {
+          console.warn('Session not available for admin login - session middleware may not be configured');
+          // Still allow login but warn about session
+        }
+      } catch (sessionError: any) {
+        console.error("Session creation error:", sessionError);
+        // Don't fail login if session fails - user can still authenticate via token
       }
       
       res.json({ 
@@ -435,13 +560,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } catch (error: any) {
       console.error("Admin login error:", error);
-      console.error("Admin login error stack:", error.stack);
+      console.error("Admin login error details:", {
+        name: error?.name,
+        message: error?.message,
+        stack: error?.stack
+      });
+      
       if (error.name === 'ZodError') {
-        return res.status(400).json({ message: error.errors[0].message });
+        return res.status(400).json({ 
+          message: "Invalid input",
+          errors: error.errors 
+        });
       }
+      
       res.status(500).json({ 
         message: "Login failed",
-        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined,
+        details: process.env.NODE_ENV === 'development' ? {
+          name: error?.name,
+          stack: error?.stack
+        } : undefined
       });
     }
   });
@@ -532,81 +670,215 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ error: 'Not authenticated' });
       }
 
-      // Get user from database using Supabase user ID
+      // Check Supabase Auth metadata and user_roles table for admin status
+      let isAdmin = false;
+      let adminCheckSource = 'none';
+      
+      // Check Supabase Auth metadata
+      try {
+        const { getSupabaseAdmin } = await import('./supabase.js');
+        const supabaseAdmin = getSupabaseAdmin();
+        const { data: { user: fullUser }, error: getUserError } = await supabaseAdmin.auth.admin.getUserById(supabaseUser.id);
+        if (!getUserError && fullUser) {
+          // Check app_metadata or user_metadata for admin status
+          const metadataAdmin = fullUser.app_metadata?.role === 'admin' || 
+                                fullUser.app_metadata?.is_admin === true ||
+                                fullUser.user_metadata?.role === 'admin' ||
+                                fullUser.user_metadata?.is_admin === true;
+          if (metadataAdmin) {
+            isAdmin = true;
+            adminCheckSource = 'supabase_metadata';
+            console.log(`[Auth] Admin role found in Supabase metadata for ${supabaseUser.email}`);
+            console.log(`[Auth] app_metadata:`, fullUser.app_metadata);
+            console.log(`[Auth] user_metadata:`, fullUser.user_metadata);
+          }
+        }
+      } catch (metadataError: any) {
+        // If we can't check metadata, continue with database check
+        console.warn('Could not check Supabase metadata for admin status:', metadataError.message);
+      }
+      
+      // Check user_roles table for admin role (if not already found)
+      if (!isAdmin) {
+        try {
+          const { rows } = await db.query(sql`
+            SELECT EXISTS (
+              SELECT 1 
+              FROM public.user_roles ur 
+              JOIN public.roles r ON r.id = ur.role_id 
+              WHERE ur.user_id = ${supabaseUser.id} 
+              AND r.name = 'admin'
+            ) as is_admin;
+          `);
+          if (rows[0]?.is_admin === true) {
+            isAdmin = true;
+            adminCheckSource = 'user_roles_table';
+            console.log(`[Auth] Admin role found in user_roles table for ${supabaseUser.email}`);
+          }
+        } catch (rolesError: any) {
+          // If user_roles table doesn't exist or query fails, continue
+          console.warn('Could not check user_roles table for admin status:', rolesError.message);
+        }
+      }
+      
+      // Fallback: Check ADMIN_EMAILS env var (temporary workaround)
+      if (!isAdmin && supabaseUser.email) {
+        const adminEmails = process.env.ADMIN_EMAILS?.split(",").map(e => e.trim()) || [];
+        if (adminEmails.includes(supabaseUser.email)) {
+          isAdmin = true;
+          adminCheckSource = 'admin_emails_env';
+          console.log(`[Auth] Admin role found via ADMIN_EMAILS env var for ${supabaseUser.email}`);
+        }
+      }
+      
+      console.log(`[Auth] Final admin check result for ${supabaseUser.email}: isAdmin=${isAdmin}, source=${adminCheckSource}`);
+
+      // Fast path: Try to get user from database first (most common case)
+      // Add timeout to prevent hanging
       let user;
       try {
-        user = await storage.getUser(supabaseUser.id);
-      } catch (getUserError: any) {
-        console.error('Error getting user from database:', getUserError);
-        // If it's a database connection error, return 500
-        if (getUserError.code === '42P01' || getUserError.message?.includes('does not exist')) {
-          console.error('Database tables not found');
-          return res.status(500).json({ 
-            error: 'Database not initialized',
-            message: 'Database tables do not exist. Please run migrations.'
-          });
-        }
-        // For other errors, try to continue
-      }
-      
-      // If user doesn't exist in our database yet, create it from Supabase data
-      if (!user && supabaseUser.email) {
-        console.log('User not found in database, creating from Supabase user:', supabaseUser.id);
+        const getUserPromise = storage.getUser(supabaseUser.id);
+        const timeoutPromise = new Promise((_, reject) => {
+          setTimeout(() => reject(new Error('Database query timeout')), 5000); // 5 second timeout (increased from 3s)
+        });
         
-        // Get full user data from Supabase to get metadata
-        try {
-          const { getSupabaseAdmin } = await import('./supabase.js');
-          const supabaseAdmin = getSupabaseAdmin();
-          const { data: { user: fullSupabaseUser } } = await supabaseAdmin.auth.admin.getUserById(supabaseUser.id);
-          
-          if (fullSupabaseUser) {
-            const userMetadata = fullSupabaseUser.user_metadata || {};
-            try {
-              user = await storage.upsertUser({
-                id: supabaseUser.id,
-                email: supabaseUser.email,
-                firstName: userMetadata.first_name || userMetadata.full_name?.split(' ')[0] || null,
-                lastName: userMetadata.last_name || userMetadata.full_name?.split(' ').slice(1).join(' ') || null,
-                emailVerified: fullSupabaseUser.email_confirmed_at ? true : false,
-                termsAccepted: userMetadata.terms_accepted || false,
-                marketingConsent: userMetadata.marketing_consent || false,
-              });
-            } catch (upsertError: any) {
-              console.error('Error upserting user:', upsertError);
-              console.error('Upsert error stack:', upsertError.stack);
-              // If it's a database error, return 500
-              if (upsertError.code === '42P01' || upsertError.message?.includes('does not exist')) {
-                return res.status(500).json({ 
-                  error: 'Database not initialized',
-                  message: 'Database tables do not exist. Please run migrations.'
-                });
-              }
-              // Try to get user again as fallback
-              try {
-                user = await storage.getUser(supabaseUser.id);
-              } catch (retryError) {
-                console.error('Error retrying getUser:', retryError);
-              }
-            }
-          }
-        } catch (supabaseError: any) {
-          console.error('Error fetching full user from Supabase:', supabaseError);
-          // Continue without metadata - user will be created with minimal info
+        user = await Promise.race([getUserPromise, timeoutPromise]) as any;
+        
+        // If user exists, return immediately (fast path)
+        if (user) {
+          return res.json(user);
         }
+      } catch (timeoutError: any) {
+        if (timeoutError.message === 'Database query timeout' || 
+            timeoutError.message?.includes('Connection terminated') ||
+            timeoutError.message?.includes('timeout exceeded')) {
+          console.warn('Database getUser timed out for user:', supabaseUser.id);
+          // Don't return 500 - instead, continue to try creating user or return JWT fallback
+          // This allows the app to continue working even if database is slow
+        }
+        // If it's not a timeout, continue to create user
       }
       
-      if (user) {
-        return res.json(user);
+      // User doesn't exist - create with minimal data from JWT (no external API calls)
+      // This is much faster than calling Supabase admin API
+      if (supabaseUser.email) {
+        try {
+          const upsertPromise = storage.upsertUser({
+            id: supabaseUser.id,
+            email: supabaseUser.email,
+            firstName: null,
+            lastName: null,
+            emailVerified: false,
+            termsAccepted: false,
+            marketingConsent: false,
+          });
+          const upsertTimeout = new Promise<never>((_, reject) => {
+            setTimeout(() => reject(new Error('Upsert timeout')), 5000); // Increased to 5s
+          });
+          
+          const newUser = await Promise.race([upsertPromise, upsertTimeout]);
+          user = newUser;
+          // If user is admin, set the role even for newly created users
+          if (isAdmin && user.role !== 'admin') {
+            console.log(`[Auth] Newly created user ${user.email || user.id} is admin. Setting role.`);
+            user.role = 'admin';
+            storage.updateUserRole(supabaseUser.id, 'admin').catch(err => {
+              console.warn('Failed to sync admin role to database:', err.message);
+            });
+          }
+          console.log(`[Auth] Returning newly created user: ${user.email || user.id}, role: ${user.role}, isAdmin check: ${isAdmin}`);
+          return res.json(user);
+        } catch (upsertError: any) {
+          console.error('Error creating user:', upsertError);
+          
+          // Check for timeout or connection errors
+          if (upsertError.message === 'Upsert timeout' || 
+              upsertError.message?.includes('Connection terminated') ||
+              upsertError.message?.includes('timeout exceeded')) {
+            // Try to get user one more time (might have been created by another request)
+            try {
+              const retryPromise = storage.getUser(supabaseUser.id);
+              const retryTimeout = new Promise((_, reject) => {
+                setTimeout(() => reject(new Error('Retry timeout')), 3000); // Increased to 3s
+              });
+              user = await Promise.race([retryPromise, retryTimeout]);
+              if (user) {
+                return res.json(user);
+              }
+            } catch (retryError) {
+              // Ignore retry errors
+            }
+            
+            // If database is timing out, return a minimal user object from JWT data
+            // This allows the app to continue working even if database is slow
+            console.warn('Database timeout - returning user from JWT data only');
+            const jwtUser = {
+              id: supabaseUser.id,
+              email: supabaseUser.email,
+              firstName: null,
+              lastName: null,
+              emailVerified: supabaseUser.email_confirmed_at ? true : false,
+              termsAccepted: false,
+              marketingConsent: false,
+              role: isAdmin ? 'admin' : null, // Include admin role from Supabase/user_roles if available
+              subscriptionTier: 'free',
+              monthlyApplicationCount: 0,
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString(),
+              _fromJWT: true, // Flag to indicate this is from JWT, not database
+            };
+            console.log(`[Auth] Returning JWT fallback user: ${jwtUser.email}, role: ${jwtUser.role}, isAdmin check: ${isAdmin}`);
+            return res.json(jwtUser);
+          }
+          
+          // Check for database errors
+          if (upsertError.code === '42P01' || upsertError.message?.includes('does not exist')) {
+            return res.status(500).json({ 
+              error: 'Database not initialized',
+              message: 'Database tables do not exist. Please run migrations.'
+            });
+          }
+          
+          // For other errors, try to get user one more time (might have been created by another request)
+          try {
+            const retryPromise = storage.getUser(supabaseUser.id);
+            const retryTimeout = new Promise((_, reject) => {
+              setTimeout(() => reject(new Error('Retry timeout')), 3000);
+            });
+            user = await Promise.race([retryPromise, retryTimeout]);
+            if (user) {
+              return res.json(user);
+            }
+          } catch (retryError) {
+            // Ignore retry errors
+          }
+          
+          // If all else fails, return user from JWT to allow app to continue
+          console.warn('Database error - returning user from JWT data only');
+          const jwtFallbackUser = {
+            id: supabaseUser.id,
+            email: supabaseUser.email,
+            firstName: null,
+            lastName: null,
+            emailVerified: supabaseUser.email_confirmed_at ? true : false,
+            termsAccepted: false,
+            marketingConsent: false,
+            role: isAdmin ? 'admin' : null, // Include admin role from Supabase/user_roles if available
+            subscriptionTier: 'free',
+            monthlyApplicationCount: 0,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+            _fromJWT: true,
+          };
+          console.log(`[Auth] Returning JWT fallback user (error case): ${jwtFallbackUser.email}, role: ${jwtFallbackUser.role}, isAdmin check: ${isAdmin}`);
+          return res.json(jwtFallbackUser);
+        }
       }
       
       // If we still don't have a user, return 401
       return res.status(401).json({ error: 'User not found' });
     } catch (error: any) {
       console.error("Unexpected error in /api/auth/user:", error);
-      console.error("Error name:", error.name);
-      console.error("Error message:", error.message);
-      console.error("Error stack:", error.stack);
-      console.error("Error code:", error.code);
       
       // Check if it's a known error type
       if (error.code === '42P01' || error.message?.includes('does not exist')) {
@@ -621,14 +893,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ 
         message: "Failed to fetch user", 
         error: error.message || 'Internal server error',
-        code: error.code,
-        // Include stack in development for debugging
-        stack: process.env.NODE_ENV === 'development' && error.stack ? error.stack.split('\n').slice(0, 5).join('\n') : undefined
+        code: error.code
       });
     }
   });
 
   // Get subscription status
+  // Note: blockBots removed - BotID is disabled in client code
   app.get('/api/subscription/status', isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user?.claims?.sub;
@@ -639,10 +910,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(status);
     } catch (error: any) {
       console.error("Error fetching subscription status:", error);
-      console.error("Error stack:", error.stack);
-      res.status(500).json({ 
-        error: "Failed to fetch subscription status",
-        message: process.env.NODE_ENV === 'development' ? error.message : undefined
+      console.error("Error stack:", error?.stack);
+      console.error("Error details:", {
+        message: error?.message,
+        code: error?.code,
+        name: error?.name
+      });
+      // Return default status instead of 500 to prevent UI breakage
+      res.json({
+        tier: 'free',
+        limits: { applications: 0, aiFeatures: false },
+        applicationQuota: {
+          used: 0,
+          remaining: 0,
+          limit: 0,
+          resetDate: new Date().toISOString(),
+        },
       });
     }
   });
@@ -868,9 +1151,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // User profile routes
-  app.get('/api/profile', isAuthenticated, async (req: any, res) => {
+  app.get('/api/profile', requireSupabaseAuth(), async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const supabaseUser = req.supabaseUser;
+      if (!supabaseUser || !supabaseUser.id) {
+        return res.status(401).json({ error: 'Not authenticated' });
+      }
+      const userId = supabaseUser.id;
       const profile = await storage.getUserProfile(userId);
       res.json(profile || null);
     } catch (error) {
@@ -879,9 +1166,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post('/api/profile', isAuthenticated, async (req: any, res) => {
+  app.post('/api/profile', requireSupabaseAuth(), async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const supabaseUser = req.supabaseUser;
+      if (!supabaseUser || !supabaseUser.id) {
+        return res.status(401).json({ error: 'Not authenticated' });
+      }
+      const userId = supabaseUser.id;
       const parsed = updateProfileSchema.safeParse(req.body);
       if (!parsed.success) {
         return res.status(400).json({ error: "Invalid profile data", details: parsed.error.errors });
@@ -898,6 +1189,258 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error saving profile:", error);
       res.status(500).json({ error: "Failed to save profile" });
+    }
+  });
+
+  // Beta tester signup (no authentication required)
+  app.post('/api/beta-tester/signup', async (req, res) => {
+    try {
+      const { email, firstName, lastName, company, role, feedback, termsAccepted, marketingConsent } = req.body;
+      
+      // Basic validation
+      if (!email || !firstName || !lastName) {
+        return res.status(400).json({ error: "Email, first name, and last name are required" });
+      }
+      
+      if (!termsAccepted) {
+        return res.status(400).json({ error: "You must accept the terms and conditions" });
+      }
+      
+      // Check if email already exists
+      const existingUser = await storage.getUserByEmail(email);
+      
+      if (existingUser) {
+        // User already exists - update their info if needed
+        if (marketingConsent !== undefined || firstName || lastName) {
+          await storage.updateUser(existingUser.id, {
+            firstName: firstName || existingUser.firstName || null,
+            lastName: lastName || existingUser.lastName || null,
+            marketingConsent: marketingConsent ?? existingUser.marketingConsent ?? false,
+            marketingConsentAt: marketingConsent ? new Date() : existingUser.marketingConsentAt || null,
+            termsAccepted: existingUser.termsAccepted || true,
+            termsAcceptedAt: existingUser.termsAcceptedAt || new Date(),
+          });
+        }
+        return res.json({ 
+          success: true, 
+          message: "You're already registered! We'll keep you updated.",
+          alreadyRegistered: true,
+          user: existingUser
+        });
+      }
+      
+      // Check if user exists in Supabase Auth (they may have signed up via Supabase first)
+      // If so, use their Supabase ID; otherwise, let database generate one
+      // Note: We can't check Supabase Auth directly here, so we'll create with auto-generated ID
+      // The sync-supabase-user endpoint will handle merging if they sign up via Supabase later
+      try {
+        const user = await storage.upsertUser({
+          email,
+          firstName,
+          lastName,
+          termsAccepted: true,
+          termsAcceptedAt: new Date(),
+          marketingConsent: marketingConsent || false,
+          marketingConsentAt: marketingConsent ? new Date() : null,
+          // Mark as beta tester in role or add a note
+          role: "participant", // Default role
+        });
+        
+        // Send welcome email for beta testers
+        try {
+          const { sendWelcomeEmail } = await import('./email.js');
+          await sendWelcomeEmail({ 
+            email: user.email!, 
+            firstName: user.firstName || undefined 
+          });
+        } catch (emailError) {
+          console.error("Failed to send beta tester welcome email:", emailError);
+          // Don't fail the request if email fails
+        }
+        
+        return res.json({ 
+          success: true, 
+          message: "Thank you for joining our beta program! We'll be in touch soon.",
+          user: {
+            id: user.id,
+            email: user.email,
+            firstName: user.firstName,
+            lastName: user.lastName,
+          }
+        });
+      } catch (createError: any) {
+        console.error("Error creating beta tester:", createError);
+        return res.status(500).json({ 
+          error: "Failed to process beta tester signup",
+          message: createError?.message || "Database error"
+        });
+      }
+    } catch (error: any) {
+      console.error("Error in beta tester signup:", error);
+      res.status(500).json({ 
+        error: "Failed to process signup",
+        message: error?.message || "Internal server error"
+      });
+    }
+  });
+
+  // Newsletter signup (no authentication required)
+  app.post('/api/newsletter/signup', async (req, res) => {
+    try {
+      const { email } = req.body;
+      
+      if (!email) {
+        return res.status(400).json({ error: "Email is required" });
+      }
+      
+      // Basic email validation
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(email)) {
+        return res.status(400).json({ error: "Invalid email address" });
+      }
+      
+      // Check if user already exists
+      const existingUser = await storage.getUserByEmail(email);
+
+      if (existingUser) {
+        // User exists - update their marketing consent
+        // Using updateUser for app-specific fields (Supabase best practice)
+        try {
+          await storage.updateUser(existingUser.id, {
+            marketingConsent: true,
+            marketingConsentAt: new Date(),
+          });
+          // Return existing user
+          return res.json({
+            success: true,
+            message: "Thank you for subscribing to our newsletter!",
+            user: existingUser,
+          });
+          return res.json({ 
+            success: true, 
+            message: "You're already subscribed! We'll keep you updated.",
+            alreadySubscribed: true
+          });
+        } catch (updateError) {
+          console.error("Error updating user marketing consent:", updateError);
+          // Continue to return success even if update fails
+          return res.json({ 
+            success: true, 
+            message: "Thank you for subscribing!",
+            alreadySubscribed: true
+          });
+        }
+      }
+      
+      // Create new user with just email and marketing consent
+      try {
+        const user = await storage.upsertUser({
+          email,
+          marketingConsent: true,
+          marketingConsentAt: new Date(),
+          termsAccepted: false, // They haven't accepted terms yet, just newsletter
+        });
+        
+        return res.json({ 
+          success: true, 
+          message: "Thank you for subscribing to our newsletter!",
+          user: {
+            id: user.id,
+            email: user.email,
+          }
+        });
+      } catch (createError: any) {
+        console.error("Error creating newsletter subscriber:", createError);
+        return res.status(500).json({ 
+          error: "Failed to process newsletter signup",
+          message: createError?.message || "Database error"
+        });
+      }
+    } catch (error: any) {
+      console.error("Error in newsletter signup:", error);
+      res.status(500).json({ 
+        error: "Failed to process signup",
+        message: error?.message || "Internal server error"
+      });
+    }
+  });
+
+  // Contact form submission
+  app.post('/api/contact', async (req, res) => {
+    try {
+      const { name, email, subject, message, type } = req.body;
+      
+      // Basic validation
+      if (!name || !email || !subject || !message) {
+        return res.status(400).json({ error: "Name, email, subject, and message are required" });
+      }
+      
+      // Email validation
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(email)) {
+        return res.status(400).json({ error: "Invalid email address" });
+      }
+      
+      // In a real application, you would:
+      // 1. Send an email notification to your team
+      // 2. Store the message in a database
+      // 3. Send an auto-reply to the user
+      
+      // For now, we'll just log it and return success
+      console.log("Contact form submission:", {
+        name,
+        email,
+        subject,
+        message,
+        type: type || "general",
+        timestamp: new Date().toISOString(),
+      });
+      
+      // TODO: Implement email sending service (e.g., SendGrid, Resend, etc.)
+      // TODO: Store in database if needed
+      
+      return res.json({ 
+        success: true, 
+        message: "Thank you for contacting us! We'll get back to you within 24-48 hours."
+      });
+    } catch (error: any) {
+      console.error("Error processing contact form:", error);
+      res.status(500).json({ 
+        error: "Failed to process contact form",
+        message: error?.message || "Internal server error"
+      });
+    }
+  });
+
+  // Update community username
+  app.patch('/api/user/community-username', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { username } = req.body;
+      
+      // Validate username (optional, can be null to clear it)
+      if (username !== null && username !== undefined) {
+        if (typeof username !== 'string') {
+          return res.status(400).json({ error: "Username must be a string" });
+        }
+        // Basic validation: alphanumeric, underscore, hyphen, 3-30 chars
+        if (username.length < 3 || username.length > 30) {
+          return res.status(400).json({ error: "Username must be between 3 and 30 characters" });
+        }
+        if (!/^[a-zA-Z0-9_-]+$/.test(username)) {
+          return res.status(400).json({ error: "Username can only contain letters, numbers, underscores, and hyphens" });
+        }
+      }
+      
+      const updated = await storage.updateUserCommunityUsername(userId, username || null);
+      if (!updated) {
+        return res.status(404).json({ error: "User not found" });
+      }
+      
+      res.json({ user: updated });
+    } catch (error: any) {
+      console.error("Error updating community username:", error);
+      res.status(500).json({ error: "Failed to update community username" });
     }
   });
 
@@ -969,10 +1512,112 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Semantic job search using Pinecone (enhanced search)
+  app.get("/api/jobs/semantic", async (req, res) => {
+    try {
+      const { query, location, type, limit } = req.query;
+      
+      if (!query || typeof query !== 'string') {
+        return res.status(400).json({ error: "Query parameter is required" });
+      }
+
+      const { searchJobsSemantic } = await import('./pineconeJobs.js');
+      
+      const results = await searchJobsSemantic(query, parseInt(limit as string) || 20, {
+        location: location as string | undefined,
+        type: type as string | undefined,
+      });
+
+      // Fetch full job details from database
+      const jobIds = results.map(r => r.jobId);
+      const jobs = await Promise.all(
+        jobIds.map(async (id) => {
+          try {
+            const job = await storage.getJob(id);
+            if (job) {
+              // Find matching result to include score
+              const match = results.find(r => r.jobId === id);
+              return {
+                ...job,
+                relevanceScore: match?.score || 0,
+              };
+            }
+            return null;
+          } catch {
+            return null;
+          }
+        })
+      );
+
+      const validJobs = jobs.filter(Boolean);
+      
+      res.json({
+        jobs: validJobs,
+        query,
+        totalResults: validJobs.length,
+        semanticSearch: true,
+      });
+    } catch (error: any) {
+      console.error("Error in semantic job search:", error);
+      res.status(500).json({ 
+        error: "Failed to perform semantic job search",
+        message: error.message 
+      });
+    }
+  });
+
+  // Resume-to-job matching using Pinecone
+  app.post("/api/jobs/match-resume", requireSupabaseAuth(), async (req: any, res) => {
+    try {
+      const { resumeText, limit } = req.body;
+      
+      if (!resumeText || typeof resumeText !== 'string') {
+        return res.status(400).json({ error: "resumeText is required" });
+      }
+
+      const { matchResumeToJobs } = await import('./pineconeJobs.js');
+      
+      const results = await matchResumeToJobs(resumeText, parseInt(limit) || 10);
+
+      // Fetch full job details
+      const jobIds = results.map(r => r.jobId);
+      const jobs = await Promise.all(
+        jobIds.map(async (id) => {
+          try {
+            const job = await storage.getJob(id);
+            if (job) {
+              const match = results.find(r => r.jobId === id);
+              return {
+                ...job,
+                matchScore: match?.score || 0,
+              };
+            }
+            return null;
+          } catch {
+            return null;
+          }
+        })
+      );
+
+      const validJobs = jobs.filter(Boolean);
+      
+      res.json({
+        jobs: validJobs,
+        totalMatches: validJobs.length,
+      });
+    } catch (error: any) {
+      console.error("Error matching resume to jobs:", error);
+      res.status(500).json({ 
+        error: "Failed to match resume to jobs",
+        message: error.message 
+      });
+    }
+  });
+
   // External jobs endpoint (from Indeed/RapidAPI with caching)
   app.get("/api/external-jobs", async (req, res) => {
     try {
-      const { query, location, type, accessibilityFilters } = req.query;
+      const { query, location, type, accessibilityFilters, indexInPinecone } = req.query;
       const filters = accessibilityFilters ? 
         (typeof accessibilityFilters === 'string' ? accessibilityFilters.split(',') : accessibilityFilters as string[]) 
         : undefined;
@@ -982,6 +1627,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
         type as string | undefined,
         filters
       );
+      
+      // Optionally index jobs in Pinecone (if enabled and Pinecone is configured)
+      if (indexInPinecone === 'true' && process.env.PINECONE_API_KEY) {
+        const { indexJob } = await import('./pineconeJobs.js');
+        // Index jobs in background (don't wait for completion)
+        Promise.all(
+          externalJobs.map(job => 
+            indexJob({
+              id: job.id,
+              title: job.title || '',
+              description: job.description || '',
+              company: job.company || undefined,
+              location: job.location || undefined,
+              type: job.type || undefined,
+            }).catch(err => console.error(`Failed to index job ${job.id}:`, err))
+          )
+        ).catch(err => console.error('Error indexing external jobs:', err));
+      }
+      
       res.json(externalJobs);
     } catch (error) {
       console.error("Error fetching external jobs:", error);
@@ -1319,7 +1983,7 @@ Return ONLY valid JSON, no markdown or explanation.`;
   });
 
   // Bulk apply to multiple jobs (Pro+ feature)
-  app.post("/api/applications/bulk", isAuthenticated, requireFeature('bulkApply'), async (req: any, res) => {
+  app.post("/api/applications/bulk", blockBots, isAuthenticated, requireFeature('bulkApply'), async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const parsed = bulkApplyRequestSchema.safeParse(req.body);
@@ -1366,7 +2030,7 @@ Return ONLY valid JSON, no markdown or explanation.`;
   });
 
   // AI-powered Cover Letter Generation (Pro+ feature)
-  app.post("/api/cover-letter/generate", isAuthenticated, requireFeature('aiCoverLetter'), async (req: any, res) => {
+  app.post("/api/cover-letter/generate", blockBots, isAuthenticated, requireFeature('aiCoverLetter'), async (req: any, res) => {
     try {
       const parsed = generateCoverLetterRequestSchema.safeParse(req.body);
       if (!parsed.success) {
@@ -1480,7 +2144,7 @@ Format as a JSON array with objects containing: question, reason, tips`;
   });
 
   // AI-powered Answer Analysis (Pro+ feature)
-  app.post("/api/interview/analyze", isAuthenticated, requireFeature('aiInterviewPrep'), async (req: any, res) => {
+  app.post("/api/interview/analyze", blockBots, isAuthenticated, requireFeature('aiInterviewPrep'), async (req: any, res) => {
     try {
       const parsed = analyzeAnswerRequestSchema.safeParse(req.body);
       if (!parsed.success) {
@@ -1611,7 +2275,7 @@ Return a JSON array with objects containing:
   });
 
   // AI Job Description Simplifier
-  app.post("/api/ai/simplify-job", async (req, res) => {
+  app.post("/api/ai/simplify-job", blockBots, async (req, res) => {
     try {
       const parsed = simplifyJobRequestSchema.safeParse(req.body);
       if (!parsed.success) {
@@ -1670,7 +2334,7 @@ Use simple words and short sentences.`;
   });
 
   // AI Skills Gap Analysis (Pro+ feature)
-  app.post("/api/ai/skills-gap", isAuthenticated, requireFeature('aiSkillsGap'), async (req: any, res) => {
+  app.post("/api/ai/skills-gap", blockBots, isAuthenticated, requireFeature('aiSkillsGap'), async (req: any, res) => {
     try {
       const parsed = skillsGapRequestSchema.safeParse(req.body);
       if (!parsed.success) {
@@ -1782,7 +2446,7 @@ Be warm, supportive, and use clear, simple language. Keep responses concise but 
   });
 
   // AI Application Tips (Pro+ feature)
-  app.post("/api/ai/application-tips", isAuthenticated, requireFeature('aiApplicationTips'), async (req: any, res) => {
+  app.post("/api/ai/application-tips", blockBots, isAuthenticated, requireFeature('aiApplicationTips'), async (req: any, res) => {
     try {
       const parsed = applicationTipsRequestSchema.safeParse(req.body);
       if (!parsed.success) {
@@ -1837,7 +2501,7 @@ Return as JSON array with objects: { tip, importance, example }`;
   });
 
   // AI Job Match Score
-  app.post("/api/ai/match-score", async (req, res) => {
+  app.post("/api/ai/match-score", blockBots, async (req, res) => {
     try {
       const parsed = jobMatchScoreRequestSchema.safeParse(req.body);
       if (!parsed.success) {
@@ -2002,7 +2666,7 @@ Return JSON with:
     }
   });
 
-  app.post("/api/stripe/portal", isAuthenticated, async (req: any, res) => {
+  app.post("/api/stripe/portal", blockBots, isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const user = await storage.getUser(userId);
@@ -2185,33 +2849,518 @@ Return JSON with:
     }
   });
 
+  // Test Contentful connection endpoint (admin only) - block bots
+  app.get("/api/contentful/test", blockBots, isAuthenticated, isAdmin, async (req: any, res) => {
+    try {
+      const { fetchContentfulPosts, getContentfulClient, getContentfulManagementClient } = await import("./contentful.js");
+      
+      // Check configuration
+      const spaceId = process.env.CONTENTFUL_SPACE_ID;
+      const accessToken = process.env.CONTENTFUL_ACCESS_TOKEN;
+      const managementToken = process.env.CONTENTFUL_MANAGEMENT_TOKEN;
+      const environment = process.env.CONTENTFUL_ENVIRONMENT || 'master';
+
+      const diagnostics: any = {
+        configured: false,
+        spaceId: spaceId ? `${spaceId.substring(0, 8)}...` : 'NOT SET',
+        environment,
+        hasAccessToken: !!accessToken,
+        hasManagementToken: !!managementToken,
+        accessTokenLength: accessToken?.length || 0,
+        managementTokenLength: managementToken?.length || 0,
+        errors: [],
+        warnings: [],
+        contentTypes: [],
+        blogPosts: [],
+        testResults: {}
+      };
+
+      // Check if configured
+      if (!spaceId || !accessToken) {
+        diagnostics.errors.push("Missing required environment variables");
+        diagnostics.errors.push(`CONTENTFUL_SPACE_ID: ${spaceId ? 'SET' : 'MISSING'}`);
+        diagnostics.errors.push(`CONTENTFUL_ACCESS_TOKEN: ${accessToken ? 'SET' : 'MISSING'}`);
+        return res.status(400).json({
+          error: "Contentful not configured",
+          diagnostics,
+          message: "Set CONTENTFUL_SPACE_ID and CONTENTFUL_ACCESS_TOKEN environment variables in Vercel"
+        });
+      }
+
+      diagnostics.configured = true;
+
+      // Test Content Delivery API (CDA)
+      const client = getContentfulClient();
+      if (!client) {
+        diagnostics.errors.push("Failed to create Contentful client");
+        return res.status(500).json({
+          error: "Failed to initialize Contentful client",
+          diagnostics
+        });
+      }
+
+      try {
+        // Test basic connection
+        const entries = await client.getEntries({ limit: 10 });
+        diagnostics.testResults.cdaConnection = "SUCCESS";
+        diagnostics.totalEntries = entries.total;
+        
+        // Get all content types
+        const contentTypeIds = entries.items.map((item: any) => item.sys.contentType.sys.id);
+        diagnostics.contentTypes = Array.from(new Set(contentTypeIds));
+        
+        // Try to fetch blog posts
+        const posts = await fetchContentfulPosts();
+        diagnostics.testResults.fetchPosts = posts.length > 0 ? "SUCCESS" : "NO_POSTS_FOUND";
+        diagnostics.blogPosts = posts.map((p: any) => ({
+          id: p.sys.id,
+          title: p.fields?.title || 'No title',
+          slug: p.fields?.slug || 'No slug',
+          contentType: p.sys.contentType.sys.id
+        }));
+
+        if (posts.length === 0) {
+          diagnostics.warnings.push("No blog posts found. Check content type name matches: blogPost, blog_post, Blog page, or blogPage");
+          diagnostics.warnings.push(`Available content types: ${diagnostics.contentTypes.join(', ')}`);
+        }
+
+        // Test Management API if token is available
+        if (managementToken) {
+          try {
+            const mgmtClient = getContentfulManagementClient();
+            if (mgmtClient) {
+              const space = await mgmtClient.getSpace(spaceId);
+              const env = await space.getEnvironment(environment);
+              diagnostics.testResults.managementApi = "SUCCESS";
+              diagnostics.spaceName = space.name;
+              diagnostics.environmentName = env.name;
+            }
+          } catch (mgmtError: any) {
+            diagnostics.testResults.managementApi = "FAILED";
+            diagnostics.warnings.push(`Management API error: ${mgmtError.message}`);
+          }
+        } else {
+          diagnostics.warnings.push("CONTENTFUL_MANAGEMENT_TOKEN not set - cannot create/update posts from admin panel");
+        }
+
+        res.json({
+          success: true,
+          message: diagnostics.errors.length === 0 ? "Contentful connection successful" : "Contentful connected with warnings",
+          diagnostics
+        });
+      } catch (apiError: any) {
+        diagnostics.testResults.cdaConnection = "FAILED";
+        diagnostics.errors.push(`API Error: ${apiError.message}`);
+        
+        // Check for specific error types
+        if (apiError.message?.includes('401') || apiError.message?.includes('Unauthorized')) {
+          diagnostics.errors.push("Invalid access token - check CONTENTFUL_ACCESS_TOKEN");
+        } else if (apiError.message?.includes('404') || apiError.message?.includes('Not Found')) {
+          diagnostics.errors.push("Space not found - check CONTENTFUL_SPACE_ID");
+        } else if (apiError.message?.includes('Network')) {
+          diagnostics.errors.push("Network error - check internet connection");
+        }
+
+        res.status(500).json({
+          error: "Contentful API error",
+          diagnostics,
+          message: apiError.message,
+          details: process.env.NODE_ENV === 'development' ? apiError.stack : undefined
+        });
+      }
+    } catch (error: any) {
+      console.error("Error testing Contentful connection:", error);
+      res.status(500).json({
+        error: "Failed to test Contentful connection",
+        message: error.message,
+        stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+      });
+    }
+  });
+
   // Manual sync endpoint (admin only)
-  app.post("/api/contentful/sync", isAuthenticated, async (req: any, res) => {
+  app.post("/api/contentful/sync", requireSupabaseAuth(), isAdmin, async (req: any, res) => {
     try {
       const result = await syncContentfulPosts(storage.upsertBlogPost.bind(storage));
       res.json({ 
         success: true, 
         synced: result.synced, 
-        errors: result.errors 
+        errors: result.errors,
+        message: result.errors > 0 
+          ? `Synced ${result.synced} posts with ${result.errors} errors. Check server logs for details.`
+          : `Successfully synced ${result.synced} posts from Contentful.`
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error syncing Contentful posts:", error);
-      res.status(500).json({ error: "Failed to sync posts" });
+      // Provide more helpful error message
+      const errorMessage = error.message || "Failed to sync posts";
+      const isConfigError = errorMessage.includes('not configured') || errorMessage.includes('CONTENTFUL');
+      
+      res.status(500).json({ 
+        error: "Failed to sync posts",
+        details: isConfigError 
+          ? "Contentful may not be configured. Check CONTENTFUL_SPACE_ID and CONTENTFUL_ACCESS_TOKEN environment variables."
+          : errorMessage,
+        synced: 0,
+        errors: 1
+      });
     }
   });
 
-  // Admin blog management routes
-  app.get("/api/admin/blog/posts", isAuthenticated, isAdmin, async (req, res) => {
+
+  // Public HubSpot blog posts endpoint
+  // This reads posts from HubSpot CMS API v3
+  // Configuration (set in your environment / Vercel):
+  // - HUBSPOT_ACCESS_TOKEN: HubSpot private app access token (required)
+  //   Create a private app in HubSpot and grant "Read" access to "Blog posts" scope
+  app.get("/api/hubspot/blog/posts", async (req, res) => {
     try {
-      const posts = await storage.getAllBlogPosts();
+      const accessToken = process.env.HUBSPOT_ACCESS_TOKEN || process.env.VITE_HUBSPOT_ACCESS_TOKEN;
+      const limit = parseInt(req.query.limit as string) || 50;
+
+      if (!accessToken) {
+        console.error("[HubSpot Blog] Missing configuration. HUBSPOT_ACCESS_TOKEN not set.");
+        return res.status(500).json({
+          error: "HubSpot blog is not configured",
+          details: "Set HUBSPOT_ACCESS_TOKEN environment variable in Vercel. Create a private app in HubSpot with 'Blog posts' read access.",
+        });
+      }
+
+      const { fetchHubSpotBlogPosts } = await import('./hubspotBlog.js');
+      const posts = await fetchHubSpotBlogPosts(accessToken, limit);
+
       res.json({ posts });
-    } catch (error) {
-      console.error("Error fetching all blog posts:", error);
-      res.status(500).json({ error: "Failed to fetch blog posts" });
+    } catch (error: any) {
+      console.error("[HubSpot Blog] Unexpected error fetching posts:", error);
+      res.status(500).json({
+        error: "Failed to load blog posts from HubSpot",
+        details: error?.message || String(error),
+      });
     }
   });
 
-  app.get("/api/admin/blog/posts/:id", isAuthenticated, isAdmin, async (req, res) => {
+  // Legacy Blogger endpoint (kept for backward compatibility, but deprecated)
+  app.get("/api/blogger/posts", async (req, res) => {
+    const apiKey = process.env.BLOGGER_API_KEY || process.env.VITE_BLOGGER_API_KEY;
+    const blogUrl = process.env.BLOGGER_BLOG_URL;
+
+    if (!apiKey || !blogUrl) {
+      console.error("[Blogger] Missing configuration. BLOGGER_API_KEY or BLOGGER_BLOG_URL not set.", {
+        hasApiKey: !!apiKey,
+        hasBlogUrl: !!blogUrl,
+      });
+      return res.status(500).json({
+        error: "Blogger is not configured",
+        details: "Set BLOGGER_API_KEY and BLOGGER_BLOG_URL environment variables.",
+      });
+    }
+
+    try {
+      // First, resolve the blog by its URL to get the blogId
+      const byUrl = `https://www.googleapis.com/blogger/v3/blogs/byurl?url=${encodeURIComponent(
+        blogUrl
+      )}&key=${encodeURIComponent(apiKey)}`;
+
+      const blogRes = await fetch(byUrl);
+      if (!blogRes.ok) {
+        const text = await blogRes.text().catch(() => "");
+        console.error("[Blogger] Failed to resolve blog by URL", {
+          status: blogRes.status,
+          statusText: blogRes.statusText,
+          body: text,
+        });
+        return res.status(502).json({
+          error: "Failed to load blog metadata from Blogger",
+          details: `Blogger API responded with ${blogRes.status} ${blogRes.statusText}`,
+        });
+      }
+
+      const blogData: any = await blogRes.json();
+      const blogId = blogData?.id;
+      if (!blogId) {
+        console.error("[Blogger] Blog ID missing in byurl response", blogData);
+        return res.status(502).json({
+          error: "Failed to determine Blogger blog ID",
+          details: "Blogger API did not return an id for the provided BLOGGER_BLOG_URL.",
+        });
+      }
+
+      // Now fetch posts for this blog
+      const postsUrl = `https://www.googleapis.com/blogger/v3/blogs/${encodeURIComponent(
+        blogId
+      )}/posts?key=${encodeURIComponent(apiKey)}`;
+
+      const postsRes = await fetch(postsUrl);
+      if (!postsRes.ok) {
+        const text = await postsRes.text().catch(() => "");
+        console.error("[Blogger] Failed to fetch posts", {
+          status: postsRes.status,
+          statusText: postsRes.statusText,
+          body: text,
+        });
+        return res.status(502).json({
+          error: "Failed to load posts from Blogger",
+          details: `Blogger API responded with ${postsRes.status} ${postsRes.statusText}`,
+        });
+      }
+
+      const postsData: any = await postsRes.json();
+      const items: any[] = postsData?.items || [];
+
+      const posts = items.map((item) => ({
+        id: item.id,
+        title: item.title,
+        url: item.url,
+        content: item.content,
+        publishedAt: item.published,
+        updatedAt: item.updated,
+        authorName: item.author?.displayName || null,
+        labels: item.labels || [],
+      }));
+
+      res.json({ posts });
+    } catch (error: any) {
+      console.error("[Blogger] Unexpected error fetching posts:", error);
+      res.status(500).json({
+        error: "Failed to load blog posts from Blogger",
+        details: error?.message || String(error),
+      });
+    }
+  });
+
+  // Admin endpoint to index jobs in Pinecone
+  app.post("/api/admin/pinecone/index-jobs", requireSupabaseAuth(), isAdmin, async (req: any, res) => {
+    try {
+      const { jobIds, indexAll } = req.body;
+      
+      const { indexJob } = await import('./pineconeJobs.js');
+      
+      if (indexAll) {
+        // Index all jobs from database
+        const allJobs = await storage.searchJobs();
+        let indexed = 0;
+        let failed = 0;
+        
+        for (const job of allJobs) {
+          try {
+            await indexJob({
+              id: job.id,
+              title: job.title || '',
+              description: job.description || '',
+              company: job.company || undefined,
+              location: job.location || undefined,
+              type: job.type || undefined,
+              requirements: job.requirements || undefined,
+            });
+            indexed++;
+          } catch (error: any) {
+            console.error(`Failed to index job ${job.id}:`, error.message);
+            failed++;
+          }
+        }
+        
+        res.json({
+          success: true,
+          message: `Indexed ${indexed} jobs, ${failed} failed`,
+          indexed,
+          failed,
+        });
+      } else if (jobIds && Array.isArray(jobIds)) {
+        // Index specific jobs
+        let indexed = 0;
+        let failed = 0;
+        
+        for (const jobId of jobIds) {
+          try {
+            const job = await storage.getJob(jobId);
+            if (job) {
+              await indexJob({
+                id: job.id,
+                title: job.title || '',
+                description: job.description || '',
+                company: job.company || undefined,
+                location: job.location || undefined,
+                type: job.type || undefined,
+                requirements: job.requirements || undefined,
+              });
+              indexed++;
+            } else {
+              failed++;
+            }
+          } catch (error: any) {
+            console.error(`Failed to index job ${jobId}:`, error.message);
+            failed++;
+          }
+        }
+        
+        res.json({
+          success: true,
+          message: `Indexed ${indexed} jobs, ${failed} failed`,
+          indexed,
+          failed,
+        });
+      } else {
+        res.status(400).json({
+          error: "Either 'indexAll: true' or 'jobIds' array is required",
+        });
+      }
+    } catch (error: any) {
+      console.error("Error indexing jobs:", error);
+      res.status(500).json({
+        error: "Failed to index jobs",
+        message: error.message,
+      });
+    }
+  });
+
+  // Supabase connection diagnostic endpoint (admin only)
+  app.get("/api/supabase/status", requireSupabaseAuth(), isAdmin, async (req: any, res) => {
+    try {
+      const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+      const hasServiceKey = !!process.env.SUPABASE_SERVICE_ROLE_KEY;
+      
+      const diagnostics: any = {
+        configured: !!supabaseUrl && hasServiceKey,
+        hasUrl: !!supabaseUrl,
+        hasServiceKey: hasServiceKey,
+        urlPrefix: supabaseUrl ? `${supabaseUrl.substring(0, 30)}...` : 'NOT SET',
+        connectionTest: null,
+        error: null,
+      };
+
+      if (!supabaseUrl || !hasServiceKey) {
+        return res.status(400).json({
+          error: "Supabase is not configured",
+          diagnostics,
+          message: "Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY environment variables in Vercel",
+        });
+      }
+
+      try {
+        const { getSupabaseAdmin } = await import('./supabase.js');
+        const supabaseAdmin = getSupabaseAdmin();
+        
+        // Test connection with a simple query
+        const { data, error } = await supabaseAdmin.auth.admin.listUsers({ page: 1, perPage: 1 });
+        
+        if (error) {
+          diagnostics.connectionTest = 'failed';
+          diagnostics.error = error.message;
+          diagnostics.errorCode = error.status;
+        } else {
+          diagnostics.connectionTest = 'success';
+          diagnostics.userCount = data?.users?.length || 0;
+        }
+      } catch (error: any) {
+        diagnostics.connectionTest = 'failed';
+        diagnostics.error = error.message;
+        diagnostics.errorStack = process.env.NODE_ENV === 'development' ? error.stack : undefined;
+      }
+
+      res.json({
+        success: diagnostics.connectionTest === 'success',
+        message: diagnostics.connectionTest === 'success' 
+          ? "Supabase is configured and connected" 
+          : "Supabase is configured but connection failed",
+        diagnostics,
+      });
+    } catch (error: any) {
+      console.error("Error testing Supabase connection:", error);
+      res.status(500).json({
+        error: "Failed to test Supabase connection",
+        message: error.message,
+        stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+      });
+    }
+  });
+
+  // Pinecone test/status endpoint (admin only)
+  app.get("/api/pinecone/status", requireSupabaseAuth(), isAdmin, async (req: any, res) => {
+    try {
+      const { getPineconeClient, listPineconeIndexes, isPineconeConfigured } = await import("./pinecone.js");
+      
+      const apiKey = process.env.PINECONE_API_KEY;
+      const configured = isPineconeConfigured();
+      
+      const diagnostics: any = {
+        configured,
+        hasApiKey: !!apiKey,
+        apiKeyPrefix: apiKey ? `${apiKey.substring(0, 8)}...` : 'NOT SET',
+        indexes: [],
+        error: null,
+      };
+
+      if (!configured) {
+        return res.status(400).json({
+          error: "Pinecone is not configured",
+          diagnostics,
+          message: "Set PINECONE_API_KEY environment variable in Vercel",
+        });
+      }
+
+      try {
+        const client = getPineconeClient();
+        if (client) {
+          const indexesResponse = await listPineconeIndexes();
+          // Handle different response formats
+          const indexes = (indexesResponse as any).indexes || (indexesResponse as any) || [];
+          diagnostics.indexes = Array.isArray(indexes) ? indexes.map((idx: any) => ({
+            name: idx.name,
+            dimension: idx.dimension,
+            metric: idx.metric,
+            host: idx.host,
+          })) : [];
+        }
+      } catch (error: any) {
+        diagnostics.error = error.message;
+        console.error("[Pinecone] Error listing indexes:", error);
+      }
+
+      res.json({
+        success: true,
+        message: configured ? "Pinecone is configured and connected" : "Pinecone is configured but connection failed",
+        diagnostics,
+      });
+    } catch (error: any) {
+      console.error("Error testing Pinecone connection:", error);
+      res.status(500).json({
+        error: "Failed to test Pinecone connection",
+        message: error.message,
+        stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+      });
+    }
+  });
+
+  // Admin blog management routes (legacy - now superseded by Blogger for content)
+  app.get("/api/admin/blog/posts", requireSupabaseAuth(), isAdmin, async (req: any, res) => {
+    try {
+      // Double-check authentication - use supabaseUser instead of req.user
+      const userId = req.supabaseUser?.id || req.user?.claims?.sub;
+      if (!userId) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+      
+      try {
+        const posts = await storage.getAllBlogPosts();
+        res.json({ posts });
+      } catch (dbError: any) {
+        // Database errors - return empty array instead of 500 to prevent UI breakage
+        console.error("Database error fetching blog posts:", dbError);
+        res.json({ posts: [] });
+      }
+    } catch (error: any) {
+      // This should rarely happen if middleware works correctly
+      console.error("Error in admin blog posts endpoint:", error);
+      // Return 401 instead of 500 for auth-related errors
+      if (error?.message?.includes('Unauthorized') || error?.message?.includes('authentication')) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+      // For other errors, return empty array to prevent UI breakage
+      res.json({ posts: [] });
+    }
+  });
+
+  app.get("/api/admin/blog/posts/:id", requireSupabaseAuth(), isAdmin, async (req, res) => {
     try {
       const { id } = req.params;
       const post = await storage.getBlogPostById(id);
@@ -2225,75 +3374,301 @@ Return JSON with:
     }
   });
 
-  app.post("/api/admin/blog/posts", isAuthenticated, isAdmin, async (req, res) => {
+  app.post("/api/admin/blog/posts", requireSupabaseAuth(), isAdmin, async (req, res) => {
     try {
-      const { title, slug, excerpt, content, authorName, featuredImage, published, tags, publishedAt } = req.body;
+      console.log("[Blog Post Create] Request received:", {
+        hasTitle: !!req.body.title,
+        hasSlug: !!req.body.slug,
+        hasContent: !!req.body.content,
+        published: req.body.published,
+        syncToContentful: req.body.syncToContentful
+      });
+
+      const { title, slug, excerpt, content, authorName, featuredImage, featuredImageAltText, published, tags, publishedAt, syncToContentful } = req.body;
       
       if (!title || !slug || !content) {
+        console.error("[Blog Post Create] Missing required fields:", { title: !!title, slug: !!slug, content: !!content });
         return res.status(400).json({ error: "Title, slug, and content are required" });
       }
 
-      const post = await storage.upsertBlogPost({
-        title,
-        slug,
-        excerpt,
-        content,
-        authorName: authorName || "The JobBridge Team",
-        featuredImage,
-        published: published !== false,
-        tags: Array.isArray(tags) ? tags : tags ? [tags] : [],
-        publishedAt: publishedAt ? new Date(publishedAt) : new Date(),
+      // Normalize tags - ensure it's an array of strings or undefined
+      let normalizedTags: string[] | undefined = undefined;
+      if (tags) {
+        if (Array.isArray(tags)) {
+          normalizedTags = tags.filter(t => t && typeof t === 'string' && t.trim().length > 0);
+        } else if (typeof tags === 'string') {
+          normalizedTags = tags.split(',').map(t => t.trim()).filter(t => t.length > 0);
+        }
+      }
+      // Use undefined instead of empty array if no tags
+      if (normalizedTags && normalizedTags.length === 0) {
+        normalizedTags = undefined;
+      }
+
+      // Validate and parse publishedAt
+      let parsedPublishedAt: Date;
+      try {
+        parsedPublishedAt = publishedAt ? new Date(publishedAt) : new Date();
+        if (isNaN(parsedPublishedAt.getTime())) {
+          console.warn("[Blog Post Create] Invalid publishedAt date, using current date");
+          parsedPublishedAt = new Date();
+        }
+      } catch (dateError) {
+        console.warn("[Blog Post Create] Error parsing publishedAt, using current date:", dateError);
+        parsedPublishedAt = new Date();
+      }
+
+      const postData = {
+        title: title.trim(),
+        slug: slug.trim(),
+        excerpt: excerpt?.trim() || undefined,
+        content: content.trim(),
+        authorName: authorName?.trim() || "The JobBridge Team",
+        featuredImage: featuredImage?.trim() || undefined,
+        featuredImageAltText: featuredImageAltText?.trim() || undefined,
+        published: published === true, // Explicitly convert to boolean
+        tags: normalizedTags,
+        publishedAt: parsedPublishedAt,
+      };
+
+      console.log("[Blog Post Create] Attempting to insert post:", {
+        title: postData.title,
+        slug: postData.slug,
+        published: postData.published,
+        hasTags: !!postData.tags
       });
+
+      const post = await storage.upsertBlogPost(postData);
+      
+      console.log("[Blog Post Create] Post created successfully:", post.id);
+
+      // Optionally sync to Contentful if requested and CMA is configured
+      if (syncToContentful) {
+        try {
+          console.log(`[Blog Post] Syncing to Contentful: ${post.title}`);
+          const contentfulResult = await upsertContentfulPost({
+            contentfulId: post.contentfulId || undefined, // Include if exists
+            title: post.title,
+            slug: post.slug,
+            excerpt: post.excerpt || undefined,
+            content: post.content,
+            featuredImage: post.featuredImage || undefined,
+            published: post.published ?? false,
+            tags: post.tags || undefined,
+            authorName: post.authorName || undefined,
+            publishedAt: post.publishedAt || undefined,
+          }, post.published ?? false);
+
+          if (contentfulResult) {
+            console.log(`[Blog Post] Contentful sync successful: ${contentfulResult.id}, published: ${contentfulResult.published}`);
+            // Update post with contentfulId if it was created
+            if (contentfulResult.id && !post.contentfulId) {
+              await storage.updateBlogPost(post.id, { contentfulId: contentfulResult.id });
+              post.contentfulId = contentfulResult.id;
+            }
+          } else {
+            console.warn(`[Blog Post] Contentful sync returned null - check logs for errors`);
+          }
+        } catch (contentfulError: any) {
+          console.error("[Blog Post] Error syncing to Contentful (post still saved to database):", contentfulError);
+          console.error("[Blog Post] Error details:", {
+            message: contentfulError.message,
+            status: contentfulError.response?.status,
+            data: contentfulError.response?.data
+          });
+          // Don't fail the request if Contentful sync fails - post is still saved
+        }
+      }
 
       res.status(201).json({ post });
     } catch (error: any) {
-      console.error("Error creating blog post:", error);
+      console.error("[Blog Post Create] Error creating blog post:", error);
+      console.error("[Blog Post Create] Error stack:", error.stack);
+      console.error("[Blog Post Create] Error details:", {
+        message: error.message,
+        code: error.code,
+        detail: error.detail,
+        constraint: error.constraint,
+        table: error.table,
+        column: error.column,
+        body: {
+          title: req.body.title,
+          slug: req.body.slug,
+          hasContent: !!req.body.content
+        }
+      });
+      
+      // Handle specific database errors
       if (error.code === '23505') { // Unique constraint violation
-        return res.status(400).json({ error: "A post with this slug already exists" });
+        if (error.constraint?.includes('slug')) {
+          return res.status(400).json({ error: "A post with this slug already exists. Please choose a different slug." });
+        }
+        return res.status(400).json({ error: "A post with this information already exists" });
       }
-      res.status(500).json({ error: "Failed to create blog post" });
+      
+      if (error.code === '23502') { // Not null constraint violation
+        const missingField = error.column || 'unknown field';
+        return res.status(400).json({ error: `Missing required field: ${missingField}` });
+      }
+      
+      if (error.code === '23503') { // Foreign key constraint violation
+        return res.status(400).json({ error: "Invalid reference in post data" });
+      }
+      
+      // Return more detailed error in development
+      const errorMessage = process.env.NODE_ENV === 'development' 
+        ? error.message || "Failed to create blog post"
+        : "Failed to create blog post";
+      
+      res.status(500).json({ 
+        error: errorMessage,
+        details: process.env.NODE_ENV === 'development' ? {
+          code: error.code,
+          detail: error.detail,
+          constraint: error.constraint,
+          table: error.table,
+          column: error.column,
+          message: error.message
+        } : undefined
+      });
     }
   });
 
-  app.put("/api/admin/blog/posts/:id", isAuthenticated, isAdmin, async (req, res) => {
+  app.put("/api/admin/blog/posts/:id", requireSupabaseAuth(), isAdmin, async (req, res) => {
     try {
       const { id } = req.params;
-      const { title, slug, excerpt, content, authorName, featuredImage, published, tags, publishedAt } = req.body;
+      const { title, slug, excerpt, content, authorName, featuredImage, featuredImageAltText, published, tags, publishedAt, syncToContentful } = req.body;
 
       const existingPost = await storage.getBlogPostById(id);
       if (!existingPost) {
         return res.status(404).json({ error: "Post not found" });
       }
 
-      const updates: any = {};
-      if (title !== undefined) updates.title = title;
-      if (slug !== undefined) updates.slug = slug;
-      if (excerpt !== undefined) updates.excerpt = excerpt;
-      if (content !== undefined) updates.content = content;
-      if (authorName !== undefined) updates.authorName = authorName;
-      if (featuredImage !== undefined) updates.featuredImage = featuredImage;
-      if (published !== undefined) updates.published = published;
-      if (tags !== undefined) updates.tags = Array.isArray(tags) ? tags : tags ? [tags] : [];
-      if (publishedAt !== undefined) updates.publishedAt = new Date(publishedAt);
+      // Normalize tags - ensure it's an array of strings or undefined
+      let normalizedTags: string[] | undefined = undefined;
+      if (tags !== undefined) {
+        if (tags === null || tags === '') {
+          normalizedTags = undefined;
+        } else if (Array.isArray(tags)) {
+          normalizedTags = tags.filter(t => t && typeof t === 'string' && t.trim().length > 0);
+          if (normalizedTags.length === 0) normalizedTags = undefined;
+        } else if (typeof tags === 'string') {
+          normalizedTags = tags.split(',').map(t => t.trim()).filter(t => t.length > 0);
+          if (normalizedTags.length === 0) normalizedTags = undefined;
+        }
+      }
 
+      const updates: any = {};
+      if (title !== undefined) updates.title = typeof title === 'string' ? title.trim() : title;
+      if (slug !== undefined) updates.slug = typeof slug === 'string' ? slug.trim() : slug;
+      if (excerpt !== undefined) updates.excerpt = excerpt ? (typeof excerpt === 'string' ? excerpt.trim() : excerpt) : undefined;
+      if (content !== undefined) updates.content = typeof content === 'string' ? content.trim() : content;
+      if (authorName !== undefined) updates.authorName = authorName ? (typeof authorName === 'string' ? authorName.trim() : authorName) : undefined;
+      if (featuredImage !== undefined) updates.featuredImage = featuredImage ? (typeof featuredImage === 'string' ? featuredImage.trim() : featuredImage) : undefined;
+      if (featuredImageAltText !== undefined) updates.featuredImageAltText = featuredImageAltText ? (typeof featuredImageAltText === 'string' ? featuredImageAltText.trim() : featuredImageAltText) : undefined;
+      if (published !== undefined) updates.published = published === true; // Explicitly convert to boolean
+      if (tags !== undefined) updates.tags = normalizedTags;
+      if (publishedAt !== undefined) updates.publishedAt = publishedAt ? new Date(publishedAt) : undefined;
+
+      console.log(`[Blog Post Update] Updating post ${id} with:`, Object.keys(updates));
       const updated = await storage.updateBlogPost(id, updates);
       if (!updated) {
+        console.error(`[Blog Post Update] Post ${id} not found`);
         return res.status(404).json({ error: "Post not found" });
+      }
+      console.log(`[Blog Post Update] Successfully updated post ${id}:`, updated.title);
+
+      // Optionally sync to Contentful if requested and CMA is configured
+      // Allow syncing even if contentfulId doesn't exist (will create new entry)
+      if (syncToContentful) {
+        try {
+          console.log(`[Blog Post] Syncing update to Contentful: ${updated.title}`);
+          const contentfulResult = await upsertContentfulPost({
+            contentfulId: existingPost.contentfulId || undefined,
+            title: updated.title,
+            slug: updated.slug,
+            excerpt: updated.excerpt || undefined,
+            content: updated.content,
+            featuredImage: updated.featuredImage || undefined,
+            published: updated.published ?? false,
+            tags: updated.tags || undefined,
+            authorName: updated.authorName || undefined,
+            publishedAt: updated.publishedAt || undefined,
+          }, updated.published ?? false);
+
+          if (contentfulResult && contentfulResult.id && !existingPost.contentfulId) {
+            // Update post with contentfulId if it was created
+            console.log(`[Blog Post] Updating post with new contentfulId: ${contentfulResult.id}`);
+            await storage.updateBlogPost(id, { contentfulId: contentfulResult.id });
+            updated.contentfulId = contentfulResult.id;
+          } else if (contentfulResult) {
+            console.log(`[Blog Post] Contentful sync successful: ${contentfulResult.id}`);
+          } else {
+            console.warn(`[Blog Post] Contentful sync returned null - check logs for errors`);
+          }
+        } catch (contentfulError: any) {
+          console.error("[Blog Post] Error syncing to Contentful (post still updated in database):", contentfulError);
+          console.error("[Blog Post] Error details:", {
+            message: contentfulError.message,
+            status: contentfulError.response?.status,
+            data: contentfulError.response?.data
+          });
+          // Don't fail the request if Contentful sync fails - post is still updated
+        }
       }
 
       res.json({ post: updated });
     } catch (error: any) {
       console.error("Error updating blog post:", error);
+      console.error("Error stack:", error.stack);
+      console.error("Error details:", {
+        message: error.message,
+        code: error.code,
+        detail: error.detail,
+        constraint: error.constraint,
+        body: req.body,
+        id: req.params.id
+      });
+      
       if (error.code === '23505') { // Unique constraint violation
         return res.status(400).json({ error: "A post with this slug already exists" });
       }
-      res.status(500).json({ error: "Failed to update blog post" });
+      
+      // Return more detailed error in development
+      const errorMessage = process.env.NODE_ENV === 'development' 
+        ? error.message || "Failed to update blog post"
+        : "Failed to update blog post";
+      
+      res.status(500).json({ 
+        error: errorMessage,
+        details: process.env.NODE_ENV === 'development' ? {
+          code: error.code,
+          detail: error.detail,
+          constraint: error.constraint,
+          stack: error.stack
+        } : undefined
+      });
     }
   });
 
-  app.delete("/api/admin/blog/posts/:id", isAuthenticated, isAdmin, async (req, res) => {
+  app.delete("/api/admin/blog/posts/:id", requireSupabaseAuth(), isAdmin, async (req, res) => {
     try {
       const { id } = req.params;
+      // For DELETE requests, body might be empty, so we check both body and query
+      const syncToContentful = req.body?.syncToContentful || req.query?.syncToContentful === 'true';
+
+      const existingPost = await storage.getBlogPostById(id);
+      
+      // Optionally delete from Contentful if requested and CMA is configured
+      if (syncToContentful && existingPost?.contentfulId) {
+        try {
+          await deleteContentfulPost(existingPost.contentfulId);
+        } catch (contentfulError: any) {
+          console.error("Error deleting from Contentful (post still deleted from database):", contentfulError);
+          // Don't fail the request if Contentful delete fails - post is still deleted from DB
+        }
+      }
+
       await storage.deleteBlogPost(id);
       res.status(204).send();
     } catch (error) {

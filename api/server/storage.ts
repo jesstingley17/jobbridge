@@ -37,7 +37,9 @@ export interface IStorage {
   // User operations (required for Replit Auth)
   getUser(id: string): Promise<User | undefined>;
   upsertUser(user: UpsertUser): Promise<User>;
+  updateUser(userId: string, updates: Partial<Omit<UpsertUser, 'id'>>): Promise<User | undefined>;
   updateUserRole(id: string, role: string): Promise<User | undefined>;
+  updateUserCommunityUsername(id: string, username: string | null): Promise<User | undefined>;
   getCommunityMembers(): Promise<User[]>;
   
   // User profile operations
@@ -153,10 +155,33 @@ export class DatabaseStorage implements IStorage {
     return user;
   }
 
+  // Update user fields (Supabase-compatible: updates app-specific fields in public.users table)
+  // For Supabase Auth fields (email, phone, metadata), use admin.auth.admin.updateUserById instead
+  async updateUser(userId: string, updates: Partial<Omit<UpsertUser, 'id'>>): Promise<User | undefined> {
+    const [updated] = await db
+      .update(users)
+      .set({
+        ...updates,
+        updatedAt: new Date(),
+      })
+      .where(eq(users.id, userId))
+      .returning();
+    return updated;
+  }
+
   async updateUserRole(id: string, role: string): Promise<User | undefined> {
     const [user] = await db
       .update(users)
       .set({ role, updatedAt: new Date() })
+      .where(eq(users.id, id))
+      .returning();
+    return user;
+  }
+
+  async updateUserCommunityUsername(id: string, username: string | null): Promise<User | undefined> {
+    const [user] = await db
+      .update(users)
+      .set({ communityUsername: username, updatedAt: new Date() })
       .where(eq(users.id, id))
       .returning();
     return user;
@@ -556,11 +581,16 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getUserByEmail(email: string): Promise<User | undefined> {
-    const [user] = await db
-      .select()
-      .from(users)
-      .where(eq(users.email, email));
-    return user;
+    try {
+      const [user] = await db
+        .select()
+        .from(users)
+        .where(eq(users.email, email));
+      return user;
+    } catch (error: any) {
+      console.error("Error in getUserByEmail:", error);
+      throw error;
+    }
   }
 
   // Email log operations
@@ -712,26 +742,78 @@ export class DatabaseStorage implements IStorage {
   }
 
   async upsertBlogPost(post: InsertBlogPost): Promise<BlogPost> {
-    if (post.contentfulId) {
-      // Check if post exists by Contentful ID
-      const existing = await this.getBlogPostByContentfulId(post.contentfulId);
-      if (existing) {
-        // Update existing post
+    try {
+      console.log("[Storage] upsertBlogPost called with:", {
+        title: post.title,
+        slug: post.slug,
+        hasContentfulId: !!post.contentfulId,
+        published: post.published
+      });
+
+      if (post.contentfulId) {
+        // Check if post exists by Contentful ID
+        const existing = await this.getBlogPostByContentfulId(post.contentfulId);
+        if (existing) {
+          console.log("[Storage] Updating existing post by Contentful ID:", existing.id);
+          // Update existing post
+          const [updated] = await db
+            .update(blogPosts)
+            .set({
+              ...post,
+              updatedAt: new Date(),
+            })
+            .where(eq(blogPosts.contentfulId, post.contentfulId))
+            .returning();
+          if (!updated) {
+            throw new Error("Failed to update blog post");
+          }
+          return updated;
+        }
+      }
+      
+      // Check if post with same slug exists
+      const existingBySlug = await db
+        .select()
+        .from(blogPosts)
+        .where(eq(blogPosts.slug, post.slug))
+        .limit(1);
+      
+      if (existingBySlug.length > 0) {
+        console.log("[Storage] Post with slug already exists, updating:", existingBySlug[0].id);
         const [updated] = await db
           .update(blogPosts)
           .set({
             ...post,
             updatedAt: new Date(),
           })
-          .where(eq(blogPosts.contentfulId, post.contentfulId))
+          .where(eq(blogPosts.slug, post.slug))
           .returning();
+        if (!updated) {
+          throw new Error("Failed to update blog post by slug");
+        }
         return updated;
       }
+      
+      // Insert new post
+      console.log("[Storage] Inserting new blog post");
+      const [newPost] = await db.insert(blogPosts).values(post).returning();
+      if (!newPost) {
+        throw new Error("Failed to insert blog post - no post returned");
+      }
+      console.log("[Storage] Blog post inserted successfully:", newPost.id);
+      return newPost;
+    } catch (error: any) {
+      console.error("[Storage] Error in upsertBlogPost:", {
+        message: error.message,
+        code: error.code,
+        detail: error.detail,
+        constraint: error.constraint,
+        table: error.table,
+        column: error.column,
+        stack: error.stack
+      });
+      throw error;
     }
-    
-    // Insert new post
-    const [newPost] = await db.insert(blogPosts).values(post).returning();
-    return newPost;
   }
 
   async incrementBlogPostViews(slug: string): Promise<void> {
@@ -743,10 +825,15 @@ export class DatabaseStorage implements IStorage {
 
   // Admin blog post operations
   async getAllBlogPosts(): Promise<BlogPost[]> {
-    return db
-      .select()
-      .from(blogPosts)
-      .orderBy(desc(blogPosts.createdAt));
+    try {
+      return await db
+        .select()
+        .from(blogPosts)
+        .orderBy(desc(blogPosts.createdAt));
+    } catch (error: any) {
+      console.error("Error in getAllBlogPosts:", error);
+      throw error;
+    }
   }
 
   async getBlogPostById(id: string): Promise<BlogPost | undefined> {
@@ -1568,5 +1655,14 @@ export async function hashPassword(password: string): Promise<string> {
 }
 
 export async function verifyPassword(password: string, hashedPassword: string): Promise<boolean> {
-  return bcrypt.compare(password, hashedPassword);
+  try {
+    if (!password || !hashedPassword) {
+      console.error("verifyPassword: Missing password or hash");
+      return false;
+    }
+    return await bcrypt.compare(password, hashedPassword);
+  } catch (error: any) {
+    console.error("Error in verifyPassword:", error);
+    throw error;
+  }
 }
