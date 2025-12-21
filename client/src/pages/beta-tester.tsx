@@ -73,7 +73,7 @@ export default function BetaTester() {
       .hs-form-frame label {
         font-size: 0.875rem;
         font-weight: 500;
-        color: hsl(var(--foreground));
+        color: hsl(var(--foreground)) !important;
         line-height: 1.5;
         margin-bottom: 0.375rem;
       }
@@ -220,7 +220,7 @@ export default function BetaTester() {
 
       /* Success messages */
       .hs-form-frame .hs-main-font-element {
-        color: hsl(var(--foreground));
+        color: hsl(var(--foreground)) !important;
         font-size: 0.875rem;
         line-height: 1.5;
       }
@@ -228,9 +228,21 @@ export default function BetaTester() {
       /* Field descriptions/help text */
       .hs-form-frame .hs-field-desc {
         font-size: 0.8125rem;
-        color: hsl(var(--muted-foreground));
+        color: hsl(var(--muted-foreground)) !important;
         margin-top: 0.25rem;
         line-height: 1.4;
+      }
+
+      /* Ensure all text elements use proper colors */
+      .hs-form-frame,
+      .hs-form-frame * {
+        color: inherit;
+      }
+
+      .hs-form-frame p,
+      .hs-form-frame span,
+      .hs-form-frame div:not(.hs-form-field) {
+        color: hsl(var(--foreground)) !important;
       }
 
       /* Required field indicator */
@@ -245,16 +257,36 @@ export default function BetaTester() {
       }
 
       /* Dark mode support */
-      @media (prefers-color-scheme: dark) {
-        .hs-form-frame input[type="text"],
-        .hs-form-frame input[type="email"],
-        .hs-form-frame input[type="tel"],
-        .hs-form-frame input[type="number"],
-        .hs-form-frame textarea,
-        .hs-form-frame select {
-          background-color: hsl(var(--background));
-          color: hsl(var(--foreground));
-        }
+      .dark .hs-form-frame input[type="text"],
+      .dark .hs-form-frame input[type="email"],
+      .dark .hs-form-frame input[type="tel"],
+      .dark .hs-form-frame input[type="number"],
+      .dark .hs-form-frame textarea,
+      .dark .hs-form-frame select,
+      [data-theme="dark"] .hs-form-frame input[type="text"],
+      [data-theme="dark"] .hs-form-frame input[type="email"],
+      [data-theme="dark"] .hs-form-frame input[type="tel"],
+      [data-theme="dark"] .hs-form-frame input[type="number"],
+      [data-theme="dark"] .hs-form-frame textarea,
+      [data-theme="dark"] .hs-form-frame select {
+        background-color: hsl(var(--background)) !important;
+        color: hsl(var(--foreground)) !important;
+        border-color: hsl(var(--input)) !important;
+      }
+
+      .dark .hs-form-frame label,
+      [data-theme="dark"] .hs-form-frame label {
+        color: hsl(var(--foreground)) !important;
+      }
+
+      .dark .hs-form-frame .hs-main-font-element,
+      [data-theme="dark"] .hs-form-frame .hs-main-font-element {
+        color: hsl(var(--foreground)) !important;
+      }
+
+      .dark .hs-form-frame .hs-field-desc,
+      [data-theme="dark"] .hs-form-frame .hs-field-desc {
+        color: hsl(var(--muted-foreground)) !important;
       }
 
       /* Responsive adjustments */
