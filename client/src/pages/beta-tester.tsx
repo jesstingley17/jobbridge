@@ -364,22 +364,18 @@ export default function BetaTester() {
               </div>
             </div>
             <h1 className="text-4xl font-bold mb-4">Join Our Beta Program</h1>
-            <p className="text-xl text-muted-foreground mb-2">
-              Be among the first to experience The JobBridge, Inc
-            </p>
-            <p className="text-muted-foreground">
-              Help shape the future of accessible job searching
+            <p className="text-lg text-muted-foreground">
+              Be among the first to experience The JobBridge and help shape the future of accessible job searching
             </p>
           </div>
 
           {/* HubSpot Form */}
           <Card>
             <CardHeader>
-              <CardTitle>Beta Tester Application</CardTitle>
+              <CardTitle>Application Form</CardTitle>
               <CardDescription>
-                Fill out the form below to join our beta testing program. After submitting, you'll be redirected to create your account and access the platform.
+                After submitting, you'll be redirected to create your account and access the platform.
               </CardDescription>
-              {/* HubSpot form will load here */}
             </CardHeader>
             <CardContent>
               <div 
