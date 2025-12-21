@@ -174,7 +174,7 @@ export default function Profile() {
           <CardContent className="pt-6">
             <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
               <Avatar className="h-20 w-20">
-                <AvatarImage src={displayUser.profileImageUrl || undefined} alt={`${displayUser.firstName} ${displayUser.lastName}`} />
+                <AvatarImage src={(displayUser as any).profileImageUrl || undefined} alt={`${displayUser.firstName} ${displayUser.lastName}`} />
                 <AvatarFallback className="text-2xl">{getInitials(displayUser.firstName, displayUser.lastName)}</AvatarFallback>
               </Avatar>
               <div className="flex-1">

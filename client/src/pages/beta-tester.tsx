@@ -67,13 +67,13 @@ export default function BetaTester() {
           <div className="mt-8 text-center">
             <p className="text-sm text-muted-foreground">
               Already have an account?{" "}
-              <Button
-                variant="link"
-                className="p-0 h-auto"
+              <button
+                type="button"
+                className="text-primary hover:underline p-0 h-auto bg-transparent border-0 cursor-pointer"
                 onClick={() => setLocation("/auth")}
               >
                 Sign in here
-              </Button>
+              </button>
             </p>
           </div>
         </div>

@@ -21,9 +21,10 @@ export function getPineconeClient(): Pinecone | null {
   }
 
   try {
+    // Pinecone v1+ requires only apiKey, environment is optional for serverless
     pineconeClient = new Pinecone({
       apiKey: apiKey,
-    });
+    } as any); // Type assertion to handle optional environment
     console.log('[Pinecone] Client initialized successfully');
     return pineconeClient;
   } catch (error: any) {

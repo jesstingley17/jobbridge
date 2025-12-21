@@ -3274,13 +3274,15 @@ Return JSON with:
       try {
         const client = getPineconeClient();
         if (client) {
-          const indexes = await listPineconeIndexes();
-          diagnostics.indexes = indexes.indexes?.map((idx: any) => ({
+          const indexesResponse = await listPineconeIndexes();
+          // Handle different response formats
+          const indexes = (indexesResponse as any).indexes || (indexesResponse as any) || [];
+          diagnostics.indexes = Array.isArray(indexes) ? indexes.map((idx: any) => ({
             name: idx.name,
             dimension: idx.dimension,
             metric: idx.metric,
             host: idx.host,
-          })) || [];
+          })) : [];
         }
       } catch (error: any) {
         diagnostics.error = error.message;
