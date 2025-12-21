@@ -328,11 +328,14 @@ export default function Pricing() {
                   <Button 
                     className="w-full mb-6" 
                     variant={plan.popular ? "default" : plan.contact ? "outline" : "outline"}
-                    onClick={() => {
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      
                       if (plan.contact || plan.name.includes("Sponsored") || plan.name.includes("Employers") || plan.name.includes("Coaches") || !plan.priceId) {
                         // Redirect to contact page with plan information
                         const planParam = encodeURIComponent(plan.name);
-                        setLocation(`/contact?plan=${planParam}&type=pricing`);
+                        window.location.href = `/contact?plan=${planParam}&type=pricing`;
                       } else if (plan.priceId) {
                         checkoutMutation.mutate(plan.priceId);
                       } else {
@@ -340,7 +343,7 @@ export default function Pricing() {
                           title: "Contact Us",
                           description: `Please contact us for ${plan.name} pricing.`,
                         });
-                        setLocation(`/contact?plan=${encodeURIComponent(plan.name)}&type=pricing`);
+                        window.location.href = `/contact?plan=${encodeURIComponent(plan.name)}&type=pricing`;
                       }
                     }}
                     disabled={checkoutMutation.isPending}

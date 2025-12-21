@@ -1368,7 +1368,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Contact form submission
   app.post('/api/contact', async (req, res) => {
     try {
-      const { name, email, subject, message, type } = req.body;
+      const { name, email, subject, message, type, planName } = req.body;
       
       // Basic validation
       if (!name || !email || !subject || !message) {
@@ -1381,22 +1381,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Invalid email address" });
       }
       
-      // In a real application, you would:
-      // 1. Send an email notification to your team
-      // 2. Store the message in a database
-      // 3. Send an auto-reply to the user
+      // Send email via Resend
+      const { sendContactEmail } = await import('./email.js');
+      const emailSent = await sendContactEmail({
+        name,
+        email,
+        subject,
+        message,
+        type: type || "general",
+        planName,
+      });
       
-      // For now, we'll just log it and return success
+      if (!emailSent) {
+        return res.status(500).json({ error: "Failed to send email. Please try again later." });
+      }
+      
       console.log("Contact form submission:", {
         name,
         email,
         subject,
         message,
         type: type || "general",
+        planName,
         timestamp: new Date().toISOString(),
       });
-      
-      // TODO: Implement email sending service (e.g., SendGrid, Resend, etc.)
       // TODO: Store in database if needed
       
       return res.json({ 

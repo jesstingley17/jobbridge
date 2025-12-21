@@ -197,6 +197,122 @@ export async function sendMagicLinkEmail({ email, firstName, magicLink }: MagicL
   }
 }
 
+export interface ContactEmailParams {
+  name: string;
+  email: string;
+  subject: string;
+  message: string;
+  type?: string;
+  planName?: string;
+}
+
+export async function sendContactEmail({ name, email, subject, message, type = "general", planName }: ContactEmailParams): Promise<boolean> {
+  try {
+    const recipientEmail = type === "help" ? "help@thejobbridge-inc.com" : "info@thejobbridge-inc.com";
+    const planInfo = planName ? `<p style="margin: 0 0 16px; color: #52525b; font-size: 16px; line-height: 1.6;"><strong>Interested in:</strong> ${planName}</p>` : "";
+    
+    // Send email to company
+    const { error: companyError } = await resend.emails.send({
+      from: FROM_EMAIL,
+      to: recipientEmail,
+      replyTo: email,
+      subject: `[Contact Form] ${subject}`,
+      html: `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f4f4f5;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f4f4f5; padding: 40px 20px;">
+    <tr>
+      <td align="center">
+        <table width="100%" cellpadding="0" cellspacing="0" style="max-width: 600px; background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+          <tr>
+            <td style="background-color: #2563eb; padding: 32px 40px; text-align: center;">
+              <h1 style="margin: 0; color: #ffffff; font-size: 28px; font-weight: 600;">New Contact Form Submission</h1>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 40px;">
+              <p style="margin: 0 0 16px; color: #52525b; font-size: 16px; line-height: 1.6;"><strong>From:</strong> ${name} (${email})</p>
+              ${planInfo}
+              <p style="margin: 0 0 16px; color: #52525b; font-size: 16px; line-height: 1.6;"><strong>Subject:</strong> ${subject}</p>
+              <p style="margin: 0 0 16px; color: #52525b; font-size: 16px; line-height: 1.6;"><strong>Message:</strong></p>
+              <div style="margin: 0 0 24px; padding: 16px; background-color: #f4f4f5; border-radius: 6px; color: #18181b; font-size: 16px; line-height: 1.6; white-space: pre-wrap;">${message}</div>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+      `,
+    });
+
+    if (companyError) {
+      console.error('Failed to send contact email to company:', companyError);
+      return false;
+    }
+
+    // Send auto-reply to user
+    const { error: userError } = await resend.emails.send({
+      from: FROM_EMAIL,
+      to: email,
+      subject: 'Thank you for contacting The Job Bridge',
+      html: `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f4f4f5;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f4f4f5; padding: 40px 20px;">
+    <tr>
+      <td align="center">
+        <table width="100%" cellpadding="0" cellspacing="0" style="max-width: 600px; background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+          <tr>
+            <td style="background-color: #2563eb; padding: 32px 40px; text-align: center;">
+              <h1 style="margin: 0; color: #ffffff; font-size: 28px; font-weight: 600;">The Job Bridge</h1>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 40px;">
+              <h2 style="margin: 0 0 16px; color: #18181b; font-size: 24px; font-weight: 600;">Hi ${name},</h2>
+              <p style="margin: 0 0 24px; color: #52525b; font-size: 16px; line-height: 1.6;">
+                Thank you for reaching out to The Job Bridge! We've received your message and will get back to you within 24-48 hours.
+              </p>
+              <p style="margin: 0; color: #52525b; font-size: 16px; line-height: 1.6;">
+                Best regards,<br>
+                <strong style="color: #18181b;">The Job Bridge Team</strong>
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+      `,
+    });
+
+    if (userError) {
+      console.error('Failed to send auto-reply to user:', userError);
+      // Don't fail if auto-reply fails, company email is more important
+    }
+    
+    console.log('Contact email sent successfully from:', email);
+    return true;
+  } catch (error) {
+    console.error('Error sending contact email:', error);
+    return false;
+  }
+}
+
 export async function sendPasswordResetEmail({ email, firstName, magicLink }: MagicLinkEmailParams): Promise<boolean> {
   try {
     const name = firstName || 'there';
