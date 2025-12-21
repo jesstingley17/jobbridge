@@ -155,9 +155,15 @@ async function initializeApp() {
 
 // Vercel serverless function handler
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  // Initialize app on first request
+  // Initialize app on first request with timeout
   try {
-    await initializeApp();
+    // Add timeout to prevent hanging (30 seconds max)
+    const initPromise = initializeApp();
+    const timeoutPromise = new Promise((_, reject) => 
+      setTimeout(() => reject(new Error('Initialization timeout after 30 seconds')), 30000)
+    );
+    
+    await Promise.race([initPromise, timeoutPromise]);
   } catch (initError: any) {
     // Log full error details for debugging
     console.error('❌ Failed to initialize Express app in Vercel handler');
