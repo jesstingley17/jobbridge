@@ -509,10 +509,15 @@ export default function BetaTester() {
             <div className="inline-flex items-center gap-2 rounded-lg border-2 border-primary/50 bg-primary/10 px-4 py-3 mb-4">
               <Sparkles className="h-5 w-5 text-primary flex-shrink-0" />
               <div className="text-left">
-                <p className="font-semibold text-primary">Full Platform Access</p>
+                <p className="font-semibold text-primary">Full Platform Access Based on Your Role</p>
                 <p className="text-sm text-muted-foreground">
-                  Beta testers get access to <strong>all features</strong> including Pro and Enterprise tier functionality at no cost.
+                  Beta testers get <strong>full access to all features</strong> according to their selected role:
                 </p>
+                <ul className="text-sm text-muted-foreground mt-2 space-y-1 list-disc list-inside ml-2">
+                  <li><strong>Job Seekers</strong> → Pro tier (all AI features, unlimited applications)</li>
+                  <li><strong>Employers</strong> → Enterprise tier (analytics, API access, team features)</li>
+                  <li><strong>Developers/Partners</strong> → Enterprise tier (API access, advanced features)</li>
+                </ul>
               </div>
             </div>
 
@@ -551,9 +556,11 @@ export default function BetaTester() {
                   Your application will be reviewed manually by our team. If approved, you'll receive an email with instructions to create your account and access the platform.
                 </p>
                 <div className="rounded-md bg-primary/10 border border-primary/20 p-3 mt-3">
-                  <p className="text-sm font-semibold text-foreground mb-1">Beta Tester Benefits:</p>
+                  <p className="text-sm font-semibold text-foreground mb-1">Beta Tester Benefits (Based on Your Role):</p>
                   <ul className="text-sm text-muted-foreground space-y-1 list-disc list-inside">
-                    <li>Full access to all platform features (Pro + Enterprise tiers)</li>
+                    <li><strong>Job Seekers:</strong> Full Pro tier access - unlimited applications, AI resume builder, interview prep, job recommendations, and all AI-powered features</li>
+                    <li><strong>Employers:</strong> Full Enterprise tier access - job posting, analytics dashboard, API access, team management, and all platform features</li>
+                    <li><strong>Developers/Partners:</strong> Full Enterprise tier access - API access, analytics, team features, and all platform capabilities</li>
                     <li>No subscription fees during beta period</li>
                     <li>Direct input on product development</li>
                   </ul>
@@ -563,6 +570,9 @@ export default function BetaTester() {
                     <li>Regular feedback submission (bug reports, feature requests, usability insights)</li>
                     <li>Participation in beta surveys and interviews when requested</li>
                   </ul>
+                  <p className="text-sm text-muted-foreground mt-3 italic">
+                    <strong>Note:</strong> Your access level will be automatically set based on the role you select in the application form below.
+                  </p>
                 </div>
                 <p className="text-sm text-muted-foreground italic mt-3">
                   Please allow 2-5 business days for review. We'll notify you via email once a decision has been made.
