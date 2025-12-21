@@ -1,146 +1,33 @@
-import { useState } from "react";
+import { useEffect } from "react";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Mail, User, CheckCircle2, Loader2, Sparkles } from "lucide-react";
-import { useMutation } from "@tanstack/react-query";
-import { apiRequest } from "@/lib/queryClient";
-import { useToast } from "@/hooks/use-toast";
-import { Logo } from "@/components/logo";
+import { Sparkles } from "lucide-react";
 
 // Beta tester signup page - accessible at /beta-tester and /beta
 export default function BetaTester() {
   const [, setLocation] = useLocation();
-  const { toast } = useToast();
-  
-  // Debug: Log that component is rendering
-  console.log("BetaTester component rendered");
-  const [email, setEmail] = useState("");
-  const [firstName, setFirstName] = useState("");
-  const [lastName, setLastName] = useState("");
-  const [company, setCompany] = useState("");
-  const [role, setRole] = useState("");
-  const [feedback, setFeedback] = useState("");
-  const [termsAccepted, setTermsAccepted] = useState(false);
-  const [marketingConsent, setMarketingConsent] = useState(false);
 
-  const signupMutation = useMutation({
-    mutationFn: async (data: {
-      email: string;
-      firstName: string;
-      lastName: string;
-      company?: string;
-      role?: string;
-      feedback?: string;
-      termsAccepted: boolean;
-      marketingConsent: boolean;
-    }) => {
-      const response = await apiRequest("POST", "/api/beta-tester/signup", data);
-      return response.json();
-    },
-    onSuccess: (_, variables) => {
-      // If marketing consent is checked, also submit to AWeber newsletter
-      if (variables.marketingConsent) {
-        submitToAWeberNewsletter(variables.firstName, variables.lastName, variables.email);
+  // Load HubSpot forms script
+  useEffect(() => {
+    // Check if script is already loaded
+    if (document.querySelector('script[src*="hsforms.net"]')) {
+      return;
+    }
+
+    const script = document.createElement('script');
+    script.src = 'https://js-na2.hsforms.net/forms/embed/244677572.js';
+    script.defer = true;
+    document.head.appendChild(script);
+
+    // Cleanup function
+    return () => {
+      const existingScript = document.querySelector('script[src*="hsforms.net"]');
+      if (existingScript) {
+        existingScript.remove();
       }
-      
-      toast({
-        title: "Thank you for signing up!",
-        description: "We'll be in touch soon with beta access details.",
-      });
-      // Reset form
-      setEmail("");
-      setFirstName("");
-      setLastName("");
-      setCompany("");
-      setRole("");
-      setFeedback("");
-      setTermsAccepted(false);
-      setMarketingConsent(false);
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Error",
-        description: error?.message || "Failed to submit. Please try again.",
-        variant: "destructive",
-      });
-    },
-  });
-
-  const submitToAWeberNewsletter = (firstName: string, lastName: string, email: string) => {
-    // Create a form element to submit to AWeber newsletter
-    const form = document.createElement("form");
-    form.method = "POST";
-    form.action = "https://www.aweber.com/scripts/addlead.pl";
-    form.acceptCharset = "UTF-8";
-    form.style.display = "none";
-
-    // Add hidden fields
-    const addHiddenField = (name: string, value: string) => {
-      const input = document.createElement("input");
-      input.type = "hidden";
-      input.name = name;
-      input.value = value;
-      form.appendChild(input);
     };
-
-    addHiddenField("meta_web_form_id", "305644354");
-    addHiddenField("meta_split_id", "");
-    addHiddenField("listname", "awlist6912956");
-    addHiddenField("redirect", window.location.href);
-    addHiddenField("meta_adtracking", "Newsletter");
-    addHiddenField("meta_message", "1");
-    addHiddenField("meta_required", "name (awf_first),name (awf_last),email");
-    addHiddenField("meta_tooltip", "");
-
-    // Add form data
-    addHiddenField("name (awf_first)", firstName);
-    addHiddenField("name (awf_last)", lastName);
-    addHiddenField("email", email);
-
-    document.body.appendChild(form);
-    form.submit();
-    
-    // Note: We don't show a separate toast for newsletter signup
-    // since it happens automatically in the background
-  };
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!email || !firstName || !lastName) {
-      toast({
-        title: "Missing information",
-        description: "Please fill in all required fields.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (!termsAccepted) {
-      toast({
-        title: "Terms required",
-        description: "Please accept the terms and conditions.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    signupMutation.mutate({
-      email,
-      firstName,
-      lastName,
-      company: company || undefined,
-      role: role || undefined,
-      feedback: feedback || undefined,
-      termsAccepted,
-      marketingConsent,
-    });
-  };
+  }, []);
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-muted/20">
@@ -162,26 +49,7 @@ export default function BetaTester() {
             </p>
           </div>
 
-          {/* Success Message */}
-          {signupMutation.isSuccess && (
-            <Card className="mb-6 border-green-200 bg-green-50 dark:bg-green-900/20 dark:border-green-800">
-              <CardContent className="pt-6">
-                <div className="flex items-center gap-3">
-                  <CheckCircle2 className="h-5 w-5 text-green-600 dark:text-green-400" />
-                  <div>
-                    <p className="font-semibold text-green-900 dark:text-green-100">
-                      Thank you for signing up!
-                    </p>
-                    <p className="text-sm text-green-700 dark:text-green-300">
-                      We've received your application. We'll send you beta access details soon.
-                    </p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Sign Up Form */}
+          {/* HubSpot Form */}
           <Card>
             <CardHeader>
               <CardTitle>Beta Tester Application</CardTitle>
@@ -190,152 +58,7 @@ export default function BetaTester() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <form onSubmit={handleSubmit} className="space-y-6">
-                {/* Name Fields */}
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <div className="space-y-2">
-                    <Label htmlFor="firstName">
-                      First Name <span className="text-red-500">*</span>
-                    </Label>
-                    <div className="relative">
-                      <User className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                      <Input
-                        id="firstName"
-                        type="text"
-                        placeholder="John"
-                        value={firstName}
-                        onChange={(e) => setFirstName(e.target.value)}
-                        className="pl-10"
-                        required
-                      />
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="lastName">
-                      Last Name <span className="text-red-500">*</span>
-                    </Label>
-                    <Input
-                      id="lastName"
-                      type="text"
-                      placeholder="Doe"
-                      value={lastName}
-                      onChange={(e) => setLastName(e.target.value)}
-                      required
-                    />
-                  </div>
-                </div>
-
-                {/* Email */}
-                <div className="space-y-2">
-                  <Label htmlFor="email">
-                    Email Address <span className="text-red-500">*</span>
-                  </Label>
-                  <div className="relative">
-                    <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      id="email"
-                      type="email"
-                      placeholder="you@example.com"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      className="pl-10"
-                      required
-                    />
-                  </div>
-                </div>
-
-                {/* Company & Role */}
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <div className="space-y-2">
-                    <Label htmlFor="company">Company / Organization (Optional)</Label>
-                    <Input
-                      id="company"
-                      type="text"
-                      placeholder="Your Company"
-                      value={company}
-                      onChange={(e) => setCompany(e.target.value)}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="role">Your Role (Optional)</Label>
-                    <Input
-                      id="role"
-                      type="text"
-                      placeholder="e.g., Developer, HR Manager"
-                      value={role}
-                      onChange={(e) => setRole(e.target.value)}
-                    />
-                  </div>
-                </div>
-
-                {/* Feedback */}
-                <div className="space-y-2">
-                  <Label htmlFor="feedback">
-                    Why are you interested in beta testing? (Optional)
-                  </Label>
-                  <textarea
-                    id="feedback"
-                    className="flex min-h-[100px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                    placeholder="Tell us what interests you about The JobBridge, Inc..."
-                    value={feedback}
-                    onChange={(e) => setFeedback(e.target.value)}
-                    rows={4}
-                  />
-                </div>
-
-                {/* Terms & Marketing */}
-                <div className="space-y-4">
-                  <div className="flex items-start space-x-2">
-                    <Checkbox
-                      id="terms"
-                      checked={termsAccepted}
-                      onCheckedChange={(checked) => setTermsAccepted(checked === true)}
-                      required
-                    />
-                    <Label htmlFor="terms" className="text-sm leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-                      I accept the{" "}
-                      <a href="/terms" className="text-primary hover:underline" target="_blank" rel="noopener noreferrer">
-                        Terms and Conditions
-                      </a>{" "}
-                      and{" "}
-                      <a href="/privacy" className="text-primary hover:underline" target="_blank" rel="noopener noreferrer">
-                        Privacy Policy
-                      </a>
-                      <span className="text-red-500">*</span>
-                    </Label>
-                  </div>
-                  <div className="flex items-start space-x-2">
-                    <Checkbox
-                      id="marketing"
-                      checked={marketingConsent}
-                      onCheckedChange={(checked) => setMarketingConsent(checked === true)}
-                    />
-                    <Label htmlFor="marketing" className="text-sm leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-                      I'd like to receive updates about new features and beta program news (also signs you up for our newsletter)
-                    </Label>
-                  </div>
-                </div>
-
-                {/* Submit Button */}
-                <Button
-                  type="submit"
-                  className="w-full"
-                  size="lg"
-                  disabled={signupMutation.isPending}
-                >
-                  {signupMutation.isPending ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Submitting...
-                    </>
-                  ) : (
-                    <>
-                      <Sparkles className="mr-2 h-4 w-4" />
-                      Join Beta Program
-                    </>
-                  )}
-                </Button>
-              </form>
+              <div className="hs-form-frame" data-region="na2" data-form-id="0dbbf15a-78b1-4ec3-8dd0-32cbb2ea1ad0" data-portal-id="244677572"></div>
             </CardContent>
           </Card>
 

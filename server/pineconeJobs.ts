@@ -183,3 +183,4 @@ export async function removeJobFromIndex(jobId: string) {
     console.error(`[Pinecone Jobs] Failed to remove job ${jobId}:`, error.message);
   }
 }
+
