@@ -34,6 +34,7 @@ interface StripeProductsResponse {
 interface Plan {
   name: string;
   role: 'participant' | 'job_developer' | 'employer' | 'free';
+  productId?: string; // Stripe product ID for matching
   subtitle?: string;
   price: string;
   period?: string;
@@ -42,6 +43,9 @@ interface Plan {
   yearlyPeriod?: string;
   yearlyPriceId?: string | null;
   sponsoredPriceId?: string | null;
+  // For Employer: multiple monthly prices
+  standardMonthlyPriceId?: string | null;
+  proMonthlyPriceId?: string | null;
   priceId: string | null; // Legacy - for backward compatibility
   popular?: boolean;
   description?: string;
@@ -80,6 +84,7 @@ const defaultPlans = [
   {
     name: "Participant (Job Seeker)",
     role: 'participant' as const,
+    productId: 'prod_TeEh1Ius7xT8RK', // Stripe product ID
     subtitle: "AI-powered job matching & career tools",
     price: "$29",
     period: "per month",
@@ -114,6 +119,7 @@ const defaultPlans = [
   {
     name: "Job Developer / Career Coach",
     role: 'job_developer' as const,
+    productId: 'prod_TeEmTY7xFiI9jv', // Stripe product ID
     subtitle: "Multi-participant coaching workspace",
     price: "$99",
     period: "per month per seat",
@@ -137,11 +143,14 @@ const defaultPlans = [
   {
     name: "Employer (HR Manager)",
     role: 'employer' as const,
+    productId: 'prod_TeEpvVK4Iozz9A', // Stripe product ID
     subtitle: "Inclusive Hiring Portal",
     price: "$199",
-    period: "per month",
+    period: "per month (Standard)",
     priceId: null,
     monthlyPriceId: null,
+    standardMonthlyPriceId: null,
+    proMonthlyPriceId: null,
     yearlyPriceId: null,
     description: "Employer hiring portal with inclusive job posts, candidate matching, and compliance tools.",
     features: [
@@ -159,7 +168,7 @@ export default function Pricing() {
   const [, setLocation] = useLocation();
   const { isAuthenticated } = useAuth();
   const { toast } = useToast();
-  const [selectedPrices, setSelectedPrices] = useState<Record<string, 'monthly' | 'yearly' | 'sponsored'>>({});
+  const [selectedPrices, setSelectedPrices] = useState<Record<string, 'monthly' | 'yearly' | 'sponsored' | 'standard' | 'pro'>>({});
 
   // Check for success/cancel from Stripe
   useEffect(() => {
@@ -231,42 +240,80 @@ export default function Pricing() {
     let monthlyPriceId: string | null = null;
     let yearlyPriceId: string | null = null;
     let sponsoredPriceId: string | null = null;
+    let standardMonthlyPriceId: string | null = null;
+    let proMonthlyPriceId: string | null = null;
     let priceId: string | null = null; // Legacy fallback
 
     if (productsData?.products) {
-      // Map by role-based product names
-      const productNameMap: Record<string, string> = {
-        'participant': 'JobBridge – Participant Access',
-        'job_developer': 'JobBridge – Job Developer Workspace',
-        'employer': 'JobBridge – Inclusive Hiring Portal',
-      };
+      // Match by product ID first (most reliable), then fall back to name
+      let matchingProduct = defaultPlan.productId 
+        ? productsData.products.find((product) => product.id === defaultPlan.productId)
+        : null;
 
-      const expectedProductName = productNameMap[defaultPlan.role];
-      const matchingProduct = productsData.products.find((product) => {
-        return product.name === expectedProductName || 
-               product.name.toLowerCase().includes(defaultPlan.role.toLowerCase());
-      });
+      // Fallback to name matching if product ID not found
+      if (!matchingProduct) {
+        const productNameMap: Record<string, string> = {
+          'participant': 'JobBridge – Participant Access',
+          'job_developer': 'JobBridge – Job Developer Workspace',
+          'employer': 'JobBridge – Inclusive Hiring Portal',
+        };
+        const expectedProductName = productNameMap[defaultPlan.role];
+        matchingProduct = productsData.products.find((product) => {
+          return product.name === expectedProductName || 
+                 product.name.toLowerCase().includes(defaultPlan.role.toLowerCase());
+        });
+      }
 
       if (matchingProduct?.prices) {
-        // Map prices by nickname or interval
-        for (const price of matchingProduct.prices) {
-          const nickname = (price.metadata?.nickname || '').toLowerCase();
-          const interval = (price.recurring_interval || '').toLowerCase();
-          
-          // Match by nickname first (most reliable)
-          if (nickname.includes('monthly') || nickname.includes('_core_monthly') || nickname.includes('_pro_monthly') || nickname.includes('_standard_monthly')) {
-            monthlyPriceId = price.id;
-            if (!priceId) priceId = price.id; // Legacy fallback
-          } else if (nickname.includes('annual') || nickname.includes('yearly') || nickname.includes('_core_annual') || nickname.includes('_pro_annual')) {
-            yearlyPriceId = price.id;
-          } else if (nickname.includes('sponsored') || nickname.includes('_sponsored')) {
-            sponsoredPriceId = price.id;
-          } else if (interval === 'month' && !monthlyPriceId) {
-            // Fallback: use interval if no nickname match
-            monthlyPriceId = price.id;
-            if (!priceId) priceId = price.id;
-          } else if (interval === 'year' && !yearlyPriceId) {
-            yearlyPriceId = price.id;
+        // For Employer: handle multiple monthly prices (Standard $199, Pro $399)
+        if (defaultPlan.role === 'employer') {
+          for (const price of matchingProduct.prices) {
+            const nickname = (price.metadata?.nickname || '').toLowerCase();
+            const interval = (price.recurring_interval || '').toLowerCase();
+            const amount = price.unit_amount || 0;
+            
+            if (interval === 'month') {
+              // Match by amount: $199 = Standard, $399 = Pro
+              if (amount === 19900) { // $199.00 in cents
+                standardMonthlyPriceId = price.id;
+                if (!priceId) priceId = price.id; // Legacy fallback
+              } else if (amount === 39900) { // $399.00 in cents
+                proMonthlyPriceId = price.id;
+              } else if (nickname.includes('standard')) {
+                standardMonthlyPriceId = price.id;
+                if (!priceId) priceId = price.id;
+              } else if (nickname.includes('pro')) {
+                proMonthlyPriceId = price.id;
+              } else if (!standardMonthlyPriceId) {
+                // Fallback: first monthly price is Standard
+                standardMonthlyPriceId = price.id;
+                if (!priceId) priceId = price.id;
+              }
+            } else if (interval === 'year') {
+              yearlyPriceId = price.id;
+            }
+          }
+        } else {
+          // For Participant and Job Developer: map prices by nickname or interval
+          for (const price of matchingProduct.prices) {
+            const nickname = (price.metadata?.nickname || '').toLowerCase();
+            const interval = (price.recurring_interval || '').toLowerCase();
+            
+            // Match by nickname first (most reliable)
+            if (nickname.includes('monthly') || nickname.includes('_core_monthly') || nickname.includes('_pro_monthly') || nickname.includes('_standard_monthly')) {
+              monthlyPriceId = price.id;
+              if (!priceId) priceId = price.id; // Legacy fallback
+            } else if (nickname.includes('annual') || nickname.includes('yearly') || nickname.includes('_core_annual') || nickname.includes('_pro_annual')) {
+              yearlyPriceId = price.id;
+            } else if (nickname.includes('sponsored') || nickname.includes('_sponsored')) {
+              sponsoredPriceId = price.id;
+            } else if (interval === 'month' && !monthlyPriceId) {
+              // Fallback: use interval if no nickname match
+              monthlyPriceId = price.id;
+              if (!priceId) priceId = price.id;
+            } else if (interval === 'year' && !yearlyPriceId) {
+              yearlyPriceId = price.id;
+            }
           }
         }
       }
@@ -277,6 +324,8 @@ export default function Pricing() {
       monthlyPriceId: monthlyPriceId || defaultPlan.monthlyPriceId,
       yearlyPriceId: yearlyPriceId || defaultPlan.yearlyPriceId,
       sponsoredPriceId: sponsoredPriceId || defaultPlan.sponsoredPriceId,
+      standardMonthlyPriceId: standardMonthlyPriceId || defaultPlan.standardMonthlyPriceId,
+      proMonthlyPriceId: proMonthlyPriceId || defaultPlan.proMonthlyPriceId,
       priceId: priceId || defaultPlan.priceId, // Legacy fallback
     };
   });
@@ -334,7 +383,37 @@ export default function Pricing() {
                   )}
                   <div className="mt-4">
                     {/* Price selection for plans with multiple prices */}
-                    {(plan.monthlyPriceId || plan.yearlyPriceId || plan.sponsoredPriceId) && (
+                    {/* For Employer: show Standard vs Pro options */}
+                    {plan.role === 'employer' && (plan.standardMonthlyPriceId || plan.proMonthlyPriceId) ? (
+                      <div className="mb-4 flex gap-2">
+                        {plan.standardMonthlyPriceId && (
+                          <button
+                            type="button"
+                            onClick={() => setSelectedPrices({ ...selectedPrices, [plan.name]: 'standard' })}
+                            className={`flex-1 px-3 py-2 text-sm rounded-md border transition-colors ${
+                              selectedPrices[plan.name] === 'standard' || !selectedPrices[plan.name]
+                                ? 'border-primary bg-primary/10 text-primary font-medium'
+                                : 'border-input bg-background text-muted-foreground hover:border-primary/50'
+                            }`}
+                          >
+                            Standard
+                          </button>
+                        )}
+                        {plan.proMonthlyPriceId && (
+                          <button
+                            type="button"
+                            onClick={() => setSelectedPrices({ ...selectedPrices, [plan.name]: 'pro' })}
+                            className={`flex-1 px-3 py-2 text-sm rounded-md border transition-colors ${
+                              selectedPrices[plan.name] === 'pro'
+                                ? 'border-primary bg-primary/10 text-primary font-medium'
+                                : 'border-input bg-background text-muted-foreground hover:border-primary/50'
+                            }`}
+                          >
+                            Pro
+                          </button>
+                        )}
+                      </div>
+                    ) : (plan.monthlyPriceId || plan.yearlyPriceId || plan.sponsoredPriceId) ? (
                       <div className="mb-4 flex gap-2">
                         {plan.monthlyPriceId && (
                           <button
@@ -376,31 +455,50 @@ export default function Pricing() {
                           </button>
                         )}
                       </div>
-                    )}
+                    ) : null}
                     
                     {/* Display selected price */}
                     <div>
-                      {(!selectedPrices[plan.name] || selectedPrices[plan.name] === 'monthly') && (
+                      {plan.role === 'employer' ? (
                         <>
-                          <span className="text-3xl font-bold">{plan.price}</span>
-                          {plan.period && (
-                            <span className="text-sm text-muted-foreground"> / {plan.period}</span>
+                          {(!selectedPrices[plan.name] || selectedPrices[plan.name] === 'standard') && plan.standardMonthlyPriceId && (
+                            <>
+                              <span className="text-3xl font-bold">$199</span>
+                              <span className="text-sm text-muted-foreground"> / per month (Standard)</span>
+                            </>
+                          )}
+                          {selectedPrices[plan.name] === 'pro' && plan.proMonthlyPriceId && (
+                            <>
+                              <span className="text-3xl font-bold">$399</span>
+                              <span className="text-sm text-muted-foreground"> / per month (Pro)</span>
+                            </>
                           )}
                         </>
-                      )}
-                      {selectedPrices[plan.name] === 'yearly' && plan.yearlyPrice && (
+                      ) : (
                         <>
-                          <span className="text-3xl font-bold">{plan.yearlyPrice}</span>
-                          {plan.yearlyPeriod && (
-                            <span className="text-sm text-muted-foreground"> / {plan.yearlyPeriod}</span>
+                          {(!selectedPrices[plan.name] || selectedPrices[plan.name] === 'monthly') && (
+                            <>
+                              <span className="text-3xl font-bold">{plan.price}</span>
+                              {plan.period && (
+                                <span className="text-sm text-muted-foreground"> / {plan.period}</span>
+                              )}
+                            </>
                           )}
-                        </>
-                      )}
-                      {selectedPrices[plan.name] === 'sponsored' && (
-                        <>
-                          <span className="text-3xl font-bold">$0</span>
-                          <span className="text-sm text-muted-foreground"> / to user</span>
-                          <p className="text-xs text-muted-foreground mt-1 italic">Billed to organization</p>
+                          {selectedPrices[plan.name] === 'yearly' && plan.yearlyPrice && (
+                            <>
+                              <span className="text-3xl font-bold">{plan.yearlyPrice}</span>
+                              {plan.yearlyPeriod && (
+                                <span className="text-sm text-muted-foreground"> / {plan.yearlyPeriod}</span>
+                              )}
+                            </>
+                          )}
+                          {selectedPrices[plan.name] === 'sponsored' && (
+                            <>
+                              <span className="text-3xl font-bold">$0</span>
+                              <span className="text-sm text-muted-foreground"> / to user</span>
+                              <p className="text-xs text-muted-foreground mt-1 italic">Billed to organization</p>
+                            </>
+                          )}
                         </>
                       )}
                     </div>
@@ -427,18 +525,31 @@ export default function Pricing() {
                       // Note: Beta/Waitlist users don't have Stripe products - handled via feature flags
 
                       // Determine which priceId to use based on selection
-                      const priceSelection = selectedPrices[plan.name] || 'monthly';
+                      const priceSelection = selectedPrices[plan.name] || (plan.role === 'employer' ? 'standard' : 'monthly');
                       let selectedPriceId: string | null = null;
 
-                      if (priceSelection === 'monthly' && plan.monthlyPriceId) {
-                        selectedPriceId = plan.monthlyPriceId;
-                      } else if (priceSelection === 'yearly' && plan.yearlyPriceId) {
-                        selectedPriceId = plan.yearlyPriceId;
-                      } else if (priceSelection === 'sponsored' && plan.sponsoredPriceId) {
-                        selectedPriceId = plan.sponsoredPriceId;
+                      if (plan.role === 'employer') {
+                        // Employer: Standard vs Pro
+                        if (priceSelection === 'standard' && plan.standardMonthlyPriceId) {
+                          selectedPriceId = plan.standardMonthlyPriceId;
+                        } else if (priceSelection === 'pro' && plan.proMonthlyPriceId) {
+                          selectedPriceId = plan.proMonthlyPriceId;
+                        } else {
+                          // Fallback to Standard
+                          selectedPriceId = plan.standardMonthlyPriceId || plan.proMonthlyPriceId || plan.priceId || null;
+                        }
                       } else {
-                        // Fallback to legacy priceId or first available
-                        selectedPriceId = plan.priceId || plan.monthlyPriceId || plan.yearlyPriceId || null;
+                        // Participant and Job Developer: Monthly/Yearly/Sponsored
+                        if (priceSelection === 'monthly' && plan.monthlyPriceId) {
+                          selectedPriceId = plan.monthlyPriceId;
+                        } else if (priceSelection === 'yearly' && plan.yearlyPriceId) {
+                          selectedPriceId = plan.yearlyPriceId;
+                        } else if (priceSelection === 'sponsored' && plan.sponsoredPriceId) {
+                          selectedPriceId = plan.sponsoredPriceId;
+                        } else {
+                          // Fallback to legacy priceId or first available
+                          selectedPriceId = plan.priceId || plan.monthlyPriceId || plan.yearlyPriceId || null;
+                        }
                       }
 
                       // Sponsored pricing - redirect to contact
