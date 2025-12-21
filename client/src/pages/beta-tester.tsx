@@ -8,7 +8,7 @@ import { Sparkles } from "lucide-react";
 export default function BetaTester() {
   const [, setLocation] = useLocation();
 
-  // Load HubSpot forms script
+  // Load HubSpot forms script and apply custom styling
   useEffect(() => {
     // Check if script is already loaded
     if (document.querySelector('script[src*="hsforms.net"]')) {
@@ -20,11 +20,250 @@ export default function BetaTester() {
     script.defer = true;
     document.head.appendChild(script);
 
+    // Add custom CSS for HubSpot form accessibility and styling
+    const style = document.createElement('style');
+    style.textContent = `
+      /* HubSpot Form Accessibility & Design Styling */
+      .hs-form-frame {
+        font-family: var(--font-sans, Inter, system-ui, sans-serif);
+      }
+
+      /* Form container */
+      .hs-form-frame .hs-form {
+        display: flex;
+        flex-direction: column;
+        gap: 1.5rem;
+      }
+
+      /* Field groups */
+      .hs-form-frame .hs-form-field {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+        margin-bottom: 0;
+      }
+
+      /* Labels - High contrast, clear typography */
+      .hs-form-frame label {
+        font-size: 0.875rem;
+        font-weight: 500;
+        color: hsl(var(--foreground));
+        line-height: 1.5;
+        margin-bottom: 0.375rem;
+      }
+
+      .hs-form-frame label.hs-form-required:after {
+        content: " *";
+        color: hsl(0 84% 45%);
+        font-weight: 600;
+      }
+
+      /* Input fields - Match design system */
+      .hs-form-frame input[type="text"],
+      .hs-form-frame input[type="email"],
+      .hs-form-frame input[type="tel"],
+      .hs-form-frame input[type="number"],
+      .hs-form-frame textarea,
+      .hs-form-frame select {
+        width: 100%;
+        min-height: 2.75rem;
+        padding: 0.625rem 0.875rem;
+        font-size: 0.875rem;
+        line-height: 1.5;
+        color: hsl(var(--foreground));
+        background-color: hsl(var(--background));
+        border: 1px solid hsl(var(--input));
+        border-radius: 0.5625rem;
+        transition: all 0.2s ease;
+        font-family: inherit;
+      }
+
+      /* Focus states - High visibility for accessibility */
+      .hs-form-frame input:focus,
+      .hs-form-frame textarea:focus,
+      .hs-form-frame select:focus {
+        outline: none;
+        border-color: hsl(var(--primary));
+        box-shadow: 0 0 0 3px hsl(var(--primary) / 0.1);
+      }
+
+      /* Hover states */
+      .hs-form-frame input:hover,
+      .hs-form-frame textarea:hover,
+      .hs-form-frame select:hover {
+        border-color: hsl(var(--input) / 0.8);
+      }
+
+      /* Textarea */
+      .hs-form-frame textarea {
+        min-height: 6rem;
+        resize: vertical;
+      }
+
+      /* Select dropdowns */
+      .hs-form-frame select {
+        cursor: pointer;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23333' d='M6 9L1 4h10z'/%3E%3C/svg%3E");
+        background-repeat: no-repeat;
+        background-position: right 0.75rem center;
+        background-size: 0.75rem;
+        padding-right: 2.5rem;
+        appearance: none;
+      }
+
+      /* Checkboxes and radio buttons - Larger touch targets */
+      .hs-form-frame input[type="checkbox"],
+      .hs-form-frame input[type="radio"] {
+        width: 1.25rem;
+        height: 1.25rem;
+        min-width: 1.25rem;
+        min-height: 1.25rem;
+        margin-right: 0.5rem;
+        cursor: pointer;
+        accent-color: hsl(var(--primary));
+      }
+
+      .hs-form-frame .hs-form-radio {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        margin-bottom: 0.5rem;
+      }
+
+      .hs-form-frame .hs-form-radio label {
+        margin-bottom: 0;
+        cursor: pointer;
+      }
+
+      /* Submit button - Match design system */
+      .hs-form-frame input[type="submit"],
+      .hs-form-frame .hs-button {
+        min-height: 2.75rem;
+        padding: 0.625rem 1.5rem;
+        font-size: 0.875rem;
+        font-weight: 500;
+        color: hsl(var(--primary-foreground));
+        background-color: hsl(var(--primary));
+        border: 1px solid hsl(var(--primary-border));
+        border-radius: 0.5625rem;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        font-family: inherit;
+        width: 100%;
+        margin-top: 0.5rem;
+      }
+
+      .hs-form-frame input[type="submit"]:hover,
+      .hs-form-frame .hs-button:hover {
+        opacity: 0.9;
+        transform: translateY(-1px);
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      }
+
+      .hs-form-frame input[type="submit"]:focus,
+      .hs-form-frame .hs-button:focus {
+        outline: none;
+        box-shadow: 0 0 0 3px hsl(var(--primary) / 0.2);
+      }
+
+      .hs-form-frame input[type="submit"]:active,
+      .hs-form-frame .hs-button:active {
+        transform: translateY(0);
+      }
+
+      /* Error messages - High contrast, clear */
+      .hs-form-frame .hs-error-msgs {
+        list-style: none;
+        padding: 0;
+        margin: 0.375rem 0 0 0;
+      }
+
+      .hs-form-frame .hs-error-msgs li {
+        color: hsl(0 84% 45%);
+        font-size: 0.8125rem;
+        margin-top: 0.25rem;
+        display: flex;
+        align-items: center;
+        gap: 0.375rem;
+      }
+
+      .hs-form-frame .hs-error-msgs li:before {
+        content: "⚠";
+        font-size: 1rem;
+      }
+
+      /* Success messages */
+      .hs-form-frame .hs-main-font-element {
+        color: hsl(var(--foreground));
+        font-size: 0.875rem;
+        line-height: 1.5;
+      }
+
+      /* Field descriptions/help text */
+      .hs-form-frame .hs-field-desc {
+        font-size: 0.8125rem;
+        color: hsl(var(--muted-foreground));
+        margin-top: 0.25rem;
+        line-height: 1.4;
+      }
+
+      /* Required field indicator */
+      .hs-form-frame .hs-form-required {
+        color: hsl(var(--foreground));
+      }
+
+      /* Loading state */
+      .hs-form-frame .hs-submit-loading {
+        opacity: 0.6;
+        cursor: not-allowed;
+      }
+
+      /* Dark mode support */
+      @media (prefers-color-scheme: dark) {
+        .hs-form-frame input[type="text"],
+        .hs-form-frame input[type="email"],
+        .hs-form-frame input[type="tel"],
+        .hs-form-frame input[type="number"],
+        .hs-form-frame textarea,
+        .hs-form-frame select {
+          background-color: hsl(var(--background));
+          color: hsl(var(--foreground));
+        }
+      }
+
+      /* Responsive adjustments */
+      @media (max-width: 640px) {
+        .hs-form-frame input[type="text"],
+        .hs-form-frame input[type="email"],
+        .hs-form-frame input[type="tel"],
+        .hs-form-frame input[type="number"],
+        .hs-form-frame textarea,
+        .hs-form-frame select {
+          font-size: 1rem; /* Prevent zoom on iOS */
+        }
+      }
+
+      /* Ensure proper spacing */
+      .hs-form-frame .hs-form-field:last-child {
+        margin-bottom: 0;
+      }
+
+      /* Accessibility: Ensure all interactive elements are keyboard accessible */
+      .hs-form-frame *:focus-visible {
+        outline: 2px solid hsl(var(--primary));
+        outline-offset: 2px;
+      }
+    `;
+    document.head.appendChild(style);
+
     // Cleanup function
     return () => {
       const existingScript = document.querySelector('script[src*="hsforms.net"]');
       if (existingScript) {
         existingScript.remove();
+      }
+      if (style.parentNode) {
+        style.parentNode.removeChild(style);
       }
     };
   }, []);
