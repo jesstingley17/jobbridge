@@ -12,17 +12,43 @@ export default function BetaTester() {
   useEffect(() => {
     // Check if script is already loaded
     if (document.querySelector('script[src*="hsforms.net"]')) {
+      // Script already loaded, just apply styles
+      applyHubSpotStyles();
       return;
     }
 
     const script = document.createElement('script');
     script.src = 'https://js-na2.hsforms.net/forms/embed/244677572.js';
     script.defer = true;
+    
+    // Wait for script to load, then wait for form to render
+    script.onload = () => {
+      // Wait for form to be injected into DOM
+      const checkForm = setInterval(() => {
+        const formFrame = document.querySelector('.hs-form-frame');
+        if (formFrame && formFrame.querySelector('.hs-form')) {
+          clearInterval(checkForm);
+          applyHubSpotStyles();
+        }
+      }, 100);
+      
+      // Stop checking after 10 seconds
+      setTimeout(() => clearInterval(checkForm), 10000);
+    };
+    
     document.head.appendChild(script);
 
-    // Add custom CSS for HubSpot form accessibility and styling
-    const style = document.createElement('style');
-    style.textContent = `
+    // Apply styles function
+    function applyHubSpotStyles() {
+      // Check if styles already applied
+      if (document.getElementById('hubspot-form-custom-styles')) {
+        return;
+      }
+
+      // Add custom CSS for HubSpot form accessibility and styling
+      const style = document.createElement('style');
+      style.id = 'hubspot-form-custom-styles';
+      style.textContent = `
       /* HubSpot Form Accessibility & Design Styling */
       .hs-form-frame {
         font-family: var(--font-sans, Inter, system-ui, sans-serif);
@@ -250,20 +276,78 @@ export default function BetaTester() {
 
       /* Accessibility: Ensure all interactive elements are keyboard accessible */
       .hs-form-frame *:focus-visible {
-        outline: 2px solid hsl(var(--primary));
-        outline-offset: 2px;
+        outline: 2px solid hsl(var(--primary)) !important;
+        outline-offset: 2px !important;
+      }
+
+      /* Override HubSpot's default styles with !important where needed */
+      .hs-form-frame .hs-form input[type="text"],
+      .hs-form-frame .hs-form input[type="email"],
+      .hs-form-frame .hs-form input[type="tel"],
+      .hs-form-frame .hs-form input[type="number"],
+      .hs-form-frame .hs-form textarea,
+      .hs-form-frame .hs-form select {
+        width: 100% !important;
+        min-height: 2.75rem !important;
+        padding: 0.625rem 0.875rem !important;
+        font-size: 0.875rem !important;
+        line-height: 1.5 !important;
+        color: hsl(var(--foreground)) !important;
+        background-color: hsl(var(--background)) !important;
+        border: 1px solid hsl(var(--input)) !important;
+        border-radius: 0.5625rem !important;
+        font-family: var(--font-sans, Inter, system-ui, sans-serif) !important;
+      }
+
+      .hs-form-frame .hs-form input[type="text"]:focus,
+      .hs-form-frame .hs-form input[type="email"]:focus,
+      .hs-form-frame .hs-form input[type="tel"]:focus,
+      .hs-form-frame .hs-form input[type="number"]:focus,
+      .hs-form-frame .hs-form textarea:focus,
+      .hs-form-frame .hs-form select:focus {
+        border-color: hsl(var(--primary)) !important;
+        box-shadow: 0 0 0 3px hsl(var(--primary) / 0.1) !important;
+        outline: none !important;
+      }
+
+      .hs-form-frame .hs-form input[type="submit"],
+      .hs-form-frame .hs-form .hs-button {
+        min-height: 2.75rem !important;
+        padding: 0.625rem 1.5rem !important;
+        font-size: 0.875rem !important;
+        font-weight: 500 !important;
+        color: hsl(var(--primary-foreground)) !important;
+        background-color: hsl(var(--primary)) !important;
+        border: 1px solid hsl(var(--primary-border)) !important;
+        border-radius: 0.5625rem !important;
+        width: 100% !important;
+        font-family: var(--font-sans, Inter, system-ui, sans-serif) !important;
+      }
+
+      .hs-form-frame .hs-form label {
+        font-size: 0.875rem !important;
+        font-weight: 500 !important;
+        color: hsl(var(--foreground)) !important;
+        font-family: var(--font-sans, Inter, system-ui, sans-serif) !important;
       }
     `;
-    document.head.appendChild(style);
+      document.head.appendChild(style);
+    }
+
+    // Apply styles immediately (in case form is already loaded)
+    applyHubSpotStyles();
+
+    // Also try applying after a delay to catch late-loading forms
+    const delayedApply = setTimeout(() => {
+      applyHubSpotStyles();
+    }, 2000);
 
     // Cleanup function
     return () => {
-      const existingScript = document.querySelector('script[src*="hsforms.net"]');
-      if (existingScript) {
-        existingScript.remove();
-      }
-      if (style.parentNode) {
-        style.parentNode.removeChild(style);
+      clearTimeout(delayedApply);
+      const existingStyle = document.getElementById('hubspot-form-custom-styles');
+      if (existingStyle && existingStyle.parentNode) {
+        existingStyle.parentNode.removeChild(existingStyle);
       }
     };
   }, []);
