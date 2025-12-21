@@ -1,6 +1,6 @@
 import { build as esbuild } from "esbuild";
 import { build as viteBuild } from "vite";
-import { rm, readFile, cp, mkdir } from "fs/promises";
+import { rm, readFile, cp, mkdir, readdir } from "fs/promises";
 import { existsSync } from "fs";
 import { join } from "path";
 
@@ -106,8 +106,13 @@ async function buildAll() {
     }
     
     // Copy all server files (but exclude node_modules if any)
-    const serverFiles = await import("fs/promises").then(m => m.readdir("server", { withFileTypes: true }));
+    const serverFiles = await readdir("server", { withFileTypes: true });
     for (const file of serverFiles) {
+      // Skip node_modules and other non-essential directories
+      if (file.name === "node_modules" || file.name.startsWith(".")) {
+        continue;
+      }
+      
       const sourcePath = join("server", file.name);
       const destPath = join(apiServerPath, file.name);
       
@@ -117,8 +122,8 @@ async function buildAll() {
           await rm(destPath, { recursive: true, force: true });
         }
         await cp(sourcePath, destPath, { recursive: true });
-      } else if (file.isFile() && file.name.endsWith('.ts')) {
-        // Copy TypeScript files
+      } else if (file.isFile() && (file.name.endsWith('.ts') || file.name.endsWith('.js'))) {
+        // Copy TypeScript and JavaScript files
         await cp(sourcePath, destPath);
       }
     }
