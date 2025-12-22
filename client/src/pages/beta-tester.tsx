@@ -14,6 +14,10 @@ export default function BetaTester() {
     if (document.querySelector('script[src*="hsforms.net/forms/embed"]')) {
       // Script already loaded, just apply styles
       applyHubSpotStyles();
+      // Also check for form after a delay
+      setTimeout(() => {
+        applyHubSpotStyles();
+      }, 1000);
       return;
     }
 
@@ -23,17 +27,21 @@ export default function BetaTester() {
     
     // Wait for script to load, then wait for form to render
     script.onload = () => {
-      // Wait for form to be injected into DOM
+      // Wait for form to be injected into DOM (HubSpot auto-renders forms)
       const checkForm = setInterval(() => {
         const formContainer = document.querySelector('[data-form-id="0dbbf15a-78b1-4ec3-8dd0-32cbb2ea1ad0"]');
-        if (formContainer && (formContainer.querySelector('.hs-form') || formContainer.querySelector('form'))) {
+        if (formContainer && (formContainer.querySelector('.hs-form') || formContainer.querySelector('form') || formContainer.innerHTML.trim().length > 0)) {
           clearInterval(checkForm);
           applyHubSpotStyles();
         }
-      }, 100);
+      }, 200);
       
-      // Stop checking after 10 seconds
-      setTimeout(() => clearInterval(checkForm), 10000);
+      // Stop checking after 15 seconds
+      setTimeout(() => clearInterval(checkForm), 15000);
+    };
+    
+    script.onerror = () => {
+      console.error('Failed to load HubSpot forms script');
     };
     
     document.head.appendChild(script);
@@ -578,14 +586,24 @@ export default function BetaTester() {
     // Apply styles immediately (in case form is already loaded)
     applyHubSpotStyles();
 
-    // Also try applying after a delay to catch late-loading forms
-    const delayedApply = setTimeout(() => {
+    // Also try applying after delays to catch late-loading forms
+    const delayedApply1 = setTimeout(() => {
       applyHubSpotStyles();
-    }, 2000);
+    }, 1000);
+    
+    const delayedApply2 = setTimeout(() => {
+      applyHubSpotStyles();
+    }, 3000);
+    
+    const delayedApply3 = setTimeout(() => {
+      applyHubSpotStyles();
+    }, 5000);
 
     // Cleanup function
     return () => {
-      clearTimeout(delayedApply);
+      clearTimeout(delayedApply1);
+      clearTimeout(delayedApply2);
+      clearTimeout(delayedApply3);
       const existingStyle = document.getElementById('hubspot-form-custom-styles');
       if (existingStyle && existingStyle.parentNode) {
         existingStyle.parentNode.removeChild(existingStyle);
