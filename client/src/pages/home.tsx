@@ -54,12 +54,7 @@ const features = [
   },
 ];
 
-const stats = [
-  { value: "10,000+", label: "Job Seekers Helped" },
-  { value: "95%", label: "Accessibility Rating" },
-  { value: "500+", label: "Inclusive Employers" },
-  { value: "4.9/5", label: "User Satisfaction" },
-];
+// Stats removed per user request
 
 const howItWorks = [
   {
@@ -724,22 +719,6 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Trust Indicators */}
-      <section className="border-y bg-muted/30 py-8" aria-labelledby="stats-heading">
-        <h2 id="stats-heading" className="sr-only">Platform Statistics</h2>
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-2 gap-8 md:grid-cols-4">
-            {stats.map((stat) => (
-              <div key={stat.label} className="text-center">
-                <p className="text-3xl font-bold text-primary md:text-4xl" data-testid={`text-stat-${stat.label.toLowerCase().replace(/\s+/g, "-")}`}>
-                  {stat.value}
-                </p>
-                <p className="mt-1 text-sm text-muted-foreground">{stat.label}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
 
       {/* Features Section */}
       <section className="py-20 md:py-32" aria-labelledby="features-heading">

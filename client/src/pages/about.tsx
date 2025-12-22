@@ -237,34 +237,6 @@ export default function About() {
         </div>
       </section>
 
-      {/* Impact Section */}
-      <section className="py-20 md:py-32" aria-labelledby="impact-heading">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="mx-auto max-w-4xl text-center">
-            <h2 id="impact-heading" className="text-3xl tracking-tight md:text-4xl mb-8">
-              Our Impact
-            </h2>
-            <div className="grid gap-8 md:grid-cols-3 mb-12">
-              {[
-                { value: "10,000+", label: "Job Seekers Helped" },
-                { value: "500+", label: "Inclusive Employers" },
-                { value: "95%", label: "Accessibility Rating" },
-              ].map((stat) => (
-                <div key={stat.label}>
-                  <p className="text-4xl text-blue-700 dark:text-blue-400 mb-2">
-                    {stat.value}
-                  </p>
-                  <p className="text-muted-foreground">{stat.label}</p>
-                </div>
-              ))}
-            </div>
-            <p className="text-lg text-muted-foreground leading-relaxed">
-              Every number represents a life changed, a career launched, and a barrier broken. 
-              We&apos;re proud of what we&apos;ve accomplished, but we know there&apos;s so much more work to do.
-            </p>
-          </div>
-        </div>
-      </section>
 
       {/* CTA Section */}
       <section className="dark:bg-blue-700 py-20 bg-[rgba(20,71,230,0.57)]" aria-labelledby="cta-heading">
