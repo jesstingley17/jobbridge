@@ -2617,7 +2617,8 @@ Return JSON with:
               interval: price.recurring.interval,
               interval_count: price.recurring.interval_count
             } : null,
-            recurring_interval: price.recurring?.interval || null
+            recurring_interval: price.recurring?.interval || null,
+            metadata: price.metadata || {}
           });
         }
       }
