@@ -122,9 +122,9 @@ const defaultPlans = [
     productId: 'prod_TeEmTY7xFiI9jv', // Stripe product ID
     subtitle: "Multi-participant coaching workspace",
     price: "$99",
-    period: "per month per seat",
+    period: "per month",
     yearlyPrice: "$999",
-    yearlyPeriod: "per year per seat",
+    yearlyPeriod: "per year",
     monthlyPriceId: null,
     yearlyPriceId: null,
     priceId: null,
