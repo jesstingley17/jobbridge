@@ -25,6 +25,7 @@ const navItems = [
   // { href: "/community", label: "Community" }, // Hidden for now
   { href: "/pricing", label: "Pricing" },
   { href: "/beta-tester", label: "Beta" },
+  { href: "https://careers.thejobbridge-inc.com/", label: "Careers", external: true },
 ];
 
 export function Navbar() {
@@ -98,18 +99,35 @@ export function Navbar() {
             </Link>
 
             <div className="hidden md:flex md:items-center md:gap-6">
-              {navItems.map((item) => (
-                <Link 
-                  key={item.href} 
-                  href={item.href}
-                  className={`text-sm font-medium transition-colors hover:text-primary ${
-                    location === item.href ? "text-primary" : "text-foreground"
-                  }`}
-                  data-testid={`link-nav-${item.label.toLowerCase().replace(/\s+/g, "-")}`}
-                >
-                  {item.label}
-                </Link>
-              ))}
+              {navItems.map((item) => {
+                const isExternal = (item as any).external === true;
+                if (isExternal) {
+                  return (
+                    <a
+                      key={item.href}
+                      href={item.href}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-sm font-medium transition-colors hover:text-primary text-foreground"
+                      data-testid={`link-nav-${item.label.toLowerCase().replace(/\s+/g, "-")}`}
+                    >
+                      {item.label}
+                    </a>
+                  );
+                }
+                return (
+                  <Link 
+                    key={item.href} 
+                    href={item.href}
+                    className={`text-sm font-medium transition-colors hover:text-primary ${
+                      location === item.href ? "text-primary" : "text-foreground"
+                    }`}
+                    data-testid={`link-nav-${item.label.toLowerCase().replace(/\s+/g, "-")}`}
+                  >
+                    {item.label}
+                  </Link>
+                );
+              })}
             </div>
 
             <div className="flex items-center gap-2">
@@ -204,18 +222,40 @@ export function Navbar() {
               aria-label="Mobile navigation"
             >
               <div className="flex flex-col gap-2">
-                {navItems.map((item) => (
-                  <Link key={item.href} href={item.href}>
-                    <Button
-                      variant={location === item.href ? "secondary" : "ghost"}
-                      className="w-full justify-start gap-3"
-                      onClick={() => setIsOpen(false)}
-                      data-testid={`link-mobile-${item.label.toLowerCase().replace(/\s+/g, "-")}`}
-                    >
-                      {item.label}
-                    </Button>
-                  </Link>
-                ))}
+                {navItems.map((item) => {
+                  const isExternal = (item as any).external === true;
+                  if (isExternal) {
+                    return (
+                      <a
+                        key={item.href}
+                        href={item.href}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={() => setIsOpen(false)}
+                        data-testid={`link-mobile-${item.label.toLowerCase().replace(/\s+/g, "-")}`}
+                      >
+                        <Button
+                          variant="ghost"
+                          className="w-full justify-start gap-3"
+                        >
+                          {item.label}
+                        </Button>
+                      </a>
+                    );
+                  }
+                  return (
+                    <Link key={item.href} href={item.href}>
+                      <Button
+                        variant={location === item.href ? "secondary" : "ghost"}
+                        className="w-full justify-start gap-3"
+                        onClick={() => setIsOpen(false)}
+                        data-testid={`link-mobile-${item.label.toLowerCase().replace(/\s+/g, "-")}`}
+                      >
+                        {item.label}
+                      </Button>
+                    </Link>
+                  );
+                })}
               </div>
             </div>
           )}
