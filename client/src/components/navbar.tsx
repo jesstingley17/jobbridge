@@ -21,8 +21,8 @@ const navItems = [
   { href: "/", label: "Home" },
   { href: "/about", label: "About" },
   { href: "/features", label: "Features" },
-  { href: "/blog", label: "Blog" },
-  { href: "/community", label: "Community" },
+  // { href: "/blog", label: "Blog" }, // Hidden for now
+  // { href: "/community", label: "Community" }, // Hidden for now
   { href: "/pricing", label: "Pricing" },
   { href: "/beta-tester", label: "Beta" },
 ];
