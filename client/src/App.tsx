@@ -1,5 +1,6 @@
 import { Switch, Route, useLocation } from "wouter";
 import { ClerkProvider } from "@clerk/clerk-react";
+import { Analytics } from "@vercel/analytics/react";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -141,6 +142,7 @@ function App() {
           <Toaster />
           <AIChatAssistant />
           <CookieConsent />
+          <Analytics />
         </SubscriptionProvider>
       </TooltipProvider>
     </QueryClientProvider>
